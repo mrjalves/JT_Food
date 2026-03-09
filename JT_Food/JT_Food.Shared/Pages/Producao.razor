@@ -1,0 +1,171 @@
+@page "/producao"
+@using JT_Food.Shared.Models
+@using JT_Food.Shared.Services
+@using JT_Food.Shared.BusinessLogic
+@using JT_UserInterface.Shared.Components
+
+<PageTitle>Produção e Baixa de Insumos - JT Food</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Painel de Produção (FIFO)</h1>
+    </div>
+
+    @if (!string.IsNullOrEmpty(mensagemAlerta))
+    {
+        <div class="alert @classeAlerta alert-dismissible fade show" role="alert">
+            @mensagemAlerta
+            <button type="button" class="btn-close" @onclick="LimparAlerta"></button>
+        </div>
+    }
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Nova Produção</h5>
+                    <p class="card-text text-muted">A produção consumirá insumos baseados no método FIFO (lote mais antigo primeiro).</p>
+
+                    <div class="mb-3">
+                        <label class="form-label">Produto a Produzir (Requer Receita)</label>
+                        <select class="form-select" @bind="produtoSelecionadoId">
+                            <option value="">Selecione um Produto...</option>
+                            @foreach (var prod in produtosComReceita)
+                            {
+                                <option value="@prod.Id">@prod.Nome</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Quantidade Produzida</label>
+                        <input type="number" class="form-control" @bind="quantidadeProduzida" min="1" step="1" />
+                    </div>
+
+                    <button class="btn btn-primary w-100" @onclick="RegistrarProducao" disabled="@isProcessando">
+                        @if (isProcessando)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span>Processando...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-bolt me-2"></i> <span>Registrar Produção</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Últimas Produções</h5>
+                    @if (historicoProducao.Count == 0)
+                    {
+                        <p class="text-muted">Nenhum registro de produção recente.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Produto</th>
+                                        <th>Qtd</th>
+                                        <th>Custo Calc.</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var prod in historicoProducao.OrderByDescending(x => x.DataProducao).Take(5))
+                                    {
+                                        <tr>
+                                            <td>@prod.DataProducao.ToString("dd/MM HH:mm")</td>
+                                            <td>@prod.NomeProduto</td>
+                                            <td>@prod.QuantidadeProduzida</td>
+                                            <td>R$ @prod.CustoTotalCalculado.ToString("F2")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<MProduto> produtosComReceita = new();
+    private List<MProducao> historicoProducao = new();
+    
+    private string produtoSelecionadoId = "";
+    private double quantidadeProduzida = 1;
+
+    private bool isProcessando = false;
+    private string mensagemAlerta = "";
+    private string classeAlerta = "alert-success";
+
+    private string CurrentUserId = "1"; // TODO: Bind to Auth later.
+
+    protected override void OnInitialized()
+    {
+        CarregarDados();
+    }
+
+    private void CarregarDados()
+    {
+        // Pega todos os produtos que possuem receita associada (flag) ou que estão vinculados a MReceita
+        // Para simplificar, pegamos todos, mas o correto seria filtrar por PossuiReceita == true
+        produtosComReceita = ProdutoService.Find("PossuiReceita = 1");
+        historicoProducao = ProducaoService.GetAll() ?? new List<MProducao>();
+    }
+
+    private async Task RegistrarProducao()
+    {
+        LimparAlerta();
+        
+        if (string.IsNullOrEmpty(produtoSelecionadoId) || quantidadeProduzida <= 0)
+        {
+            ExibirAlerta("Selecione um produto e uma quantidade válida.", "alert-warning");
+            return;
+        }
+
+        isProcessando = true;
+        StateHasChanged();
+
+        // Simulate a slight delay to block UI (and show spinner) during calculation.
+        await Task.Delay(300); 
+
+        var resultado = ProducaoLogic.ProcessarProducao(produtoSelecionadoId, quantidadeProduzida, CurrentUserId);
+
+        if (resultado.Sucesso)
+        {
+            ExibirAlerta(resultado.Mensagem, "alert-success");
+            // Refresh history
+            CarregarDados();
+            quantidadeProduzida = 1;
+            produtoSelecionadoId = "";
+        }
+        else
+        {
+            ExibirAlerta(resultado.Mensagem, "alert-danger");
+        }
+
+        isProcessando = false;
+        StateHasChanged();
+    }
+
+    private void ExibirAlerta(string mensagem, string classe)
+    {
+        mensagemAlerta = mensagem;
+        classeAlerta = classe;
+    }
+
+    private void LimparAlerta()
+    {
+        mensagemAlerta = "";
+    }
+}

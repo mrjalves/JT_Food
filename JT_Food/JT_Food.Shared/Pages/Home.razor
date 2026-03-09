@@ -1,7 +1,46 @@
 ﻿@page "/"
+@using JT_UserInterface.Shared.Components
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Home - JT Food</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 text-primary">Painel de Controle - JT Food</h1>
+            <p class="text-muted">Bem-vindo ao sistema de gestão de restaurante e pedidos.</p>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Comandas Abertas</h5>
+                    <p class="card-text fs-2">0</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Mesas Ocupadas</h5>
+                    <p class="card-text fs-2">0</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Itens no Menu</h5>
+                    <p class="card-text fs-2">0</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
-Welcome to your new app.
+@code {
+    protected override void OnInitialized()
+    {
+        // Load stats here later
+    }
+}

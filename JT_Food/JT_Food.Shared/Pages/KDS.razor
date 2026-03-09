@@ -1,0 +1,248 @@
+@page "/kds"
+@using JT_Food.Shared.Models
+@using JT_Food.Shared.Services
+@using JT_Food.Shared.BusinessLogic
+@implements IDisposable
+
+<PageTitle>KDS - Cozinha | JT Food</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h3 mb-0"><i class="fas fa-tv text-danger me-2"></i>KDS — Cozinha</h1>
+            <small class="text-muted">Atualização automática a cada 30s. Última: @ultimaAtualizacao.ToString("HH:mm:ss")</small>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="CarregarItens">
+            <i class="fas fa-sync-alt me-1"></i> Atualizar Agora
+        </button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(mensagemAlerta))
+    {
+        <div class="alert @classeAlerta alert-dismissible fade show" role="alert">
+            @mensagemAlerta
+            <button type="button" class="btn-close" @onclick="LimparAlerta"></button>
+        </div>
+    }
+
+    <div class="row g-3">
+        <!-- Coluna: Pendentes -->
+        <div class="col-md-6">
+            <div class="card border-warning shadow-sm h-100">
+                <div class="card-header bg-warning text-dark fw-bold d-flex justify-content-between">
+                    <span><i class="fas fa-clock me-2"></i>PENDENTES</span>
+                    <span class="badge bg-dark">@itensPendentes.Count</span>
+                </div>
+                <div class="card-body p-2" style="overflow-y:auto; max-height:70vh;">
+                    @if (!itensPendentes.Any())
+                    {
+                        <div class="text-center text-muted py-5">
+                            <i class="fas fa-check-circle fa-3x mb-2 text-success"></i>
+                            <p>Nenhum item pendente!</p>
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var item in itensPendentes)
+                        {
+                            var adicionais = adicionaisPorItem.GetValueOrDefault(item.Id.ToString(), new());
+                            <div class="card mb-2 border-warning">
+                                <div class="card-body py-2 px-3">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <strong class="fs-5">@item.NomeProduto</strong>
+                                            <span class="ms-2 badge bg-dark fs-6">x @item.Quantidade</span>
+                                            <br />
+                                            <small class="text-muted">
+                                                Comanda #@item.ComandaId
+                                                @if (!string.IsNullOrEmpty(ObterMesaDaComanda(item.ComandaId)))
+                                                {
+                                                    <span class="ms-1 badge bg-secondary">Mesa @ObterMesaDaComanda(item.ComandaId)</span>
+                                                }
+                                            </small>
+                                        </div>
+                                        <button class="btn btn-sm btn-success" @onclick="() => AvancarStatus(item.Id)">
+                                            <i class="fas fa-play me-1"></i> Iniciar
+                                        </button>
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(item.Observacao) && !item.Observacao.Contains("→"))
+                                    {
+                                        <div class="mt-1 p-1 bg-light rounded">
+                                            <small class="text-danger"><i class="fas fa-exclamation-circle me-1"></i>@item.Observacao</small>
+                                        </div>
+                                    }
+                                    @if (adicionais.Any())
+                                    {
+                                        <div class="mt-1">
+                                            @foreach (var ad in adicionais)
+                                            {
+                                                <span class="badge bg-info text-dark me-1">+ @ad.NomeProduto (x@ad.Quantidade)</span>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Coluna: Em Preparo -->
+        <div class="col-md-6">
+            <div class="card border-primary shadow-sm h-100">
+                <div class="card-header bg-primary text-white fw-bold d-flex justify-content-between">
+                    <span><i class="fas fa-fire me-2"></i>EM PREPARO</span>
+                    <span class="badge bg-warning text-dark">@itensEmPreparo.Count</span>
+                </div>
+                <div class="card-body p-2" style="overflow-y:auto; max-height:70vh;">
+                    @if (!itensEmPreparo.Any())
+                    {
+                        <div class="text-center text-muted py-5">
+                            <i class="fas fa-utensils fa-3x mb-2"></i>
+                            <p>Nenhum item em preparo.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var item in itensEmPreparo)
+                        {
+                            var adicionais = adicionaisPorItem.GetValueOrDefault(item.Id.ToString(), new());
+                            <div class="card mb-2 border-primary">
+                                <div class="card-body py-2 px-3">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <strong class="fs-5">@item.NomeProduto</strong>
+                                            <span class="ms-2 badge bg-dark fs-6">x @item.Quantidade</span>
+                                            <br />
+                                            <small class="text-muted">
+                                                Comanda #@item.ComandaId
+                                                @if (!string.IsNullOrEmpty(ObterMesaDaComanda(item.ComandaId)))
+                                                {
+                                                    <span class="ms-1 badge bg-secondary">Mesa @ObterMesaDaComanda(item.ComandaId)</span>
+                                                }
+                                            </small>
+                                        </div>
+                                        <button class="btn btn-sm btn-outline-success" @onclick="() => AvancarStatus(item.Id)">
+                                            <i class="fas fa-check me-1"></i> Pronto
+                                        </button>
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(item.Observacao) && !item.Observacao.Contains("→"))
+                                    {
+                                        <div class="mt-1 p-1 bg-light rounded">
+                                            <small class="text-danger"><i class="fas fa-exclamation-circle me-1"></i>@item.Observacao</small>
+                                        </div>
+                                    }
+                                    @if (adicionais.Any())
+                                    {
+                                        <div class="mt-1">
+                                            @foreach (var ad in adicionais)
+                                            {
+                                                <span class="badge bg-info text-dark me-1">+ @ad.NomeProduto (x@ad.Quantidade)</span>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<MItemComanda> itensPendentes = new();
+    private List<MItemComanda> itensEmPreparo = new();
+    private Dictionary<string, List<MAdicionaisItemComanda>> adicionaisPorItem = new();
+    private Dictionary<string, string> mesaPorComanda = new(); // comandaId → MesaId
+
+    private DateTime ultimaAtualizacao = DateTime.Now;
+    private System.Threading.Timer? timer;
+
+    private string mensagemAlerta = "";
+    private string classeAlerta = "alert-success";
+
+    protected override void OnInitialized()
+    {
+        CarregarItens();
+        // Auto-refresh a cada 30 segundos
+        timer = new System.Threading.Timer(_ =>
+        {
+            InvokeAsync(() =>
+            {
+                CarregarItens();
+                StateHasChanged();
+            });
+        }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+    }
+
+    private void CarregarItens()
+    {
+        var todos = KDSLogic.ObterItensAtivosKDS();
+
+        itensPendentes = todos.Where(x => x.Status == "Pendente").ToList();
+        itensEmPreparo = todos.Where(x => x.Status == "EmPreparo").ToList();
+
+        // Carregar adicionais e mesas das comandas ativas
+        adicionaisPorItem = new();
+        mesaPorComanda = new();
+
+        var comandaIds = todos.Select(x => x.ComandaId).Distinct().ToList();
+        foreach (var cmdId in comandaIds)
+        {
+            if (!mesaPorComanda.ContainsKey(cmdId))
+            {
+                var comanda = ComandaService.GetById(Convert.ToInt32(cmdId));
+                mesaPorComanda[cmdId] = comanda?.MesaId ?? "";
+            }
+        }
+
+        foreach (var item in todos)
+        {
+            var ads = AdicionaisItemComandaService.Find($"ItemComandaId = '{item.Id}'");
+            if (ads != null && ads.Any())
+                adicionaisPorItem[item.Id.ToString()] = ads;
+        }
+
+        ultimaAtualizacao = DateTime.Now;
+    }
+
+    private void AvancarStatus(int itemId)
+    {
+        LimparAlerta();
+        var result = KDSLogic.AvancarStatusItem(itemId);
+
+        if (result.Sucesso)
+        {
+            ExibirAlerta($"✓ {result.Mensagem}", "alert-success");
+            CarregarItens();
+        }
+        else
+        {
+            ExibirAlerta(result.Mensagem, "alert-warning");
+        }
+    }
+
+    private string ObterMesaDaComanda(string comandaId)
+    {
+        return mesaPorComanda.GetValueOrDefault(comandaId, "");
+    }
+
+    private void ExibirAlerta(string mensagem, string classe)
+    {
+        mensagemAlerta = mensagem;
+        classeAlerta = classe;
+    }
+
+    private void LimparAlerta()
+    {
+        mensagemAlerta = "";
+    }
+
+    public void Dispose()
+    {
+        timer?.Dispose();
+    }
+}

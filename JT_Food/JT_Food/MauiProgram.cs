@@ -1,4 +1,16 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using JT_Aplicacao;
+
+using JT_Classes.Acessos;
+
+using JT_Food.Shared.Layout;
+
+using JT_UserInterface.Shared.Services.Interfaces;
+
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+using System.Reflection;
 
 namespace JT_Food
 {
@@ -15,6 +27,58 @@ namespace JT_Food
                 });
 
             builder.Services.AddMauiBlazorWebView();
+            // 1. Carregamento do appsettings.json
+            var assembly = Assembly.GetExecutingAssembly();
+            // IMPORTANTE: Verifique se o nome do recurso estÃ¡ correto (Namespace.Arquivo)
+            using var stream = assembly.GetManifestResourceStream("JT_Food.appsettings.json");
+
+            if (stream != null)
+            {
+                var configRoot = new ConfigurationBuilder().AddJsonStream(stream).Build();
+                builder.Configuration.AddConfiguration(configRoot);
+
+                var secaoConfig = configRoot.GetSection("Config");
+                var dadosConfig = secaoConfig.Get<Config>();
+
+                if (dadosConfig != null)
+                {
+                    Config.SetInstancia(dadosConfig);
+                    builder.Services.AddSingleton(Config.Instancia);
+
+                    // 2. ConfiguraÃ§Ã£o do Firebase via IOptions
+
+                    if (Config.Instancia.FirebaseConfig != null)
+                    {
+                        FirebaseConfig.SetInstancia(Config.Instancia.FirebaseConfig);
+                        builder.Services.AddSingleton(FirebaseConfig.Instancia);
+                        builder.Services.Configure<FirebaseConfig>(configRoot.GetSection("Config:FirebaseConfig"));
+                    }
+                }
+
+            }
+            else
+            {
+                Console.WriteLine("AVISO: appsettings.json nÃ£o encontrado.");
+            }
+
+            // 5. HttpClient com ajuste para Android Localhost
+            builder.Services.AddScoped(sp =>
+            {
+                var baseAddressUrl = FirebaseConfig.Instancia.BaseApiUrl ?? "https://localhost:7166";
+
+                if (DeviceInfo.Platform == DevicePlatform.Android && baseAddressUrl.Contains("localhost"))
+                {
+                    baseAddressUrl = baseAddressUrl.Replace("localhost", "10.0.2.2");
+                }
+
+                return new HttpClient { BaseAddress = new Uri(baseAddressUrl) };
+            });
+
+            // 3. ServiÃ§os Singleton
+            JT_UserInterface.Shared.DependencyInjection.AddJTUserInterface(builder.Services);
+
+            // 4. ServiÃ§os Scoped
+            builder.Services.AddScoped<IMenuProvider, MenuLateral>();
 
 #if DEBUG
             builder.Services.AddBlazorWebViewDeveloperTools();

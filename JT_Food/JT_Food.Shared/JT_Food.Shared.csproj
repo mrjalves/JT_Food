@@ -12,6 +12,11 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="9.0.9" />
+    <PackageReference Include="Microsoft.Maui.Essentials" Version="9.0.120" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\JT_ApplicationLayer\JT_UserInterface.Shared\JT_UserInterface.Shared.csproj" />
   </ItemGroup>
 
 </Project>

@@ -7,6 +7,8 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
 
+builder.Services.AddScoped<JT_UserInterface.Shared.Services.Interfaces.IMenuProvider, JT_Food.Shared.Layout.MenuLateral>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

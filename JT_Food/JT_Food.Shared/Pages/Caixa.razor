@@ -1,0 +1,267 @@
+@page "/caixa"
+@using JT_Food.Shared.Models
+@using JT_Food.Shared.Services
+@using JT_Food.Shared.BusinessLogic
+
+<PageTitle>Frente de Caixa (PDV) - JT Food</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Frente de Caixa</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            @if (CaixaAberto)
+            {
+                <span class="badge bg-success pt-2 fs-6">CAIXA ABERTO</span>
+            }
+            else
+            {
+                <span class="badge bg-danger pt-2 fs-6">CAIXA FECHADO</span>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(mensagemAlerta))
+    {
+        <div class="alert @classeAlerta alert-dismissible fade show" role="alert">
+            @mensagemAlerta
+            <button type="button" class="btn-close" @onclick="LimparAlerta"></button>
+        </div>
+    }
+
+    <div class="row">
+        @if (!CaixaAberto)
+        {
+            <div class="col-md-6 offset-md-3">
+                <div class="card shadow-sm text-center">
+                    <div class="card-body py-5">
+                        <i class="fas fa-lock fa-4x text-muted mb-3"></i>
+                        <h4 class="card-title">Caixa Fechado</h4>
+                        <p class="card-text text-muted mb-4">Abra o caixa informando o saldo inicial (fundo de troco).</p>
+
+                        <div class="input-group mb-3 w-75 mx-auto">
+                            <span class="input-group-text">R$</span>
+                            <input type="number" class="form-control text-end" @bind="saldoInicial" step="0.01" placeholder="0,00" />
+                        </div>
+
+                        <button class="btn btn-success px-5 py-2" @onclick="AbrirCaixa">
+                            <i class="fas fa-lock-open me-2"></i> Abrir Caixa
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="col-md-4">
+                <div class="card bg-primary text-white shadow-sm mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Saldo Previsto no Caixa</h5>
+                        <p class="card-text fs-2 fw-bold text-end">R$ @caixaAtual?.SaldoFinalCalculado.ToString("F2")</p>
+                    </div>
+                </div>
+                
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-warning fw-bold">
+                        <i class="fas fa-exchange-alt me-2"></i> Movimentar Valor
+                    </div>
+                    <div class="card-body">
+                         <div class="mb-3">
+                            <label class="form-label">Tipo</label>
+                            <select class="form-select" @bind="tipoMovimentacaoSelecionada">
+                                <option value="Sangria">Sangria (Retirada)</option>
+                                <option value="Reforço">Reforço (Entrada)</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Valor (R$)</label>
+                            <input type="number" class="form-control" @bind="valorMovimentacao" step="0.01" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Observação</label>
+                            <input type="text" class="form-control" @bind="observacaoMovimentacao" />
+                        </div>
+                        <button class="btn btn-warning w-100 fw-bold" @onclick="RegistrarSangriaReforco">Gravar</button>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm">
+                    <div class="card-header bg-danger text-white fw-bold">
+                         <i class="fas fa-door-closed me-2"></i> Encerrar Turno / Fechar Caixa
+                    </div>
+                    <div class="card-body text-center">
+                        <p class="small text-muted mb-2">Informe o valor real contado na gaveta para fechamento.</p>
+                        <div class="input-group input-group-sm mb-3">
+                            <span class="input-group-text">R$</span>
+                            <input type="number" class="form-control text-end" @bind="saldoInformadoFinal" step="0.01" />
+                        </div>
+                        <button class="btn btn-outline-danger w-100" @onclick="FecharCaixa">Efetuar Fechamento</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white">
+                        <h6 class="mb-0">Histórico de Movimentações (Turno Atual)</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="max-height: 500px">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th>Hora</th>
+                                        <th>Operação</th>
+                                        <th>Tipo</th>
+                                        <th class="text-end">R$ Valor</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if(movimentacoes == null || !movimentacoes.Any())
+                                    {
+                                        <tr><td colspan="4" class="text-center text-muted p-3">Nenhuma movimentação.</td></tr>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var mov in movimentacoes.OrderByDescending(x => x.DataHora))
+                                        {
+                                            <tr>
+                                                <td>@mov.DataHora.ToString("HH:mm")</td>
+                                                <td>
+                                                    <strong>@mov.TipoMovimentacao</strong><br/>
+                                                    <small class="text-muted">@mov.Descricao</small>
+                                                </td>
+                                                <td>
+                                                    @if(mov.Natureza == "Entrada") { <span class="badge bg-success">Entrada</span> }
+                                                    else if(mov.Natureza == "Saida") { <span class="badge bg-danger">Saída</span> }
+                                                    else { <span class="badge bg-secondary">Info</span> }
+                                                </td>
+                                                <td class="text-end align-middle fw-bold">
+                                                    @(mov.Natureza == "Saida" ? "-" : "")@mov.Valor.ToString("F2")
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private bool CaixaAberto = false;
+    private MCaixa? caixaAtual;
+    private List<MMovimentacaoCaixa> movimentacoes = new();
+
+    private double saldoInicial = 0.0;
+    private double saldoInformadoFinal = 0.0;
+
+    private string tipoMovimentacaoSelecionada = "Sangria";
+    private double valorMovimentacao = 0.0;
+    private string observacaoMovimentacao = "";
+
+    private string mensagemAlerta = "";
+    private string classeAlerta = "alert-success";
+
+    private string CurrentUserId = "1"; // Mocked Worker ID
+
+    protected override void OnInitialized()
+    {
+        CarregarSituacaoCaixa();
+    }
+
+    private void CarregarSituacaoCaixa()
+    {
+        var result = CaixaLogic.ObterCaixaAberto();
+        CaixaAberto = result.Sucesso;
+
+        if (CaixaAberto)
+        {
+            caixaAtual = result.CaixaAtual;
+            movimentacoes = MovimentacaoCaixaService.Find($"CaixaId = '{caixaAtual?.Id}'");
+            // Set suggested final balance to calculated balance
+            saldoInformadoFinal = caixaAtual?.SaldoFinalCalculado ?? 0;
+        }
+        else
+        {
+            caixaAtual = null;
+            movimentacoes.Clear();
+        }
+    }
+
+    private void AbrirCaixa()
+    {
+        LimparAlerta();
+        var result = CaixaLogic.AbrirCaixa(CurrentUserId, saldoInicial, "Opeador logado via PDV");
+        
+        if (result.Sucesso)
+        {
+            ExibirAlerta(result.Mensagem, "alert-success");
+            CarregarSituacaoCaixa();
+        }
+        else
+        {
+            ExibirAlerta(result.Mensagem, "alert-danger");
+        }
+    }
+
+    private void RegistrarSangriaReforco()
+    {
+        LimparAlerta();
+        if (valorMovimentacao <= 0)
+        {
+             ExibirAlerta("Valor deve ser maior que zero.", "alert-warning");
+             return;
+        }
+
+        string natureza = tipoMovimentacaoSelecionada == "Sangria" ? "Saida" : "Entrada";
+        
+        // Log movement and adjust balance via logic
+        CaixaLogic.RegistrarMovimentacao(
+            caixaAtual!.Id.ToString(),
+            CurrentUserId,
+            tipoMovimentacaoSelecionada,
+            natureza,
+            valorMovimentacao,
+            "Dinheiro", // By definition usually Sangria/Reforco occurs in physical cash.
+            observacaoMovimentacao
+        );
+
+        ExibirAlerta($"{tipoMovimentacaoSelecionada} de R$ {valorMovimentacao:F2} registrada com sucesso.", "alert-success");
+        
+        valorMovimentacao = 0;
+        observacaoMovimentacao = "";
+        CarregarSituacaoCaixa();
+    }
+
+    private void FecharCaixa()
+    {
+        LimparAlerta();
+        var result = CaixaLogic.FecharCaixa(caixaAtual!.Id.ToString(), CurrentUserId, saldoInformadoFinal, "Fechamento manual");
+        
+        if (result.Sucesso)
+        {
+             ExibirAlerta(result.Mensagem, "alert-success");
+             saldoInicial = 0;
+             CarregarSituacaoCaixa();
+        }
+        else
+        {
+            ExibirAlerta(result.Mensagem, "alert-danger");
+        }
+    }
+
+    private void ExibirAlerta(string mensagem, string classe)
+    {
+        mensagemAlerta = mensagem;
+        classeAlerta = classe;
+    }
+
+    private void LimparAlerta()
+    {
+        mensagemAlerta = "";
+    }
+}
