@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="JT_Food/JT_Food.Shared/JT_Food.Shared.csproj" />
+  <Project Path="JT_Food/JT_Food.Web.Client/JT_Food.Web.Client.csproj" />
+  <Project Path="JT_Food/JT_Food.Web/JT_Food.Web.csproj" />
+  <Project Path="JT_Food/JT_Food/JT_Food.csproj" />
+</Solution>
