@@ -1,0 +1,57 @@
+@using JT_Food.Shared.Models
+@using JT_Food.Shared.Services
+@using JT_Food.Shared.Components
+
+<ModalGenerico @ref="modalRef" Title="@($"Dados da Comanda #{Comanda.Id}")" OnSave="Save">
+    <ChildContent>
+        <div class="mb-3">
+            <label class="form-label">Cliente</label>
+            <input type="text" class="form-control" @bind="Comanda.NomeCliente" />
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Mesa</label>
+                <select class="form-select" @bind="Comanda.MesaId">
+                    <option value="">Sem Mesa</option>
+                    @foreach (var m in mesas)
+                    {
+                        <option value="@m.Id">@m.Identificacao</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Status</label>
+                <select class="form-select" @bind="Comanda.Status">
+                    <option value="Aberta">Aberta</option>
+                    <option value="Fechada">Fechada</option>
+                    <option value="Cancelada">Cancelada</option>
+                </select>
+            </div>
+        </div>
+    </ChildContent>
+</ModalGenerico>
+
+@code {
+    [Parameter] public MComanda Comanda { get; set; } = new();
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    private ModalGenerico modalRef = default!;
+    private List<MMesa> mesas = new();
+
+    protected override void OnInitialized()
+    {
+        mesas = MesaService.GetAll().Where(x => x.Status == StatusMesa.Livre || x.Id.ToString() == Comanda.MesaId).ToList();
+    }
+
+    public Task Open() => modalRef.Open();
+    public Task Close() => modalRef.Close();
+
+    private async Task Save()
+    {
+        if (ComandaService.Save(Comanda))
+        {
+            await OnSaved.InvokeAsync();
+            await Close();
+        }
+    }
+}

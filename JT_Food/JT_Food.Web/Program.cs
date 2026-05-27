@@ -8,6 +8,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
 
 builder.Services.AddScoped<JT_UserInterface.Shared.Services.Interfaces.IMenuProvider, JT_Food.Shared.Layout.MenuLateral>();
+builder.Services.AddScoped<JT_UserInterface.Shared.Services.Interfaces.IConfiguracaoTabProvider, JT_Food.Shared.Services.RestauranteConfigTabProvider>();
 
 var app = builder.Build();
 

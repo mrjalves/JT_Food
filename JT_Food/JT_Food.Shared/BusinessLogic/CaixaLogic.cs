@@ -7,7 +7,7 @@ namespace JT_Food.Shared.BusinessLogic
     {
         public static (bool Sucesso, string Mensagem, MCaixa? CaixaAtual) ObterCaixaAberto()
         {
-            var caixas = CaixaService.Find("Status = 'Aberto'");
+            var caixas = CaixaService.Find(new Dictionary<string, object> { { "Status", "Aberto" } });
             if (caixas != null && caixas.Any())
             {
                 return (true, "Caixa aberto encontrado.", caixas.FirstOrDefault());
@@ -166,7 +166,7 @@ namespace JT_Food.Shared.BusinessLogic
         public static (bool Quitada, double TotalPago, double SaldoPendente) VerificarComandaQuitada(
             string comandaId, double totalComanda)
         {
-            var pagamentos = PagamentoComandaService.Find($"ComandaId = '{comandaId}'");
+            var pagamentos = PagamentoComandaService.Find(new Dictionary<string, object> { { "ComandaId", comandaId } });
             double totalPago = pagamentos?.Sum(p => p.Valor) ?? 0;
             double saldoPendente = totalComanda - totalPago;
 

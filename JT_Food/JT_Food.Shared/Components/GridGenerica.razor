@@ -1,0 +1,81 @@
+@typeparam TItem where TItem : class, new()
+@using JT_UserInterface.Shared.Components
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold text-primary">@Title</h6>
+        <div class="d-flex gap-2">
+            @if (ShowSearch)
+            {
+                <div class="input-group input-group-sm" style="width: 250px;">
+                    <input type="text" class="form-control" placeholder="Buscar..." @bind="SearchTerm" @bind:event="oninput" />
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                </div>
+            }
+            @if (HeaderActions != null)
+            {
+                @HeaderActions
+            }
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <DataGrid TItem="TItem" Items="FilteredItems" IsLoading="IsLoading">
+            <HeaderTemplate>
+                @HeaderTemplate
+                @if (ShowActions)
+                {
+                    <th class="text-end" style="width: 100px;">Ações</th>
+                }
+            </HeaderTemplate>
+            <RowTemplate Context="item">
+                @RowTemplate(item)
+                @if (ShowActions)
+                {
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => OnEdit.InvokeAsync(item)">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => OnDelete.InvokeAsync(item)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                }
+            </RowTemplate>
+            <EmptyTemplate>
+                <div class="text-center p-5">
+                    <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">Nenhum registro encontrado.</p>
+                </div>
+            </EmptyTemplate>
+        </DataGrid>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Registros";
+    [Parameter] public IEnumerable<TItem>? Items { get; set; }
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public bool ShowSearch { get; set; } = true;
+    [Parameter] public bool ShowActions { get; set; } = true;
+    
+    [Parameter] public RenderFragment? HeaderTemplate { get; set; }
+    [Parameter] public RenderFragment<TItem>? RowTemplate { get; set; }
+    [Parameter] public RenderFragment? HeaderActions { get; set; }
+    
+    [Parameter] public EventCallback<TItem> OnEdit { get; set; }
+    [Parameter] public EventCallback<TItem> OnDelete { get; set; }
+    
+    [Parameter] public Func<TItem, string, bool>? SearchPredicate { get; set; }
+
+    private string SearchTerm { get; set; } = "";
+
+    private IEnumerable<TItem> FilteredItems
+    {
+        get
+        {
+            if (Items == null) return Enumerable.Empty<TItem>();
+            if (string.IsNullOrWhiteSpace(SearchTerm) || SearchPredicate == null) return Items;
+            return Items.Where(x => SearchPredicate(x, SearchTerm));
+        }
+    }
+}

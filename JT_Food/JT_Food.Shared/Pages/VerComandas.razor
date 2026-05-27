@@ -1,12 +1,53 @@
 @page "/comandas"
+@using JT_Food.Shared.Models
+@using JT_Food.Shared.Services
+@using JT_Food.Shared.Components
 
-<PageTitle>Comandas e Mesas - JT Food</PageTitle>
+<PageTitle>Gerenciar Comandas - JT Food</PageTitle>
 
 <div class="container-fluid py-4">
-    <h3>Acompanhamento de Comandas e Mesas</h3>
-    <p>Visualize as mesas ocupadas e lance novos pedidos nas comandas.</p>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Comandas</h1>
+        <button class="btn btn-primary" @onclick="NovaComanda">
+            <i class="fas fa-plus me-2"></i> Abrir Nova Comanda
+        </button>
+    </div>
+
+    <GridComandas Comandas="comandas" IsLoading="loading" OnEdit="Editar" OnDelete="Excluir" />
 </div>
 
-@code {
+<ModalComanda @ref="modalComanda" Comanda="comandaSelecionada" OnSaved="Carregar" />
 
+@code {
+    private List<MComanda>? comandas;
+    private bool loading = true;
+    private MComanda comandaSelecionada = new();
+    private ModalComanda modalComanda = default!;
+
+    protected override void OnInitialized() => Carregar();
+
+    private void Carregar()
+    {
+        loading = true;
+        comandas = ComandaService.GetAll();
+        loading = false;
+        StateHasChanged();
+    }
+
+    private async Task NovaComanda()
+    {
+        comandaSelecionada = new MComanda { UserId = "1", DataAbertura = DateTime.UtcNow };
+        await modalComanda.Open();
+    }
+
+    private async Task Editar(MComanda c)
+    {
+        comandaSelecionada = c;
+        await modalComanda.Open();
+    }
+
+    private void Excluir(MComanda c)
+    {
+        if (ComandaService.Delete(c.Id)) Carregar();
+    }
 }

@@ -21,6 +21,11 @@ namespace JT_Food.Shared.Services
             return BaseRepository.Find<MCaixa>(condicao);
         }
 
+        public static List<MCaixa> Find(Dictionary<string, object> filtros)
+        {
+            return BaseRepository.Find<MCaixa>(filtros);
+        }
+
         public static bool Save(MCaixa entity)
         {
             var isNew = entity.Id == 0;

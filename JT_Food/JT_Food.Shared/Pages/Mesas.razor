@@ -1,0 +1,59 @@
+@page "/mesas"
+@using JT_Food.Shared.Models
+@using JT_Food.Shared.Services
+@using JT_Food.Shared.Components
+
+<PageTitle>Gestão de Mesas - JT Food</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Mesas e Salão</h1>
+        <button class="btn btn-primary shadow-sm" @onclick="NovaMesa">
+            <i class="fas fa-plus fa-sm text-white-50 me-2"></i> Nova Mesa
+        </button>
+    </div>
+
+    <GridMesas Mesas="mesas" IsLoading="loading" OnEdit="EditarMesa" OnDelete="ExcluirMesa" />
+</div>
+
+<ModalMesa @ref="modalMesa" Mesa="mesaSelecionada" OnSaved="CarregarMesas" />
+
+@code {
+    private List<MMesa>? mesas;
+    private bool loading = true;
+    private MMesa mesaSelecionada = new();
+    private ModalMesa modalMesa = default!;
+
+    protected override void OnInitialized()
+    {
+        CarregarMesas();
+    }
+
+    private void CarregarMesas()
+    {
+        loading = true;
+        mesas = MesaService.GetAll();
+        loading = false;
+        StateHasChanged();
+    }
+
+    private async Task NovaMesa()
+    {
+        mesaSelecionada = new MMesa();
+        await modalMesa.Open();
+    }
+
+    private async Task EditarMesa(MMesa mesa)
+    {
+        mesaSelecionada = mesa;
+        await modalMesa.Open();
+    }
+
+    private void ExcluirMesa(MMesa mesa)
+    {
+        if (MesaService.Delete(mesa.Id))
+        {
+            CarregarMesas();
+        }
+    }
+}

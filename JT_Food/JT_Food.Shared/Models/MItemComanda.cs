@@ -7,8 +7,7 @@ namespace JT_Food.Shared.Models
     [NomeTabela("food_itens_comanda")]
     public class MItemComanda : ClasseBase
     {
-        [NomeColuna("UserId")]
-        public string UserId { get; set; } = string.Empty;
+
 
         [Required]
         [NomeColuna("ComandaId")]
@@ -32,9 +31,9 @@ namespace JT_Food.Shared.Models
         [NomeColuna("TotalItem")]
         public double TotalItem { get; set; } = 0.0;
         
-        // Status: "Pendente", "Preparando", "Pronto", "Entregue", "Cancelado"
+        // Status: "Confirmado", "Em Produção", "Pronto", "Saída para Entrega", "Entregue", "Cancelado"
         [NomeColuna("Status")]
-        public string Status { get; set; } = "Pendente";
+        public string Status { get; set; } = "Confirmado";
 
         [NomeColuna("Observacao")]
         public string? Observacao { get; set; }

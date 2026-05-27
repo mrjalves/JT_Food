@@ -1,0 +1,40 @@
+@using JT_Food.Shared.Models
+@using JT_Food.Shared.Services
+@using JT_Food.Shared.Components
+
+<GridGenerica TItem="MMesa" 
+              Title="Mapa de Mesas" 
+              Items="Mesas" 
+              IsLoading="IsLoading" 
+              OnEdit="OnEdit" 
+              OnDelete="OnDelete"
+              SearchPredicate="@((mesa, term) => mesa.Identificacao.Contains(term, StringComparison.OrdinalIgnoreCase))">
+    <HeaderTemplate>
+        <th>Identificação</th>
+        <th>Capacidade</th>
+        <th>Status</th>
+    </HeaderTemplate>
+    <RowTemplate Context="mesa">
+        <td>@mesa.Identificacao</td>
+        <td>@mesa.Capacidade</td>
+        <td>
+            <span class="badge @GetStatusClass(mesa.Status)">@mesa.Status</span>
+        </td>
+    </RowTemplate>
+</GridGenerica>
+
+@code {
+    [Parameter] public IEnumerable<MMesa>? Mesas { get; set; }
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public EventCallback<MMesa> OnEdit { get; set; }
+    [Parameter] public EventCallback<MMesa> OnDelete { get; set; }
+
+    private string GetStatusClass(string status) => status switch
+    {
+        StatusMesa.Livre => "bg-success",
+        StatusMesa.Ocupada => "bg-danger",
+        StatusMesa.AguardandoPagamento => "bg-warning text-dark",
+        StatusMesa.Reservada => "bg-info",
+        _ => "bg-secondary"
+    };
+}

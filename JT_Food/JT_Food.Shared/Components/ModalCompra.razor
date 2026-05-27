@@ -1,0 +1,134 @@
+@using JT_Food.Shared.Models
+@using JT_Food.Shared.Services
+@using JT_Food.Shared.BusinessLogic
+@using JT_Food.Shared.Components
+
+<ModalGenerico @ref="modalRef" Title="Nova Compra (Entrada de Estoque)" Size="Modal.ModalSize.Large" OnSave="Finalizar">
+    <ChildContent>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Fornecedor</label>
+                <input type="text" class="form-control" @bind="Compra.Fornecedor" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Data da Compra</label>
+                <input type="date" class="form-control" @bind="Compra.DataCompra" />
+            </div>
+        </div>
+
+        <div class="card bg-light mb-3">
+            <div class="card-body">
+                <h6 class="card-title">Adicionar Insumo</h6>
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <select class="form-select select2" @bind="insumoSelecionadoId">
+                            <option value="">-- Selecione o Insumo --</option>
+                            @foreach (var ins in insumosDisponiveis)
+                            {
+                                <option value="@ins.Id">@ins.Nome (@ins.UnidadeMedida)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" class="form-control" placeholder="Qtd" @bind="itemTemp.Quantidade" />
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" class="form-control" placeholder="Vlr Un." @bind="itemTemp.ValorUnitario" />
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-success w-100" @onclick="AdicionarItem">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <table class="table table-sm table-hover">
+            <thead>
+                <tr>
+                    <th>Insumo</th>
+                    <th class="text-center">Qtd</th>
+                    <th class="text-end">Vlr Unit.</th>
+                    <th class="text-end">Total</th>
+                    <th style="width: 50px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Itens)
+                {
+                    <tr>
+                        <td>@item.NomeInsumo</td>
+                        <td class="text-center">@item.Quantidade</td>
+                        <td class="text-end">R$ @item.ValorUnitario.ToString("F2")</td>
+                        <td class="text-end">R$ @item.ValorTotal.ToString("F2")</td>
+                        <td>
+                            <button class="btn btn-sm btn-link text-danger" @onclick="() => Itens.Remove(item)">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr class="fw-bold">
+                    <td colspan="3" class="text-end">TOTAL DA COMPRA:</td>
+                    <td class="text-end">R$ @Itens.Sum(x => x.ValorTotal).ToString("F2")</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </ChildContent>
+</ModalGenerico>
+
+@code {
+    [Parameter] public EventCallback OnSaved { get; set; }
+    
+    private MCompra Compra = new();
+    private List<MItemCompra> Itens = new();
+    private MItemCompra itemTemp = new();
+    private string insumoSelecionadoId = "";
+    private List<MInsumo> insumosDisponiveis = new();
+    
+    private ModalGenerico modalRef = default!;
+
+    protected override void OnInitialized()
+    {
+        insumosDisponiveis = InsumoService.GetAll();
+    }
+
+    public async Task Open()
+    {
+        Compra = new MCompra { UserId = "1", DataCompra = DateTime.Today };
+        Itens = new List<MItemCompra>();
+        itemTemp = new MItemCompra();
+        await modalRef.Open();
+    }
+
+    private void AdicionarItem()
+    {
+        if (string.IsNullOrEmpty(insumoSelecionadoId) || itemTemp.Quantidade <= 0) return;
+
+        var insumo = insumosDisponiveis.FirstOrDefault(x => x.Id.ToString() == insumoSelecionadoId);
+        if (insumo != null)
+        {
+            itemTemp.InsumoId = insumo.Id.ToString();
+            itemTemp.NomeInsumo = insumo.Nome;
+            itemTemp.ValorTotal = itemTemp.Quantidade * itemTemp.ValorUnitario;
+            
+            Itens.Add(itemTemp);
+            itemTemp = new MItemCompra();
+            insumoSelecionadoId = "";
+        }
+    }
+
+    private async Task Finalizar()
+    {
+        var result = ComercialLogic.FinalizarCompra(Compra, Itens);
+        if (result.Sucesso)
+        {
+            await OnSaved.InvokeAsync();
+            await modalRef.Close();
+        }
+    }
+}

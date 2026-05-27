@@ -21,6 +21,11 @@ namespace JT_Food.Shared.Services
             return BaseRepository.Find<MMesa>(condicao);
         }
 
+        public static List<MMesa> Find(Dictionary<string, object> filtros)
+        {
+            return BaseRepository.Find<MMesa>(filtros);
+        }
+
         public static bool Save(MMesa entity)
         {
             var isNew = entity.Id == 0;

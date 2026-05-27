@@ -13,9 +13,9 @@ namespace JT_Food.Shared.BusinessLogic
         // Sequência definida de status de preparo
         public static readonly string[] CicloStatus =
         [
-            "Pendente",
-            "EmPreparo",
-            "Pronto",
+            "Confirmado",
+            "Em Produção",
+            "Saída para Entrega",
             "Entregue"
         ];
 
@@ -24,9 +24,15 @@ namespace JT_Food.Shared.BusinessLogic
         /// </summary>
         public static List<MItemComanda> ObterItensAtivosKDS()
         {
-            var itens = ItemComandaService.Find(
-                "Status IN ('Pendente', 'EmPreparo') ORDER BY Id ASC");
-            return itens ?? new List<MItemComanda>();
+            var pendentes = ItemComandaService.Find(new Dictionary<string, object> { { "Status", "Confirmado" } });
+            var emPreparo = ItemComandaService.Find(new Dictionary<string, object> { { "Status", "Em Produção" } });
+
+            var todos = new List<MItemComanda>();
+            if (pendentes != null) todos.AddRange(pendentes);
+            if (emPreparo != null) todos.AddRange(emPreparo);
+
+            // Ordenação manual em memória já que ORDER BY não é suportado via dicionário no BaseRepository
+            return todos.OrderBy(x => x.Id).ToList();
         }
 
         /// <summary>
@@ -55,7 +61,20 @@ namespace JT_Food.Shared.BusinessLogic
             int proximoIndice = Math.Min(indiceAtual + 1, CicloStatus.Length - 1);
             string novoStatus = CicloStatus[proximoIndice];
 
-            // Registrar transição no campo Observacao (log leve, sem nova coluna)
+            // 1. Se estiver indo para "Saída para Entrega", finaliza a produção e dá baixa no estoque
+            if (novoStatus == "Saída para Entrega" && item.Status == "Em Produção")
+            {
+                var prodResult = ProducaoLogic.ProcessarProducao(item.ProdutoId, item.Quantidade, item.UserId);
+                if (!prodResult.Sucesso)
+                {
+                    return (false, $"Erro na produção: {prodResult.Mensagem}", item.Status);
+                }
+
+                // Também processa adicionais se houverem
+                ProducaoLogic.ProcessarAdicionaisItem(item.Id.ToString(), item.UserId);
+            }
+
+            // Registrar transição no campo Observacao
             string logEntry = $"[{DateTime.UtcNow:dd/MM HH:mm}] {item.Status} → {novoStatus}";
             item.Observacao = string.IsNullOrEmpty(item.Observacao)
                 ? logEntry
@@ -76,23 +95,20 @@ namespace JT_Food.Shared.BusinessLogic
         {
             return statusAtual switch
             {
-                "Pendente" => "▶ Iniciar Preparo",
-                "EmPreparo" => "✓ Marcar como Pronto",
-                "Pronto" => "🚀 Confirmar Entrega",
+                "Confirmado" => "▶ Iniciar Produção",
+                "Em Produção" => "✓ Finalizar Produção",
+                "Saída para Entrega" => "🚀 Confirmar Entrega",
                 _ => "Avançar"
             };
         }
 
-        /// <summary>
-        /// Retorna a classe CSS Bootstrap para o badge de status do item.
-        /// </summary>
         public static string ObterClasseBadgeStatus(string status)
         {
             return status switch
             {
-                "Pendente" => "bg-warning text-dark",
-                "EmPreparo" => "bg-primary",
-                "Pronto" => "bg-success",
+                "Confirmado" => "bg-warning text-dark",
+                "Em Produção" => "bg-primary",
+                "Saída para Entrega" => "bg-success",
                 "Entregue" => "bg-secondary",
                 "Cancelado" => "bg-danger",
                 _ => "bg-light text-dark"

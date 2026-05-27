@@ -1,9 +1,10 @@
 @page "/producao"
+@using JT_Classes.Acessos
 @using JT_Food.Shared.Models
 @using JT_Food.Shared.Services
 @using JT_Food.Shared.BusinessLogic
 @using JT_UserInterface.Shared.Components
-
+@inject CurrentUserState UserState
 <PageTitle>Produção e Baixa de Insumos - JT Food</PageTitle>
 
 <div class="container-fluid py-4">
@@ -119,8 +120,8 @@
     {
         // Pega todos os produtos que possuem receita associada (flag) ou que estão vinculados a MReceita
         // Para simplificar, pegamos todos, mas o correto seria filtrar por PossuiReceita == true
-        produtosComReceita = ProdutoService.Find("PossuiReceita = 1");
-        historicoProducao = ProducaoService.GetAll() ?? new List<MProducao>();
+        produtosComReceita = ProdutoService.GetAll().Where(r => r.UserId == UserState.UsuarioID ).ToList();
+        historicoProducao = ProducaoService.GetAll().Where(p => p.UserId == UserState.UsuarioID).ToList();
     }
 
     private async Task RegistrarProducao()

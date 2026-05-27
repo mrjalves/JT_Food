@@ -21,6 +21,11 @@ namespace JT_Food.Shared.Services
             return BaseRepository.Find<MItemComanda>(condicao);
         }
 
+        public static List<MItemComanda> Find(Dictionary<string, object> filtros)
+        {
+            return BaseRepository.Find<MItemComanda>(filtros);
+        }
+
         public static bool Save(MItemComanda entity)
         {
             var isNew = entity.Id == 0;

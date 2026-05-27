@@ -21,6 +21,11 @@ namespace JT_Food.Shared.Services
             return BaseRepository.Find<MMemoriaCalculo>(condicao);
         }
 
+        public static List<MMemoriaCalculo> Find(Dictionary<string, object> filtros)
+        {
+            return BaseRepository.Find<MMemoriaCalculo>(filtros);
+        }
+
         public static bool Save(MMemoriaCalculo entity)
         {
             var isNew = entity.Id == 0;

@@ -10,7 +10,6 @@ namespace JT_Food.Shared.Layout
             return new List<SItemMenu>
             {
                 new SItemMenu { Titulo = "Home", Texto = "Home", Url = "/", Icone = "fas fa-home", MatchAll = true },
-                new SItemMenu { Titulo = "Configurar Restaurante", Texto = "Geral", Url = "/configuracao", Icone = "fas fa-cogs" },
                 new SItemMenu { Titulo = "Menu", Texto = "Menu", Url = "/menu", Icone = "fas fa-utensils" },
                 new SItemMenu { Titulo = "Receitas", Texto = "Receitas", Url = "/receita", Icone = "fas fa-book-open" },
                 new SItemMenu { Titulo = "Estoque", Texto = "Estoque", Url = "/estoque", Icone = "fas fa-boxes" },

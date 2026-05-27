@@ -7,8 +7,6 @@ namespace JT_Food.Shared.Models
     [NomeTabela("food_caixa")]
     public class MCaixa : ClasseBase
     {
-        [NomeColuna("UserId")]
-        public string UserId { get; set; } = string.Empty;
 
         [Required]
         [NomeColuna("OperadorAberturaId")]

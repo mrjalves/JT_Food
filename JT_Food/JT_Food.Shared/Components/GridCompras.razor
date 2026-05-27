@@ -1,0 +1,30 @@
+@using JT_Food.Shared.Models
+@using JT_Food.Shared.Services
+@using JT_Food.Shared.Components
+
+<GridGenerica TItem="MCompra" 
+              Title="Histórico de Compras" 
+              Items="Compras" 
+              IsLoading="IsLoading" 
+              ShowActions="false"
+              SearchPredicate="@((compra, term) => compra.Fornecedor.Contains(term, StringComparison.OrdinalIgnoreCase))">
+    <HeaderTemplate>
+        <th>Data</th>
+        <th>Fornecedor</th>
+        <th>Valor Total</th>
+        <th>Status</th>
+    </HeaderTemplate>
+    <RowTemplate Context="compra">
+        <td>@compra.DataCompra.ToShortDateString()</td>
+        <td>@compra.Fornecedor</td>
+        <td>R$ @compra.ValorTotal.ToString("F2")</td>
+        <td>
+            <span class="badge @(compra.Status == "Finalizada" ? "bg-success" : "bg-warning")">@compra.Status</span>
+        </td>
+    </RowTemplate>
+</GridGenerica>
+
+@code {
+    [Parameter] public IEnumerable<MCompra>? Compras { get; set; }
+    [Parameter] public bool IsLoading { get; set; }
+}

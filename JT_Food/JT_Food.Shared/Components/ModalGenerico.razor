@@ -1,0 +1,28 @@
+@using JT_UserInterface.Shared.Components
+
+<Modal @ref="modalRef" Title="@Title" Size="@Size" OnClose="OnClose">
+    <BodyContent>
+        @if (ChildContent != null)
+        {
+            @ChildContent
+        }
+    </BodyContent>
+    <FooterContent>
+        <button type="button" class="btn btn-secondary" @onclick="Close">Cancelar</button>
+        <button type="button" class="btn btn-primary" @onclick="OnSave">@SaveButtonText</button>
+    </FooterContent>
+</Modal>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Cadastro";
+    [Parameter] public string SaveButtonText { get; set; } = "Salvar";
+    [Parameter] public Modal.ModalSize Size { get; set; } = Modal.ModalSize.Default;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private Modal modalRef = default!;
+
+    public Task Open() => modalRef.Open();
+    public Task Close() => modalRef.Close();
+}

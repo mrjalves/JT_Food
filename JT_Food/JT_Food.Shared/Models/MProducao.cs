@@ -33,6 +33,12 @@ namespace JT_Food.Shared.Models
         [NomeColuna("CustoUnitarioSugerido")]
         public double CustoUnitarioSugerido { get; set; } = 0.0;
 
+        [NomeColuna("PrecoVendaTotal")]
+        public double PrecoVendaTotal { get; set; } = 0.0;
+
+        [NomeColuna("LucroLote")]
+        public double LucroLote { get; set; } = 0.0;
+
         [NomeColuna("Observacoes")]
         public string? Observacoes { get; set; }
 

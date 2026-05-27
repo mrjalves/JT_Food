@@ -3,7 +3,9 @@
 using JT_Classes.Acessos;
 
 using JT_Food.Shared.Layout;
+using JT_Food.Shared.Services;
 
+using JT_UserInterface.Shared.Services;
 using JT_UserInterface.Shared.Services.Interfaces;
 
 using Microsoft.Extensions.Configuration;
@@ -77,8 +79,19 @@ namespace JT_Food
             // 3. ServiÃ§os Singleton
             JT_UserInterface.Shared.DependencyInjection.AddJTUserInterface(builder.Services);
 
+            builder.Services.AddScoped<SUsuarioRepository>(sp =>
+            {
+                var options = sp.GetRequiredService<IOptions<FirebaseConfig>>();
+                var config = options.Value;
+                var userState = sp.GetRequiredService<CurrentUserState>();
+                var httpClient = sp.GetRequiredService<HttpClient>();
+                var dbUrl = string.IsNullOrEmpty(config.DatabaseUrl) ? "https://config-missing.firebaseio.com" : config.DatabaseUrl;
+                return new SUsuarioRepository(dbUrl, userState, httpClient);
+            });
+
             // 4. ServiÃ§os Scoped
             builder.Services.AddScoped<IMenuProvider, MenuLateral>();
+            builder.Services.AddScoped<IConfiguracaoTabProvider, RestauranteConfigTabProvider>();
 
 #if DEBUG
             builder.Services.AddBlazorWebViewDeveloperTools();

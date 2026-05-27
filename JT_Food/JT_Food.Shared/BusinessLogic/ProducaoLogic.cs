@@ -14,7 +14,7 @@ namespace JT_Food.Shared.BusinessLogic
             if (produto == null) return (false, "Produto não encontrado.");
 
             // Get the Recipe items for this product
-            var receitas = ReceitaService.Find($"ProdutoId = '{produtoId}'");
+            var receitas = ReceitaService.Find(new Dictionary<string, object> { { "ProdutoId", produtoId } });
             if (receitas == null || !receitas.Any()) return (false, "Nenhuma receita cadastrada para este produto.");
 
             double custoTotalProducao = 0;
@@ -27,14 +27,26 @@ namespace JT_Food.Shared.BusinessLogic
                 double quantidadeFaltante = quantidadeNecessariaTotal;
 
                 // Retrieve all unexhausted batches for this ingredient, ordered by DataEntrada (FIFO)
-                var lotesInsumo = LoteInsumoService.Find($"InsumoId = '{rec.InsumoId}' AND QuantidadeDisponivel > 0 ORDER BY DataEntrada ASC");
+                // Firestore não suporta o filtro complexo e ORDER BY via dicionário, então filtramos/ordenamos na memória
+                var lotesInsumo = LoteInsumoService.Find(new Dictionary<string, object> { { "InsumoId", rec.InsumoId } });
                 
                 if (lotesInsumo == null || !lotesInsumo.Any())
                 {
                     return (false, $"Sem estoque para o insumo: {rec.NomeInsumo ?? rec.InsumoId}");
                 }
 
-                foreach (var lote in lotesInsumo)
+                // Filtrar apenas lotes com estoque > 0 e ordenar por DataEntrada (FIFO)
+                var lotesFiltrados = lotesInsumo
+                    .Where(l => l.QuantidadeDisponivel > 0)
+                    .OrderBy(l => l.DataEntrada)
+                    .ToList();
+
+                if (!lotesFiltrados.Any())
+                {
+                    return (false, $"Sem estoque disponível para o insumo: {rec.NomeInsumo ?? rec.InsumoId}");
+                }
+
+                foreach (var lote in lotesFiltrados)
                 {
                     if (quantidadeFaltante <= 0) break;
 
@@ -77,14 +89,20 @@ namespace JT_Food.Shared.BusinessLogic
                 LoteInsumoService.Save(lote);
             }
 
+            double precoVendaTotalLote = produto.Preco * quantidadeProduzida;
+            double lucroLote = precoVendaTotalLote - custoTotalProducao;
+
             var producao = new MProducao
             {
+                UserId = operadorId, // Assuming UserId
                 ProdutoId = produtoId,
                 NomeProduto = produto.Nome,
                 QuantidadeProduzida = quantidadeProduzida,
                 ResponsavelId = operadorId,
                 CustoTotalCalculado = custoTotalProducao,
                 CustoUnitarioSugerido = quantidadeProduzida > 0 ? (custoTotalProducao / quantidadeProduzida) : 0,
+                PrecoVendaTotal = precoVendaTotalLote,
+                LucroLote = lucroLote,
                 Observacoes = "Produzido via regra de consumo FIFO"
             };
             ProducaoService.Save(producao);
@@ -95,10 +113,7 @@ namespace JT_Food.Shared.BusinessLogic
                 MemoriaCalculoService.Save(mem);
             }
 
-            // (Optional) Augment stock of the final product, if it's managed by MEstoque.
-            // ... MEstoque augmentation logic could go here depending if Product is treated as Stock.
-
-            return (true, $"Produção finalizada com sucesso! Custo total calculado: R$ {custoTotalProducao:F2}");
+            return (true, $"Produção finalizada com sucesso! Custo: R$ {custoTotalProducao:F2}, Lucro: R$ {lucroLote:F2}");
         }
 
         /// <summary>
@@ -107,7 +122,7 @@ namespace JT_Food.Shared.BusinessLogic
         /// </summary>
         public static (bool Sucesso, string Mensagem, double CustoAdicionais) ProcessarAdicionaisItem(string itemComandaId, string operadorId)
         {
-            var adicionais = AdicionaisItemComandaService.Find($"ItemComandaId = '{itemComandaId}'");
+            var adicionais = AdicionaisItemComandaService.Find(new Dictionary<string, object> { { "ItemComandaId", itemComandaId } });
             if (adicionais == null || !adicionais.Any())
                 return (true, "Nenhum adicional a processar.", 0);
 
@@ -121,7 +136,7 @@ namespace JT_Food.Shared.BusinessLogic
                 // Só dá baixa em estoque se o produto adicional tiver receita
                 if (!produto.PossuiReceita) continue;
 
-                var receitas = ReceitaService.Find($"ProdutoId = '{adicional.ProdutoId}'");
+                var receitas = ReceitaService.Find(new Dictionary<string, object> { { "ProdutoId", adicional.ProdutoId } });
                 if (receitas == null || !receitas.Any()) continue;
 
                 foreach (var rec in receitas)
@@ -129,13 +144,20 @@ namespace JT_Food.Shared.BusinessLogic
                     double quantidadeNecessaria = rec.Quantidade * adicional.Quantidade;
                     double quantidadeFaltante = quantidadeNecessaria;
 
-                    var lotesInsumo = LoteInsumoService.Find(
-                        $"InsumoId = '{rec.InsumoId}' AND QuantidadeDisponivel > 0 ORDER BY DataEntrada ASC");
+                    var allLotes = LoteInsumoService.Find(new Dictionary<string, object> { { "InsumoId", rec.InsumoId } });
 
-                    if (lotesInsumo == null || !lotesInsumo.Any())
+                    if (allLotes == null || !allLotes.Any())
                         return (false, $"Sem estoque para o insumo do adicional: {rec.NomeInsumo ?? rec.InsumoId}", 0);
 
-                    foreach (var lote in lotesInsumo)
+                    var lotesDisponiveis = allLotes
+                        .Where(l => l.QuantidadeDisponivel > 0)
+                        .OrderBy(l => l.DataEntrada)
+                        .ToList();
+
+                    if (!lotesDisponiveis.Any())
+                        return (false, $"Sem estoque para o insumo do adicional: {rec.NomeInsumo ?? rec.InsumoId}", 0);
+
+                    foreach (var lote in lotesDisponiveis)
                     {
                         if (quantidadeFaltante <= 0) break;
 

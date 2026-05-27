@@ -6,22 +6,27 @@ namespace JT_Food.Shared.Services
 {
     public static class UsuarioService
     {
-        public static MUsuario? GetById(int id)
+        public static Usuario? GetById(int id)
         {
-            return BaseRepository.GetById<MUsuario>(id);
+            return BaseRepository.GetById<Usuario>(id);
         }
 
-        public static List<MUsuario> GetAll()
+        public static List<Usuario> GetAll()
         {
-            return BaseRepository.GetAll<MUsuario>();
+            return BaseRepository.GetAll<Usuario>();
         }
 
-        public static List<MUsuario> Find(string condicao)
+        public static List<Usuario> Find(string condicao)
         {
-            return BaseRepository.Find<MUsuario>(condicao);
+            return BaseRepository.Find<Usuario>(condicao);
         }
 
-        public static bool Save(MUsuario entity)
+        public static List<Usuario> Find(Dictionary<string, object> filtros)
+        {
+            return BaseRepository.Find<Usuario>(filtros);
+        }
+
+        public static bool Save(Usuario entity)
         {
             var isNew = entity.Id == 0;
             var acao = isNew ? "Salvar" : "Atualizar";
@@ -51,7 +56,7 @@ namespace JT_Food.Shared.Services
             if (entity == null) return false;
 
             AcoplamentoRN.Executar(entity, "Excluir", "Antes");
-            var result = BaseRepository.Delete<MUsuario>(id);
+            var result = BaseRepository.Delete<Usuario>(id);
             AcoplamentoRN.Executar(entity, "Excluir", "Depois");
 
             return result;

@@ -1,0 +1,43 @@
+@page "/compras"
+@using JT_Food.Shared.Models
+@using JT_Food.Shared.Services
+@using JT_Food.Shared.Components
+
+<PageTitle>Entrada de Estoque (Compras) - JT Food</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Compras e Entradas</h1>
+        <button class="btn btn-primary shadow-sm" @onclick="NovaCompra">
+            <i class="fas fa-cart-plus fa-sm text-white-50 me-2"></i> Registrar Compra
+        </button>
+    </div>
+
+    <GridCompras Compras="compras" IsLoading="loading" />
+</div>
+
+<ModalCompra @ref="modalCompra" OnSaved="CarregarCompras" />
+
+@code {
+    private List<MCompra>? compras;
+    private bool loading = true;
+    private ModalCompra modalCompra = default!;
+
+    protected override void OnInitialized()
+    {
+        CarregarCompras();
+    }
+
+    private void CarregarCompras()
+    {
+        loading = true;
+        compras = CompraService.GetAll();
+        loading = false;
+        StateHasChanged();
+    }
+
+    private async Task NovaCompra()
+    {
+        await modalCompra.Open();
+    }
+}

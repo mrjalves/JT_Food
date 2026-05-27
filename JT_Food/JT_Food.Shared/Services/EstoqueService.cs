@@ -21,6 +21,11 @@ namespace JT_Food.Shared.Services
             return BaseRepository.Find<MEstoque>(condicao);
         }
 
+        public static List<MEstoque> Find(Dictionary<string, object> filtros)
+        {
+            return BaseRepository.Find<MEstoque>(filtros);
+        }
+
         public static bool Save(MEstoque entity)
         {
             var isNew = entity.Id == 0;

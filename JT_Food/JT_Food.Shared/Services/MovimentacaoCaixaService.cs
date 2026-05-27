@@ -21,6 +21,11 @@ namespace JT_Food.Shared.Services
             return BaseRepository.Find<MMovimentacaoCaixa>(condicao);
         }
 
+        public static List<MMovimentacaoCaixa> Find(Dictionary<string, object> filtros)
+        {
+            return BaseRepository.Find<MMovimentacaoCaixa>(filtros);
+        }
+
         public static bool Save(MMovimentacaoCaixa entity)
         {
             var isNew = entity.Id == 0;

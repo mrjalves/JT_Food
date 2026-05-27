@@ -270,19 +270,19 @@
             comanda = ComandaService.GetById(id);
             if (comanda != null)
             {
-                itens = ItemComandaService.Find($"ComandaId = '{comanda.Id}'");
+                itens = ItemComandaService.Find(new Dictionary<string, object> { { "ComandaId", comanda.Id.ToString() } });
 
                 // Carregar adicionais de cada item
                 adicionaisPorItem = new();
                 foreach (var item in itens)
                 {
-                    var ads = AdicionaisItemComandaService.Find($"ItemComandaId = '{item.Id}'");
+                    var ads = AdicionaisItemComandaService.Find(new Dictionary<string, object> { { "ItemComandaId", item.Id.ToString() } });
                     if (ads != null && ads.Any())
                         adicionaisPorItem[item.Id.ToString()] = ads;
                 }
 
                 // Carregar pagamentos já registrados
-                pagamentosRegistrados = PagamentoComandaService.Find($"ComandaId = '{comanda.Id}'") ?? new();
+                pagamentosRegistrados = PagamentoComandaService.Find(new Dictionary<string, object> { { "ComandaId", comanda.Id.ToString() } }) ?? new();
 
                 Recalcular();
             }
@@ -399,7 +399,7 @@
     private void AtualizarStatusMesa(string novoStatus)
     {
         if (comanda == null || string.IsNullOrEmpty(comanda.MesaId)) return;
-        var mesas = MesaService.Find($"Identificacao = '{comanda.MesaId}'");
+        var mesas = MesaService.Find(new Dictionary<string, object> { { "Identificacao", comanda.MesaId } });
         var mesa = mesas?.FirstOrDefault();
         if (mesa != null)
         {

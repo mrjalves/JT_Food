@@ -21,6 +21,11 @@ namespace JT_Food.Shared.Services
             return BaseRepository.Find<MInsumo>(condicao);
         }
 
+        public static List<MInsumo> Find(Dictionary<string, object> filtros)
+        {
+            return BaseRepository.Find<MInsumo>(filtros);
+        }
+
         public static bool Save(MInsumo entity)
         {
             var isNew = entity.Id == 0;

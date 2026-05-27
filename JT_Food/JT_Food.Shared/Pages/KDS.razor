@@ -62,7 +62,7 @@
                                             </small>
                                         </div>
                                         <button class="btn btn-sm btn-success" @onclick="() => AvancarStatus(item.Id)">
-                                            <i class="fas fa-play me-1"></i> Iniciar
+                                            @KDSLogic.ObterLabelBotaoAcao(item.Status)
                                         </button>
                                     </div>
                                     @if (!string.IsNullOrEmpty(item.Observacao) && !item.Observacao.Contains("→"))
@@ -124,7 +124,7 @@
                                             </small>
                                         </div>
                                         <button class="btn btn-sm btn-outline-success" @onclick="() => AvancarStatus(item.Id)">
-                                            <i class="fas fa-check me-1"></i> Pronto
+                                            @KDSLogic.ObterLabelBotaoAcao(item.Status)
                                         </button>
                                     </div>
                                     @if (!string.IsNullOrEmpty(item.Observacao) && !item.Observacao.Contains("→"))
@@ -166,7 +166,7 @@
 
     protected override void OnInitialized()
     {
-        CarregarItens();
+         CarregarItens();
         // Auto-refresh a cada 30 segundos
         timer = new System.Threading.Timer(_ =>
         {
@@ -182,8 +182,8 @@
     {
         var todos = KDSLogic.ObterItensAtivosKDS();
 
-        itensPendentes = todos.Where(x => x.Status == "Pendente").ToList();
-        itensEmPreparo = todos.Where(x => x.Status == "EmPreparo").ToList();
+        itensPendentes = todos.Where(x => x.Status == "Confirmado").ToList();
+        itensEmPreparo = todos.Where(x => x.Status == "Em Produção").ToList();
 
         // Carregar adicionais e mesas das comandas ativas
         adicionaisPorItem = new();
@@ -201,7 +201,7 @@
 
         foreach (var item in todos)
         {
-            var ads = AdicionaisItemComandaService.Find($"ItemComandaId = '{item.Id}'");
+            var ads = AdicionaisItemComandaService.Find(new Dictionary<string, object> { { "ItemComandaId", item.Id.ToString() } });
             if (ads != null && ads.Any())
                 adicionaisPorItem[item.Id.ToString()] = ads;
         }
