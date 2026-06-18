@@ -1,7 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk.Razor">
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
@@ -19,12 +19,24 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="9.0.9" />
-    <PackageReference Include="Microsoft.Maui.Essentials" Version="9.0.120" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Maui.Essentials" Version="10.0.71" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\JT_ApplicationLayer\JT_UserInterface.Shared\JT_UserInterface.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="JT_Aplicacao">
+      <HintPath>..\..\..\JT_ApplicationLayer\JT_ApplicationLayer\bin\Debug\net10.0\JT_Aplicacao.dll</HintPath>
+    </Reference>
+    <Reference Include="JT_Classes">
+      <HintPath>..\..\..\JT_ApplicationLayer\JT_Servicos\bin\Debug\net10.0\JT_Classes.dll</HintPath>
+    </Reference>
+    <Reference Include="JT_Servicos">
+      <HintPath>..\..\..\JT_ApplicationLayer\JT_Servicos\bin\Debug\net10.0\JT_Servicos.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
 </Project>

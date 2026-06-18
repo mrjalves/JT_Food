@@ -31,7 +31,7 @@ namespace JT_Food
             builder.Services.AddMauiBlazorWebView();
             // 1. Carregamento do appsettings.json
             var assembly = Assembly.GetExecutingAssembly();
-            // IMPORTANTE: Verifique se o nome do recurso estÃ¡ correto (Namespace.Arquivo)
+            // IMPORTANTE: Verifique se o nome do recurso está correto (Namespace.Arquivo)
             using var stream = assembly.GetManifestResourceStream("JT_Food.appsettings.json");
 
             if (stream != null)
@@ -47,7 +47,7 @@ namespace JT_Food
                     Config.SetInstancia(dadosConfig);
                     builder.Services.AddSingleton(Config.Instancia);
 
-                    // 2. ConfiguraÃ§Ã£o do Firebase via IOptions
+                    // 2. Configuração do Firebase via IOptions
 
                     if (Config.Instancia.FirebaseConfig != null)
                     {
@@ -60,7 +60,7 @@ namespace JT_Food
             }
             else
             {
-                Console.WriteLine("AVISO: appsettings.json nÃ£o encontrado.");
+                Console.WriteLine("AVISO: appsettings.json não encontrado.");
             }
 
             // 5. HttpClient com ajuste para Android Localhost
@@ -76,7 +76,7 @@ namespace JT_Food
                 return new HttpClient { BaseAddress = new Uri(baseAddressUrl) };
             });
 
-            // 3. ServiÃ§os Singleton
+            // 3. Serviços Singleton
             JT_UserInterface.Shared.DependencyInjection.AddJTUserInterface(builder.Services);
 
             builder.Services.AddScoped<SUsuarioRepository>(sp =>
@@ -89,7 +89,7 @@ namespace JT_Food
                 return new SUsuarioRepository(dbUrl, userState, httpClient);
             });
 
-            // 4. ServiÃ§os Scoped
+            // 4. Serviços Scoped
             builder.Services.AddScoped<IMenuProvider, MenuLateral>();
             builder.Services.AddScoped<IConfiguracaoTabProvider, RestauranteConfigTabProvider>();
 
