@@ -1,5 +1,5 @@
 using JT_UserInterface.Shared.Models;
-using JT_UserInterface.Shared.Services.Interfaces;
+using JT_UserInterface.Shared.Services.Interfaces.Comum;
 using JT_Food.Shared.Components;
 using Microsoft.AspNetCore.Components;
 
@@ -22,3 +22,4 @@ namespace JT_Food.Shared.Services
         }
     }
 }
+

@@ -1,3 +1,5 @@
+using JT_Aplicacao.Classes;
+using JT_UserInterface.Shared.Services.Comum;
 using JT_Aplicacao;
 using JT_Atributos;
 
@@ -38,3 +40,4 @@ namespace JT_Food.Shared.Models
         public override List<Filtro> CarregarFiltros() => [];
     }
 }
+

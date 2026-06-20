@@ -1,4 +1,4 @@
-Ôªøusing JT_Aplicacao;
+using JT_Aplicacao;
 
 using JT_Classes.Acessos;
 
@@ -6,7 +6,7 @@ using JT_Food.Shared.Layout;
 using JT_Food.Shared.Services;
 
 using JT_UserInterface.Shared.Services;
-using JT_UserInterface.Shared.Services.Interfaces;
+using JT_UserInterface.Shared.Services.Interfaces.Comum;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -31,7 +31,7 @@ namespace JT_Food
             builder.Services.AddMauiBlazorWebView();
             // 1. Carregamento do appsettings.json
             var assembly = Assembly.GetExecutingAssembly();
-            // IMPORTANTE: Verifique se o nome do recurso est√° correto (Namespace.Arquivo)
+            // IMPORTANTE: Verifique se o nome do recurso est· correto (Namespace.Arquivo)
             using var stream = assembly.GetManifestResourceStream("JT_Food.appsettings.json");
 
             if (stream != null)
@@ -47,7 +47,7 @@ namespace JT_Food
                     Config.SetInstancia(dadosConfig);
                     builder.Services.AddSingleton(Config.Instancia);
 
-                    // 2. Configura√ß√£o do Firebase via IOptions
+                    // 2. ConfiguraÁ„o do Firebase via IOptions
 
                     if (Config.Instancia.FirebaseConfig != null)
                     {
@@ -60,7 +60,7 @@ namespace JT_Food
             }
             else
             {
-                Console.WriteLine("AVISO: appsettings.json n√£o encontrado.");
+                Console.WriteLine("AVISO: appsettings.json n„o encontrado.");
             }
 
             // 5. HttpClient com ajuste para Android Localhost
@@ -76,7 +76,7 @@ namespace JT_Food
                 return new HttpClient { BaseAddress = new Uri(baseAddressUrl) };
             });
 
-            // 3. Servi√ßos Singleton
+            // 3. ServiÁos Singleton
             JT_UserInterface.Shared.DependencyInjection.AddJTUserInterface(builder.Services);
 
             builder.Services.AddScoped<SUsuarioRepository>(sp =>
@@ -89,7 +89,7 @@ namespace JT_Food
                 return new SUsuarioRepository(dbUrl, userState, httpClient);
             });
 
-            // 4. Servi√ßos Scoped
+            // 4. ServiÁos Scoped
             builder.Services.AddScoped<IMenuProvider, MenuLateral>();
             builder.Services.AddScoped<IConfiguracaoTabProvider, RestauranteConfigTabProvider>();
 
@@ -102,3 +102,4 @@ namespace JT_Food
         }
     }
 }
+

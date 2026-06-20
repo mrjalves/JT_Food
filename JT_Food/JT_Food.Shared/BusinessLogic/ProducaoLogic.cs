@@ -1,3 +1,5 @@
+using JT_Aplicacao.Classes;
+using JT_UserInterface.Shared.Services.Comum;
 using JT_Food.Shared.Models;
 using JT_Food.Shared.Services;
 
@@ -192,3 +194,4 @@ namespace JT_Food.Shared.BusinessLogic
         }
     }
 }
+

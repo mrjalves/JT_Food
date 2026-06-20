@@ -1,5 +1,6 @@
 using JT_Aplicacao;
-using JT_UserInterface.Shared.Services.Interfaces;
+using JT_Aplicacao.Interface;
+using JT_UserInterface.Shared.Services.Interfaces.Comum;
 
 namespace JT_Food.Shared.Layout
 {
@@ -22,3 +23,5 @@ namespace JT_Food.Shared.Layout
         }
     }
 }
+
+
