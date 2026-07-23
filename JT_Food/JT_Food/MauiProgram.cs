@@ -1,18 +1,17 @@
+using System;
 using JT_Aplicacao;
-
+using JT_Aplicacao.Config;
 using JT_Classes.Acessos;
-
+using JT_Food.Shared;
 using JT_Food.Shared.Layout;
 using JT_Food.Shared.Services;
-
 using JT_UserInterface.Shared.Services;
 using JT_UserInterface.Shared.Services.Interfaces.Comum;
-
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-
 using System.Reflection;
+using System.Net.Http;
 
 namespace JT_Food
 {
@@ -20,86 +19,90 @@ namespace JT_Food
     {
         public static MauiApp CreateMauiApp()
         {
-            var builder = MauiApp.CreateBuilder();
-            builder
-                .UseMauiApp<App>()
-                .ConfigureFonts(fonts =>
-                {
-                    fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
-                });
-
-            builder.Services.AddMauiBlazorWebView();
-            // 1. Carregamento do appsettings.json
-            var assembly = Assembly.GetExecutingAssembly();
-            // IMPORTANTE: Verifique se o nome do recurso est· correto (Namespace.Arquivo)
-            using var stream = assembly.GetManifestResourceStream("JT_Food.appsettings.json");
-
-            if (stream != null)
+            try
             {
-                var configRoot = new ConfigurationBuilder().AddJsonStream(stream).Build();
-                builder.Configuration.AddConfiguration(configRoot);
-
-                var secaoConfig = configRoot.GetSection("Config");
-                var dadosConfig = secaoConfig.Get<Config>();
-
-                if (dadosConfig != null)
-                {
-                    Config.SetInstancia(dadosConfig);
-                    builder.Services.AddSingleton(Config.Instancia);
-
-                    // 2. ConfiguraÁ„o do Firebase via IOptions
-
-                    if (Config.Instancia.FirebaseConfig != null)
+                var builder = MauiApp.CreateBuilder();
+                builder
+                    .UseMauiApp<App>()
+                    .ConfigureFonts(fonts =>
                     {
-                        FirebaseConfig.SetInstancia(Config.Instancia.FirebaseConfig);
-                        builder.Services.AddSingleton(FirebaseConfig.Instancia);
-                        builder.Services.Configure<FirebaseConfig>(configRoot.GetSection("Config:FirebaseConfig"));
+                        fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
+                    });
+
+                builder.Services.AddMauiBlazorWebView();
+                
+                // 1. Carregamento do appsettings.json
+                var assembly = Assembly.GetExecutingAssembly();
+                using var stream = assembly.GetManifestResourceStream("JT_Food.appsettings.json");
+
+                if (stream != null)
+                {
+                    var configRoot = new ConfigurationBuilder().AddJsonStream(stream).Build();
+                    builder.Configuration.AddConfiguration(configRoot);
+
+                    var secaoConfig = configRoot.GetSection("Config");
+                    var dadosConfig = secaoConfig.Get<Config>();
+
+                    if (dadosConfig != null)
+                    {
+                        Config.SetInstancia(dadosConfig);
+                        builder.Services.AddSingleton(Config.Instancia);
                     }
                 }
-
-            }
-            else
-            {
-                Console.WriteLine("AVISO: appsettings.json n„o encontrado.");
-            }
-
-            // 5. HttpClient com ajuste para Android Localhost
-            builder.Services.AddScoped(sp =>
-            {
-                var baseAddressUrl = FirebaseConfig.Instancia.BaseApiUrl ?? "https://localhost:7166";
-
-                if (DeviceInfo.Platform == DevicePlatform.Android && baseAddressUrl.Contains("localhost"))
+                else
                 {
-                    baseAddressUrl = baseAddressUrl.Replace("localhost", "10.0.2.2");
+                    Console.WriteLine("AVISO: appsettings.json n√£o encontrado.");
                 }
 
-                return new HttpClient { BaseAddress = new Uri(baseAddressUrl) };
-            });
+                // 2. Configura√ß√£o do Firebase via IOptions
+                var secaoFConfig = builder.Configuration.GetSection("Config:FirebaseConfig");
+                var dadosFConfig = secaoFConfig.Get<FirebaseConfig>();
 
-            // 3. ServiÁos Singleton
-            JT_UserInterface.Shared.DependencyInjection.AddJTUserInterface(builder.Services);
+                if (dadosFConfig != null)
+                {
+                    FirebaseConfig.SetInstancia(dadosFConfig);
+                    builder.Services.AddSingleton(FirebaseConfig.Instancia);
+                }
 
-            builder.Services.AddScoped<SUsuarioRepository>(sp =>
-            {
-                var options = sp.GetRequiredService<IOptions<FirebaseConfig>>();
-                var config = options.Value;
-                var userState = sp.GetRequiredService<CurrentUserState>();
-                var httpClient = sp.GetRequiredService<HttpClient>();
-                var dbUrl = string.IsNullOrEmpty(config.DatabaseUrl) ? "https://config-missing.firebaseio.com" : config.DatabaseUrl;
-                return new SUsuarioRepository(dbUrl, userState, httpClient);
-            });
+                // 3. HttpClient com ajuste para Android Localhost
+                builder.Services.AddScoped(sp =>
+                {
+                    var baseAddressUrl = FirebaseConfig.Instancia?.BaseApiUrl ?? "https://localhost:7166";
 
-            // 4. ServiÁos Scoped
-            builder.Services.AddScoped<IMenuProvider, MenuLateral>();
-            builder.Services.AddScoped<IConfiguracaoTabProvider, RestauranteConfigTabProvider>();
+                    if (DeviceInfo.Platform == DevicePlatform.Android && baseAddressUrl.Contains("localhost"))
+                    {
+                        baseAddressUrl = baseAddressUrl.Replace("localhost", "10.0.2.2");
+                    }
+
+                    var httpClient = new HttpClient { BaseAddress = new Uri(baseAddressUrl) };
+                    
+                    var configPayload = new ClientConfigPayload { ClientId = "JT_Food" };
+                    var json = System.Text.Json.JsonSerializer.Serialize(configPayload);
+                    var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
+                    httpClient.DefaultRequestHeaders.Add("X-Client-Config", encoded);
+
+                    return httpClient;
+                });
+
+                // 4. Servi√ßos Globais
+                JT_UserInterface.Shared.DependencyInjection.AddJTUserInterface(builder.Services);
+                builder.Services.AddSingleton<ISecureStorageService, Services.MauiSecureStorageService>();
+
+                // 5. Servi√ßos do JT_Food
+                builder.Services.AddJTFoodServices();
 
 #if DEBUG
-            builder.Services.AddBlazorWebViewDeveloperTools();
-            builder.Logging.AddDebug();
+                builder.Services.AddBlazorWebViewDeveloperTools();
+                builder.Logging.AddDebug();
 #endif
 
-            return builder.Build();
+                return builder.Build();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erro ao criar o MauiApp: {ex.Message}");
+                throw;
+            }
         }
     }
 }
-
