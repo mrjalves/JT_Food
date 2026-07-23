@@ -23,19 +23,10 @@ namespace JT_Food.Shared.Layout
                         new SItemMenu { Titulo = "Comandas", Texto = "Comandas", Url = "/comandas", Icone = "fas fa-clipboard-list" },
                         new SItemMenu { Titulo = "KDS (Cozinha)", Texto = "KDS", Url = "/kds", Icone = "fas fa-tv" },
                         new SItemMenu { Titulo = "Menu", Texto = "Menu", Url = "/menu", Icone = "fas fa-utensils" },
-                    }
-                },
-                new SModuloMenu
-                {
-                    NomeModulo = "Gestão",
-                    Icone = "bi-sliders",
-                    Modulo = eModuloSistema.Gestao,
-                    Itens = new List<SItemMenu>
-                    {
                         new SItemMenu { Titulo = "Receitas", Texto = "Receitas", Url = "/receita", Icone = "fas fa-book-open" },
                         new SItemMenu { Titulo = "Estoque", Texto = "Estoque", Url = "/estoque", Icone = "fas fa-boxes" },
                         new SItemMenu { Titulo = "Produção", Texto = "Produção", Url = "/producao", Icone = "fas fa-blender" },
-                        new SItemMenu { Titulo = "Caixa", Texto = "Caixa", Url = "/caixa", Icone = "fas fa-cash-register" },
+                        new SItemMenu { Titulo = "Caixa", Texto = "Caixa", Url = "/caixa", Icone = "fas fa-cash-register" }
                     }
                 }
             };

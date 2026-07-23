@@ -1,4 +1,4 @@
-using JT_Aplicacao.Config;
+﻿using JT_Aplicacao.Config;
 using JT_Classes.Acessos;
 using JT_Food.Shared;
 using JT_Food.Web.Components;
@@ -33,7 +33,15 @@ builder.Services.AddHttpClient();
 builder.Services.AddScoped(sp =>
 {
     var baseUrl = builder.Configuration["Config:FirebaseConfig:BaseApiUrl"] ?? "https://localhost:7166";
-    return new HttpClient { BaseAddress = new Uri(baseUrl) };
+    var httpClient = new HttpClient { BaseAddress = new Uri(baseUrl) };
+
+    var configPayload = new JT_Aplicacao.Config.ClientConfigPayload { ClientId = "JT_Food" };
+    JT_Aplicacao.Config.Config.Instancia.ClientId = configPayload.ClientId;
+    var json = System.Text.Json.JsonSerializer.Serialize(configPayload);
+    var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
+    httpClient.DefaultRequestHeaders.Add("X-Client-Config", encoded);
+
+    return httpClient;
 });
 
 builder.Services.AddJTUserInterface();
@@ -78,3 +86,4 @@ app.MapRazorComponents<App>()
     );
 
 app.Run();
+

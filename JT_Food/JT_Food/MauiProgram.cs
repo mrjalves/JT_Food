@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using JT_Aplicacao;
 using JT_Aplicacao.Config;
 using JT_Classes.Acessos;
@@ -51,10 +51,10 @@ namespace JT_Food
                 }
                 else
                 {
-                    Console.WriteLine("AVISO: appsettings.json não encontrado.");
+                    Console.WriteLine("AVISO: appsettings.json nÃ£o encontrado.");
                 }
 
-                // 2. Configuração do Firebase via IOptions
+                // 2. ConfiguraÃ§Ã£o do Firebase via IOptions
                 var secaoFConfig = builder.Configuration.GetSection("Config:FirebaseConfig");
                 var dadosFConfig = secaoFConfig.Get<FirebaseConfig>();
 
@@ -77,6 +77,7 @@ namespace JT_Food
                     var httpClient = new HttpClient { BaseAddress = new Uri(baseAddressUrl) };
                     
                     var configPayload = new ClientConfigPayload { ClientId = "JT_Food" };
+    JT_Aplicacao.Config.Config.Instancia.ClientId = configPayload.ClientId;
                     var json = System.Text.Json.JsonSerializer.Serialize(configPayload);
                     var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
                     httpClient.DefaultRequestHeaders.Add("X-Client-Config", encoded);
@@ -84,11 +85,11 @@ namespace JT_Food
                     return httpClient;
                 });
 
-                // 4. Serviços Globais
+                // 4. ServiÃ§os Globais
                 JT_UserInterface.Shared.DependencyInjection.AddJTUserInterface(builder.Services);
                 builder.Services.AddSingleton<ISecureStorageService, Services.MauiSecureStorageService>();
 
-                // 5. Serviços do JT_Food
+                // 5. ServiÃ§os do JT_Food
                 builder.Services.AddJTFoodServices();
 
 #if DEBUG
@@ -106,3 +107,4 @@ namespace JT_Food
         }
     }
 }
+
