@@ -10,6 +10,10 @@
     {
         // Usa o serviço específico do Food para carregar a configuração do restaurante
         configuracaoAtual = ConfiguracaoService.Get();
+        if (configuracaoAtual != null && configuracaoAtual.IdUsuario == 0 && UserState != null && UserState.UsuarioID > 0)
+        {
+            configuracaoAtual.IdUsuario = UserState.UsuarioID;
+        }
         await Task.CompletedTask;
     }
 
