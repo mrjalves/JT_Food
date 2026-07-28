@@ -1,6 +1,6 @@
 using JT_Aplicacao.Classes;
 using JT_UserInterface.Shared.Services.Comum;
-using JT_Food.Shared.Models;
+using JT_Classes.Restaurante;
 using JT_Food.Shared.Services;
 
 namespace JT_Food.Shared.BusinessLogic
@@ -91,7 +91,7 @@ namespace JT_Food.Shared.BusinessLogic
                 LoteInsumoService.Save(lote);
             }
 
-            double precoVendaTotalLote = produto.Preco * quantidadeProduzida;
+            double precoVendaTotalLote = (double)produto.Preco * quantidadeProduzida;
             double lucroLote = precoVendaTotalLote - custoTotalProducao;
 
             var producao = new MProducao
@@ -194,4 +194,8 @@ namespace JT_Food.Shared.BusinessLogic
         }
     }
 }
+
+
+
+
 

@@ -1,5 +1,5 @@
 @page "/comandas"
-@using JT_Food.Shared.Models
+@using JT_Classes.Restaurante
 @using JT_Food.Shared.Services
 @using JT_Food.Shared.Components
 
@@ -19,9 +19,9 @@
 <ModalComanda @ref="modalComanda" Comanda="comandaSelecionada" OnSaved="Carregar" />
 
 @code {
-    private List<MComanda>? comandas;
+    private List<Comanda>? comandas;
     private bool loading = true;
-    private MComanda comandaSelecionada = new();
+    private Comanda comandaSelecionada = new();
     private ModalComanda modalComanda = default!;
 
     protected override void OnInitialized() => Carregar();
@@ -36,18 +36,21 @@
 
     private async Task NovaComanda()
     {
-        comandaSelecionada = new MComanda { UserId = "1", DataAbertura = DateTime.UtcNow };
-        await modalComanda.Open();
+        comandaSelecionada = new Comanda { UserId = "1", DataAbertura = DateTime.UtcNow };
+        modalComanda.Open();
     }
 
-    private async Task Editar(MComanda c)
+    private async Task Editar(Comanda c)
     {
         comandaSelecionada = c;
-        await modalComanda.Open();
+        modalComanda.Open();
     }
 
-    private void Excluir(MComanda c)
+    private void Excluir(Comanda c)
     {
         if (ComandaService.Delete(c.Id)) Carregar();
     }
 }
+
+
+

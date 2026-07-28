@@ -1,5 +1,5 @@
 @page "/fechamento/{ComandaId}"
-@using JT_Food.Shared.Models
+@using JT_Classes.Restaurante
 @using JT_Food.Shared.Services
 @using JT_Food.Shared.BusinessLogic
 
@@ -241,7 +241,7 @@
     [Parameter]
     public string ComandaId { get; set; } = string.Empty;
 
-    private MComanda? comanda;
+    private Comanda? comanda;
     private List<MItemComanda> itens = new();
     private Dictionary<string, List<MAdicionaisItemComanda>> adicionaisPorItem = new();
     private List<MPagamentoComanda> pagamentosRegistrados = new();
@@ -428,3 +428,5 @@
         mensagemAlerta = "";
     }
 }
+
+

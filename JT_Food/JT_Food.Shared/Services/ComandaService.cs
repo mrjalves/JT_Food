@@ -1,32 +1,33 @@
-using JT_Aplicacao;
-using JT_Classes.Acessos;
-using JT_Food.Shared.Models;
+using JT_Aplicacao.Classes;
+using JT_Aplicacao.Eventos;
+using JT_Classes.Restaurante;
+using System.Collections.Generic;
 
 namespace JT_Food.Shared.Services
 {
     public static class ComandaService
     {
-        public static MComanda? GetById(int id)
+        public static Comanda? GetById(int id)
         {
-            return BaseRepository.GetById<MComanda>(id);
+            return BaseRepository.GetById<Comanda>(id);
         }
 
-        public static List<MComanda> GetAll()
+        public static List<Comanda> GetAll()
         {
-            return BaseRepository.GetAll<MComanda>();
+            return BaseRepository.GetAll<Comanda>();
         }
 
-        public static List<MComanda> Find(string condicao)
+        public static List<Comanda> Find(string condicao)
         {
-            return BaseRepository.Find<MComanda>(condicao);
+            return BaseRepository.Find<Comanda>(condicao);
         }
 
-        public static List<MComanda> Find(Dictionary<string, object> filtros)
+        public static List<Comanda> Find(Dictionary<string, object> filtros)
         {
-            return BaseRepository.Find<MComanda>(filtros);
+            return BaseRepository.Find<Comanda>(filtros);
         }
 
-        public static bool Save(MComanda entity)
+        public static bool Save(Comanda entity)
         {
             var isNew = entity.Id == 0;
             var acao = isNew ? "Salvar" : "Atualizar";
@@ -39,19 +40,6 @@ namespace JT_Food.Shared.Services
                 var newId = BaseRepository.Add(entity);
                 entity.Id = newId;
                 result = newId > 0;
-
-                // Regra de negócio: ao abrir uma comanda vinculada a uma mesa,
-                // atualizar automaticamente o status da mesa para "Ocupada".
-                if (result && !string.IsNullOrEmpty(entity.MesaId))
-                {
-                    var mesas = MesaService.Find($"Identificacao = '{entity.MesaId}'");
-                    var mesa = mesas?.FirstOrDefault();
-                    if (mesa != null && mesa.Status == StatusMesa.Livre)
-                    {
-                        mesa.Status = StatusMesa.Ocupada;
-                        MesaService.Save(mesa);
-                    }
-                }
             }
             else
             {
@@ -69,7 +57,7 @@ namespace JT_Food.Shared.Services
             if (entity == null) return false;
 
             AcoplamentoRN.Executar(entity, "Excluir", "Antes");
-            var result = BaseRepository.Delete<MComanda>(id);
+            var result = BaseRepository.Delete<Comanda>(id);
             AcoplamentoRN.Executar(entity, "Excluir", "Depois");
 
             return result;

@@ -1,14 +1,14 @@
-@using JT_Food.Shared.Models
+@using JT_Classes.Restaurante
 @using JT_Food.Shared.Services
-@using JT_Food.Shared.Components
+@using JT_UserInterface.Shared.Components.Core
 
-<ModalGenerico @ref="modalRef" Title="@(Mesa.Id == 0 ? "Nova Mesa" : "Editar Mesa")" OnSave="Save">
-    <ChildContent>
+<Modal @ref="modalRef" Title="@(Mesa.Id == 0 ? "Nova Mesa" : "Editar Mesa")" EntidadeContexto="Mesa">
+    <BodyContent>
         <EditForm Model="Mesa">
             <DataAnnotationsValidator />
             <div class="mb-3">
-                <label class="form-label">IdentificaÃ§Ã£o / NÃºmero</label>
-                <input type="text" class="form-control" @bind="Mesa.Identificacao" placeholder="Ex: Mesa 01, BalcÃ£o 2" />
+                <label class="form-label">Identificação / Número</label>
+                <input type="text" class="form-control" @bind="Mesa.Identificacao" placeholder="Ex: Mesa 01, Balcão 2" />
                 <ValidationMessage For="@(() => Mesa.Identificacao)" />
             </div>
             <div class="mb-3">
@@ -25,24 +25,28 @@
                 </select>
             </div>
         </EditForm>
-    </ChildContent>
-</ModalGenerico>
+    </BodyContent>
+    <FooterContent>
+        <button type="button" class="btn btn-secondary" @onclick="Close">Cancelar</button>
+        <button type="button" class="btn btn-primary" @onclick="Save">Salvar</button>
+    </FooterContent>
+</Modal>
 
 @code {
-    [Parameter] public MMesa Mesa { get; set; } = new();
+    [Parameter] public Mesa Mesa { get; set; } = new();
     [Parameter] public EventCallback OnSaved { get; set; }
 
-    private ModalGenerico modalRef = default!;
+    private Modal modalRef = default!;
 
-    public Task Open() => modalRef.Open();
-    public Task Close() => modalRef.Close();
+    public void Open() => modalRef.Open();
+    public void Close() => modalRef.Close();
 
     private async Task Save()
     {
         if (MesaService.Save(Mesa))
         {
             await OnSaved.InvokeAsync();
-            await Close();
+            Close();
         }
     }
 }

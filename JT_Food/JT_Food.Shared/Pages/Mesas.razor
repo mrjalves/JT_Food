@@ -1,5 +1,5 @@
 @page "/mesas"
-@using JT_Food.Shared.Models
+@using JT_Classes.Restaurante
 @using JT_Food.Shared.Services
 @using JT_Food.Shared.Components
 
@@ -19,9 +19,9 @@
 <ModalMesa @ref="modalMesa" Mesa="mesaSelecionada" OnSaved="CarregarMesas" />
 
 @code {
-    private List<MMesa>? mesas;
+    private List<Mesa>? mesas;
     private bool loading = true;
-    private MMesa mesaSelecionada = new();
+    private Mesa mesaSelecionada = new();
     private ModalMesa modalMesa = default!;
 
     protected override void OnInitialized()
@@ -39,17 +39,17 @@
 
     private async Task NovaMesa()
     {
-        mesaSelecionada = new MMesa();
-        await modalMesa.Open();
+        mesaSelecionada = new Mesa();
+        modalMesa.Open();
     }
 
-    private async Task EditarMesa(MMesa mesa)
+    private async Task EditarMesa(Mesa mesa)
     {
         mesaSelecionada = mesa;
-        await modalMesa.Open();
+        modalMesa.Open();
     }
 
-    private void ExcluirMesa(MMesa mesa)
+    private void ExcluirMesa(Mesa mesa)
     {
         if (MesaService.Delete(mesa.Id))
         {
@@ -57,3 +57,6 @@
         }
     }
 }
+
+
+

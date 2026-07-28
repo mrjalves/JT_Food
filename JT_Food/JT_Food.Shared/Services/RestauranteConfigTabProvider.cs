@@ -1,3 +1,5 @@
+using JT_Aplicacao.Classes;
+using JT_Aplicacao.Eventos;
 using JT_UserInterface.Shared.Models;
 using JT_UserInterface.Shared.Services.Interfaces.Comum;
 using JT_Food.Shared.Components;
@@ -22,4 +24,5 @@ namespace JT_Food.Shared.Services
         }
     }
 }
+
 

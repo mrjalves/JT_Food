@@ -1,28 +1,33 @@
-@using JT_Food.Shared.Models
+@using JT_Classes.Restaurante
 @using JT_Food.Shared.Services
-@using JT_Food.Shared.Components
+@using JT_UserInterface.Shared.Components.Core
 
-<GridGenerica TItem="MCompra" 
-              Title="HistÃ³rico de Compras" 
-              Items="Compras" 
-              IsLoading="IsLoading" 
-              ShowActions="false"
-              SearchPredicate="@((compra, term) => compra.Fornecedor.Contains(term, StringComparison.OrdinalIgnoreCase))">
-    <HeaderTemplate>
-        <th>Data</th>
-        <th>Fornecedor</th>
-        <th>Valor Total</th>
-        <th>Status</th>
-    </HeaderTemplate>
-    <RowTemplate Context="compra">
-        <td>@compra.DataCompra.ToShortDateString()</td>
-        <td>@compra.Fornecedor</td>
-        <td>R$ @compra.ValorTotal.ToString("F2")</td>
-        <td>
-            <span class="badge @(compra.Status == "Finalizada" ? "bg-success" : "bg-warning")">@compra.Status</span>
-        </td>
-    </RowTemplate>
-</GridGenerica>
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-cart me-2 text-primary"></i>Histórico de Compras</h5>
+    </div>
+    <div class="card-body p-0">
+        <DataGrid TItem="MCompra" 
+                  Items="Compras" 
+                  IsLoading="IsLoading" 
+                  UseServerPagination="false">
+            <HeaderTemplate>
+                <th>Data</th>
+                <th>Fornecedor</th>
+                <th>Valor Total</th>
+                <th>Status</th>
+            </HeaderTemplate>
+            <RowTemplate Context="compra">
+                <td>@compra.DataCompra.ToShortDateString()</td>
+                <td>@(compra.FornecedorRestaurante ?? "S/ Fornecedor")</td>
+                <td>R$ @compra.Valor.ToString("F2")</td>
+                <td>
+                    <span class="badge @(compra.Status == "Finalizada" ? "bg-success" : "bg-warning")">@compra.Status</span>
+                </td>
+            </RowTemplate>
+        </DataGrid>
+    </div>
+</div>
 
 @code {
     [Parameter] public IEnumerable<MCompra>? Compras { get; set; }

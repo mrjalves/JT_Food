@@ -1,4 +1,4 @@
-using JT_Food.Shared.Models;
+using JT_Classes.Restaurante;
 using JT_Food.Shared.Services;
 
 namespace JT_Food.Shared.BusinessLogic
@@ -12,7 +12,7 @@ namespace JT_Food.Shared.BusinessLogic
 
             // 1. Salvar a Compra principal
             compra.Status = "Finalizada";
-            compra.ValorTotal = itens.Sum(x => x.ValorTotal);
+            compra.Valor = (decimal)itens.Sum(x => x.ValorTotal);
             if (!CompraService.Save(compra))
                 return (false, "Erro ao salvar o cabeçalho da compra.");
 
@@ -69,3 +69,6 @@ namespace JT_Food.Shared.BusinessLogic
         }
     }
 }
+
+
+

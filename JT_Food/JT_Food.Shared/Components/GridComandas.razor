@@ -1,43 +1,60 @@
-@using JT_Food.Shared.Models
+@using JT_Classes.Restaurante
 @using JT_Food.Shared.Services
-@using JT_Food.Shared.Components
+@using JT_UserInterface.Shared.Components.Core
 
-<GridGenerica TItem="MComanda" 
-              Title="Controle de Comandas" 
-              Items="Comandas" 
-              IsLoading="IsLoading" 
-              OnEdit="OnEdit" 
-              OnDelete="OnDelete"
-              SearchPredicate="@((c, term) => (c.NomeCliente?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) || c.Id.ToString().Contains(term))">
-    <HeaderTemplate>
-        <th>ID</th>
-        <th>Mesa</th>
-        <th>Cliente</th>
-        <th>Abertura</th>
-        <th class="text-end">Total</th>
-        <th>Status</th>
-    </HeaderTemplate>
-    <RowTemplate Context="c">
-        <td>#@c.Id</td>
-        <td>@(string.IsNullOrEmpty(c.MesaId) ? "S/ Mesa" : $"Mesa {c.MesaId}")</td>
-        <td>@(c.NomeCliente ?? "Consumidor")</td>
-        <td>@c.DataAbertura.ToString("HH:mm")</td>
-        <td class="text-end fw-bold text-success">R$ @c.Total.ToString("F2")</td>
-        <td>
-            <span class="badge @(c.Status == "Aberta" ? "bg-primary" : "bg-secondary")">@c.Status</span>
-        </td>
-    </RowTemplate>
-    <HeaderActions>
-         <div class="btn-group me-2">
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-receipt me-2 text-primary"></i>Controle de Comandas</h5>
+        <div class="btn-group me-2">
             <button class="btn btn-sm btn-outline-info active">Todas</button>
             <button class="btn btn-sm btn-outline-info">Abertas</button>
         </div>
-    </HeaderActions>
-</GridGenerica>
+    </div>
+    <div class="card-body p-0">
+        <DataGrid TItem="Comanda" 
+                  Items="Comandas" 
+                  IsLoading="IsLoading" 
+                  EnableRowClick="true"
+                  OnRowClick="HandleRowClick"
+                  UseServerPagination="false">
+            <HeaderTemplate>
+                <th>ID</th>
+                <th>Mesa</th>
+                <th>Cliente</th>
+                <th>Abertura</th>
+                <th class="text-end">Total</th>
+                <th>Status</th>
+                <th class="text-end">Ações</th>
+            </HeaderTemplate>
+            <RowTemplate Context="c">
+                <td>#@c.Id</td>
+                <td>@(string.IsNullOrEmpty(c.MesaId) ? "S/ Mesa" : "Mesa " + c.MesaId)</td>
+                <td>@(c.NomeCliente ?? "Consumidor")</td>
+                <td>@c.DataAbertura.ToString("HH:mm")</td>
+                <td class="text-end fw-bold text-success">R$ @c.Total.ToString("F2")</td>
+                <td>
+                    <span class="badge @(c.Status == "Aberta" ? "bg-primary" : "bg-secondary")">@c.Status</span>
+                </td>
+                <td class="text-end" @onclick:stopPropagation="true">
+                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => OnEdit.InvokeAsync(c)"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => OnDelete.InvokeAsync(c)"><i class="bi bi-trash"></i></button>
+                </td>
+            </RowTemplate>
+        </DataGrid>
+    </div>
+</div>
 
 @code {
-    [Parameter] public IEnumerable<MComanda>? Comandas { get; set; }
+    [Parameter] public IEnumerable<Comanda>? Comandas { get; set; }
     [Parameter] public bool IsLoading { get; set; }
-    [Parameter] public EventCallback<MComanda> OnEdit { get; set; }
-    [Parameter] public EventCallback<MComanda> OnDelete { get; set; }
+    [Parameter] public EventCallback<Comanda> OnEdit { get; set; }
+    [Parameter] public EventCallback<Comanda> OnDelete { get; set; }
+
+    private async Task HandleRowClick(Comanda comanda)
+    {
+        if (OnEdit.HasDelegate)
+        {
+            await OnEdit.InvokeAsync(comanda);
+        }
+    }
 }

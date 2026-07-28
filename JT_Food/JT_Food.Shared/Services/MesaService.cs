@@ -1,32 +1,34 @@
+using JT_Aplicacao.Classes;
+using JT_Aplicacao.Eventos;
 using JT_Aplicacao;
 using JT_Classes.Acessos;
-using JT_Food.Shared.Models;
+using JT_Classes.Restaurante;
 
 namespace JT_Food.Shared.Services
 {
     public static class MesaService
     {
-        public static MMesa? GetById(int id)
+        public static Mesa? GetById(int id)
         {
-            return BaseRepository.GetById<MMesa>(id);
+            return BaseRepository.GetById<Mesa>(id);
         }
 
-        public static List<MMesa> GetAll()
+        public static List<Mesa> GetAll()
         {
-            return BaseRepository.GetAll<MMesa>();
+            return BaseRepository.GetAll<Mesa>();
         }
 
-        public static List<MMesa> Find(string condicao)
+        public static List<Mesa> Find(string condicao)
         {
-            return BaseRepository.Find<MMesa>(condicao);
+            return BaseRepository.Find<Mesa>(condicao);
         }
 
-        public static List<MMesa> Find(Dictionary<string, object> filtros)
+        public static List<Mesa> Find(Dictionary<string, object> filtros)
         {
-            return BaseRepository.Find<MMesa>(filtros);
+            return BaseRepository.Find<Mesa>(filtros);
         }
 
-        public static bool Save(MMesa entity)
+        public static bool Save(Mesa entity)
         {
             var isNew = entity.Id == 0;
             var acao = isNew ? "Salvar" : "Atualizar";
@@ -56,10 +58,13 @@ namespace JT_Food.Shared.Services
             if (entity == null) return false;
 
             AcoplamentoRN.Executar(entity, "Excluir", "Antes");
-            var result = BaseRepository.Delete<MMesa>(id);
+            var result = BaseRepository.Delete<Mesa>(id);
             AcoplamentoRN.Executar(entity, "Excluir", "Depois");
 
             return result;
         }
     }
 }
+
+
+

@@ -1,3 +1,5 @@
+using JT_Aplicacao.Classes;
+using JT_Aplicacao.Eventos;
 using System;
 using System.Threading.Tasks;
 using JT_Classes.Acessos;
@@ -52,3 +54,4 @@ namespace JT_Food.Shared.Services
         }
     }
 }
+

@@ -1,5 +1,5 @@
 @page "/compras"
-@using JT_Food.Shared.Models
+@using JT_Classes.Restaurante
 @using JT_Food.Shared.Services
 @using JT_Food.Shared.Components
 
@@ -38,6 +38,8 @@
 
     private async Task NovaCompra()
     {
-        await modalCompra.Open();
+        modalCompra.Open();
     }
 }
+
+

@@ -1,6 +1,6 @@
 @page "/producao"
 @using JT_Classes.Acessos
-@using JT_Food.Shared.Models
+@using JT_Classes.Restaurante
 @using JT_Food.Shared.Services
 @using JT_Food.Shared.BusinessLogic
 @using JT_UserInterface.Shared.Components
@@ -120,8 +120,8 @@
     {
         // Pega todos os produtos que possuem receita associada (flag) ou que estão vinculados a MReceita
         // Para simplificar, pegamos todos, mas o correto seria filtrar por PossuiReceita == true
-        produtosComReceita = ProdutoService.GetAll().Where(r => r.UserId == UserState.UsuarioID ).ToList();
-        historicoProducao = ProducaoService.GetAll().Where(p => p.UserId == UserState.UsuarioID).ToList();
+        produtosComReceita = ProdutoService.GetAll().Where(r => r.UserId == UserState.UsuarioID.ToString() ).ToList();
+        historicoProducao = ProducaoService.GetAll().Where(p => p.UserId == UserState.UsuarioID.ToString()).ToList();
     }
 
     private async Task RegistrarProducao()
@@ -170,3 +170,5 @@
         mensagemAlerta = "";
     }
 }
+
+

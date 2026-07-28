@@ -13,19 +13,13 @@ namespace JT_Food.Shared
     {
         public static IServiceCollection AddJTFoodServices(this IServiceCollection services)
         {
-            services.AddScoped<SUsuarioRepository>(sp =>
-            {
-                var options = sp.GetRequiredService<IOptions<FirebaseConfig>>();
-                var config = options.Value;
-                var userState = sp.GetRequiredService<CurrentUserState>();
-                var httpClient = sp.GetRequiredService<HttpClient>();
-                var dbUrl = string.IsNullOrEmpty(config.DatabaseUrl) ? "https://config-missing.firebaseio.com" : config.DatabaseUrl;
-                return new SUsuarioRepository(dbUrl, userState, httpClient);
-            });
-
             services.AddScoped<IMenuProvider, MenuLateral>();
             services.AddScoped<IModuloMenuProvider, MenuLateral>();
             services.AddScoped<IConfiguracaoTabProvider, RestauranteConfigTabProvider>();
+
+            // Registros de Serviços Core (JT_Servicos)
+            
+            // Registros de Wrappers UI
 
             return services;
         }

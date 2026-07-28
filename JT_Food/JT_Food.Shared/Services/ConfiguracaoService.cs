@@ -1,5 +1,7 @@
+using JT_Aplicacao.Classes;
+using JT_Aplicacao.Eventos;
 using JT_Aplicacao;
-using JT_Food.Shared.Models;
+using JT_Classes.Restaurante;
 
 namespace JT_Food.Shared.Services
 {
@@ -25,8 +27,7 @@ namespace JT_Food.Shared.Services
                 Tema = entity.Tema,
                 ItensPorPagina = entity.ItensPorPagina,
                 NotificacoesEmail = entity.NotificacoesEmail,
-                Status = entity.Status,
-                Ativo = entity.Ativo
+                Status = entity.Status
             };
 
             if (entity.Id == 0)
@@ -50,3 +51,7 @@ namespace JT_Food.Shared.Services
         }
     }
 }
+
+
+
+

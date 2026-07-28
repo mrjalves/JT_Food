@@ -1,4 +1,4 @@
-using JT_Food.Shared.Models;
+using JT_Classes.Restaurante;
 using JT_Food.Shared.Services;
 
 namespace JT_Food.Shared.BusinessLogic
@@ -64,14 +64,14 @@ namespace JT_Food.Shared.BusinessLogic
             // 1. Se estiver indo para "Saída para Entrega", finaliza a produção e dá baixa no estoque
             if (novoStatus == "Saída para Entrega" && item.Status == "Em Produção")
             {
-                var prodResult = ProducaoLogic.ProcessarProducao(item.ProdutoId, item.Quantidade, item.UserId);
+                var prodResult = ProducaoLogic.ProcessarProducao(item.ProdutoId, item.Quantidade, "1");
                 if (!prodResult.Sucesso)
                 {
                     return (false, $"Erro na produção: {prodResult.Mensagem}", item.Status);
                 }
 
                 // Também processa adicionais se houverem
-                ProducaoLogic.ProcessarAdicionaisItem(item.Id.ToString(), item.UserId);
+                ProducaoLogic.ProcessarAdicionaisItem(item.Id.ToString(), "1");
             }
 
             // Registrar transição no campo Observacao
@@ -116,3 +116,7 @@ namespace JT_Food.Shared.BusinessLogic
         }
     }
 }
+
+
+
+

@@ -1,14 +1,14 @@
-@using JT_Food.Shared.Models
+@using JT_Classes.Restaurante
 @using JT_Food.Shared.Services
 @using JT_Food.Shared.BusinessLogic
-@using JT_Food.Shared.Components
+@using JT_UserInterface.Shared.Components.Core
 
-<ModalGenerico @ref="modalRef" Title="Nova Compra (Entrada de Estoque)" Size="Modal.ModalSize.Large" OnSave="Finalizar">
-    <ChildContent>
+<Modal @ref="modalRef" Title="Nova Compra (Entrada de Estoque)" SizeCssClass="modal-lg" EntidadeContexto="Compra">
+    <BodyContent>
         <div class="row mb-3">
             <div class="col-md-6">
                 <label class="form-label">Fornecedor</label>
-                <input type="text" class="form-control" @bind="Compra.Fornecedor" />
+                <input type="text" class="form-control" @bind="Compra.FornecedorRestaurante" />
             </div>
             <div class="col-md-6">
                 <label class="form-label">Data da Compra</label>
@@ -37,7 +37,7 @@
                     </div>
                     <div class="col-md-2">
                         <button class="btn btn-success w-100" @onclick="AdicionarItem">
-                            <i class="fas fa-plus"></i>
+                            <i class="bi bi-plus"></i>
                         </button>
                     </div>
                 </div>
@@ -64,7 +64,7 @@
                         <td class="text-end">R$ @item.ValorTotal.ToString("F2")</td>
                         <td>
                             <button class="btn btn-sm btn-link text-danger" @onclick="() => Itens.Remove(item)">
-                                <i class="fas fa-times"></i>
+                                <i class="bi bi-x"></i>
                             </button>
                         </td>
                     </tr>
@@ -78,8 +78,12 @@
                 </tr>
             </tfoot>
         </table>
-    </ChildContent>
-</ModalGenerico>
+    </BodyContent>
+    <FooterContent>
+        <button type="button" class="btn btn-secondary" @onclick="Close">Cancelar</button>
+        <button type="button" class="btn btn-primary" @onclick="Finalizar">Salvar</button>
+    </FooterContent>
+</Modal>
 
 @code {
     [Parameter] public EventCallback OnSaved { get; set; }
@@ -90,19 +94,24 @@
     private string insumoSelecionadoId = "";
     private List<MInsumo> insumosDisponiveis = new();
     
-    private ModalGenerico modalRef = default!;
+    private Modal modalRef = default!;
 
     protected override void OnInitialized()
     {
         insumosDisponiveis = InsumoService.GetAll();
     }
 
-    public async Task Open()
+    public void Open()
     {
         Compra = new MCompra { UserId = "1", DataCompra = DateTime.Today };
         Itens = new List<MItemCompra>();
         itemTemp = new MItemCompra();
-        await modalRef.Open();
+        modalRef.Open();
+    }
+
+    public void Close()
+    {
+        modalRef.Close();
     }
 
     private void AdicionarItem()
@@ -128,7 +137,7 @@
         if (result.Sucesso)
         {
             await OnSaved.InvokeAsync();
-            await modalRef.Close();
+            Close();
         }
     }
 }

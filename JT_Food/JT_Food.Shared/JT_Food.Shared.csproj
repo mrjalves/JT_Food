@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -28,15 +28,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Reference Include="JT_Aplicacao">
-      <HintPath>..\..\..\JT_ApplicationLayer\JT_ApplicationLayer\bin\Debug\net10.0\JT_Aplicacao.dll</HintPath>
-    </Reference>
-    <Reference Include="JT_Classes">
-      <HintPath>..\..\..\JT_ApplicationLayer\JT_Servicos\bin\Debug\net10.0\JT_Classes.dll</HintPath>
-    </Reference>
-    <Reference Include="JT_Servicos">
-      <HintPath>..\..\..\JT_ApplicationLayer\JT_Servicos\bin\Debug\net10.0\JT_Servicos.dll</HintPath>
-    </Reference>
+    <ProjectReference Include="..\..\..\JT_ApplicationLayer\JT_ApplicationLayer\JT_Aplicacao.csproj" />
+    <ProjectReference Include="..\..\..\JT_ApplicationLayer\JT_Classes\JT_Classes.csproj" />
+    <ProjectReference Include="..\..\..\JT_ApplicationLayer\JT_Servicos\JT_Servicos.csproj" />
   </ItemGroup>
 
 </Project>
