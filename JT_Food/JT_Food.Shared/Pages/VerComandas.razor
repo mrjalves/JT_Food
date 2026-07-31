@@ -1,22 +1,24 @@
-@page "/comandas"
+﻿@page "/comandas"
 @using JT_Classes.Restaurante
-@using JT_Food.Shared.Services
+@using JT_Servicos.Restaurante
 @using JT_Food.Shared.Components
 
-<PageTitle>Gerenciar Comandas - JT Food</PageTitle>
+@inject ComandaService ComandaService
+
+<PageTitle>Comandas - JT Food</PageTitle>
 
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0 text-gray-800">Comandas</h1>
-        <button class="btn btn-primary" @onclick="NovaComanda">
-            <i class="fas fa-plus me-2"></i> Abrir Nova Comanda
+        <h1 class="h3 mb-0 text-gray-800">Comandas e Pedidos</h1>
+        <button class="btn btn-primary shadow-sm" @onclick="NovaComanda">
+            <i class="fas fa-plus fa-sm text-white-50 me-2"></i> Nova Comanda
         </button>
     </div>
 
-    <GridComandas Comandas="comandas" IsLoading="loading" OnEdit="Editar" OnDelete="Excluir" />
+    <GridComandas Comandas="comandas" IsLoading="loading" OnEdit="EditarComanda" OnDelete="ExcluirComanda" />
 </div>
 
-<ModalComanda @ref="modalComanda" Comanda="comandaSelecionada" OnSaved="Carregar" />
+<ModalComanda @ref="modalComanda" Comanda="comandaSelecionada" OnSaved="CarregarAsync" />
 
 @code {
     private List<Comanda>? comandas;
@@ -24,12 +26,15 @@
     private Comanda comandaSelecionada = new();
     private ModalComanda modalComanda = default!;
 
-    protected override void OnInitialized() => Carregar();
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarAsync();
+    }
 
-    private void Carregar()
+    private async Task CarregarAsync()
     {
         loading = true;
-        comandas = ComandaService.GetAll();
+        comandas = await ComandaService.GetAll();
         loading = false;
         StateHasChanged();
     }
@@ -40,17 +45,17 @@
         modalComanda.Open();
     }
 
-    private async Task Editar(Comanda c)
+    private async Task EditarComanda(Comanda c)
     {
         comandaSelecionada = c;
         modalComanda.Open();
     }
 
-    private void Excluir(Comanda c)
+    private async Task ExcluirComanda(Comanda c)
     {
-        if (ComandaService.Delete(c.Id)) Carregar();
+        if (await ComandaService.Delete(c.Id))
+        {
+            await CarregarAsync();
+        }
     }
 }
-
-
-

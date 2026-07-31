@@ -1,46 +1,40 @@
-using JT_Classes.Restaurante;
-using JT_Food.Shared.Services;
+﻿using JT_Classes.Restaurante;
+using JT_Servicos.Restaurante;
 
 namespace JT_Food.Shared.BusinessLogic
 {
-    /// <summary>
-    /// Lógica de negócio do KDS (Kitchen Display System).
-    /// Gerencia o ciclo de vida de preparo dos itens da comanda.
-    /// Ciclo: Pendente → EmPreparo → Pronto → Entregue
-    /// </summary>
-    public static class KDSLogic
+    public class KDSLogic
     {
-        // Sequência definida de status de preparo
-        public static readonly string[] CicloStatus =
-        [
-            "Confirmado",
-            "Em Produção",
-            "Saída para Entrega",
-            "Entregue"
-        ];
+        private readonly ItemComandaService _itemComandaService;
+        private readonly ProducaoLogic _producaoLogic;
 
-        /// <summary>
-        /// Retorna todos os itens ativos no KDS (Pendente e EmPreparo), ordenados por data de lançamento.
-        /// </summary>
-        public static List<MItemComanda> ObterItensAtivosKDS()
+        public static readonly string[] CicloStatus = { "Pendente", "Em Produção", "Saída para Entrega", "Entregue" };
+
+        public KDSLogic(
+            ItemComandaService itemComandaService,
+            ProducaoLogic producaoLogic)
         {
-            var pendentes = ItemComandaService.Find(new Dictionary<string, object> { { "Status", "Confirmado" } });
-            var emPreparo = ItemComandaService.Find(new Dictionary<string, object> { { "Status", "Em Produção" } });
+            _itemComandaService = itemComandaService;
+            _producaoLogic = producaoLogic;
+        }
 
+        public async Task<List<MItemComanda>> ObterItensAtivosKDSAsync()
+        {
             var todos = new List<MItemComanda>();
+
+            var pendentes = await _itemComandaService.Find("Status = 'Confirmado'");
+            var emPreparo = await _itemComandaService.Find("Status = 'Em Produção'");
+
             if (pendentes != null) todos.AddRange(pendentes);
             if (emPreparo != null) todos.AddRange(emPreparo);
 
-            // Ordenação manual em memória já que ORDER BY não é suportado via dicionário no BaseRepository
             return todos.OrderBy(x => x.Id).ToList();
         }
 
-        /// <summary>
-        /// Avança o status de preparo do item para o próximo na sequência do ciclo KDS.
-        /// </summary>
-        public static (bool Sucesso, string Mensagem, string? NovoStatus) AvancarStatusItem(int itemId)
+        public async Task<(bool Sucesso, string Mensagem, string? NovoStatus)> AvancarStatusItemAsync(int itemId)
         {
-            var item = ItemComandaService.GetById(itemId);
+            var item = await _itemComandaService.GetById(itemId);
+
             if (item == null)
                 return (false, "Item não encontrado.", null);
 
@@ -51,9 +45,9 @@ namespace JT_Food.Shared.BusinessLogic
                 return (false, "Item já foi entregue. Ciclo encerrado.", "Entregue");
 
             int indiceAtual = Array.IndexOf(CicloStatus, item.Status);
-            if (indiceAtual < 0)
+
+            if (item.Status == "Confirmado" || indiceAtual == -1)
             {
-                // Status desconhecido, reinicia como Pendente
                 item.Status = "Pendente";
                 indiceAtual = 0;
             }
@@ -61,20 +55,17 @@ namespace JT_Food.Shared.BusinessLogic
             int proximoIndice = Math.Min(indiceAtual + 1, CicloStatus.Length - 1);
             string novoStatus = CicloStatus[proximoIndice];
 
-            // 1. Se estiver indo para "Saída para Entrega", finaliza a produção e dá baixa no estoque
             if (novoStatus == "Saída para Entrega" && item.Status == "Em Produção")
             {
-                var prodResult = ProducaoLogic.ProcessarProducao(item.ProdutoId, item.Quantidade, "1");
+                var prodResult = await _producaoLogic.ProcessarProducaoAsync(item.ProdutoId, item.Quantidade, "1");
                 if (!prodResult.Sucesso)
                 {
                     return (false, $"Erro na produção: {prodResult.Mensagem}", item.Status);
                 }
 
-                // Também processa adicionais se houverem
-                ProducaoLogic.ProcessarAdicionaisItem(item.Id.ToString(), "1");
+                await _producaoLogic.ProcessarAdicionaisItemAsync(item.Id.ToString(), "1");
             }
 
-            // Registrar transição no campo Observacao
             string logEntry = $"[{DateTime.UtcNow:dd/MM HH:mm}] {item.Status} → {novoStatus}";
             item.Observacao = string.IsNullOrEmpty(item.Observacao)
                 ? logEntry
@@ -82,22 +73,22 @@ namespace JT_Food.Shared.BusinessLogic
 
             item.Status = novoStatus;
 
-            bool salvo = ItemComandaService.Save(item);
+            bool salvo = await _itemComandaService.SaveAsync(item) > 0;
+
             return salvo
                 ? (true, $"Status avançado para '{novoStatus}'.", novoStatus)
                 : (false, "Erro ao salvar o status do item.", null);
         }
 
-        /// <summary>
-        /// Retorna o nome do botão de ação para o status atual do item.
-        /// </summary>
         public static string ObterLabelBotaoAcao(string statusAtual)
         {
             return statusAtual switch
             {
-                "Confirmado" => "▶ Iniciar Produção",
-                "Em Produção" => "✓ Finalizar Produção",
-                "Saída para Entrega" => "🚀 Confirmar Entrega",
+                "Confirmado" => "Iniciar Preparo",
+                "Pendente" => "Iniciar Preparo",
+                "Em Produção" => "Avisar Garçom (Pronto)",
+                "Saída para Entrega" => "Entregar à Mesa",
+                "Entregue" => "Finalizado",
                 _ => "Avançar"
             };
         }
@@ -107,16 +98,13 @@ namespace JT_Food.Shared.BusinessLogic
             return status switch
             {
                 "Confirmado" => "bg-warning text-dark",
-                "Em Produção" => "bg-primary",
-                "Saída para Entrega" => "bg-success",
-                "Entregue" => "bg-secondary",
-                "Cancelado" => "bg-danger",
-                _ => "bg-light text-dark"
+                "Pendente" => "bg-warning text-dark",
+                "Em Produção" => "bg-primary text-light",
+                "Saída para Entrega" => "bg-success text-light",
+                "Entregue" => "bg-secondary text-light",
+                "Cancelado" => "bg-danger text-light",
+                _ => "bg-secondary text-light"
             };
         }
     }
 }
-
-
-
-

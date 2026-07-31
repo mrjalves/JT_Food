@@ -1,22 +1,15 @@
 @page "/caixa"
 @using JT_Classes.Restaurante
-@using JT_Food.Shared.Services
 @using JT_Food.Shared.BusinessLogic
+@using JT_Servicos.Restaurante
+@inject CaixaLogic CaixaLogic
+@inject JT_Servicos.Restaurante.MovimentacaoCaixaService MovimentacaoCaixaService
 
-<PageTitle>Frente de Caixa (PDV) - JT Food</PageTitle>
-
-<div class="container-fluid py-4">
-    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2">Frente de Caixa</h1>
-        <div class="btn-toolbar mb-2 mb-md-0">
-            @if (CaixaAberto)
-            {
-                <span class="badge bg-success pt-2 fs-6">CAIXA ABERTO</span>
-            }
-            else
-            {
-                <span class="badge bg-danger pt-2 fs-6">CAIXA FECHADO</span>
-            }
+<div class="container-fluid p-3">
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="mb-0">Controle de Caixa</h2>
+            <p class="text-muted">Abertura, fechamento e movimentações avulsas.</p>
         </div>
     </div>
 
@@ -28,23 +21,23 @@
         </div>
     }
 
-    <div class="row">
+    <div class="row g-4">
         @if (!CaixaAberto)
         {
-            <div class="col-md-6 offset-md-3">
-                <div class="card shadow-sm text-center">
-                    <div class="card-body py-5">
-                        <i class="fas fa-lock fa-4x text-muted mb-3"></i>
-                        <h4 class="card-title">Caixa Fechado</h4>
-                        <p class="card-text text-muted mb-4">Abra o caixa informando o saldo inicial (fundo de troco).</p>
-
-                        <div class="input-group mb-3 w-75 mx-auto">
-                            <span class="input-group-text">R$</span>
-                            <input type="number" class="form-control text-end" @bind="saldoInicial" step="0.01" placeholder="0,00" />
+            <div class="col-md-6 col-lg-4 mx-auto">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-primary text-white text-center py-3">
+                        <i class="fas fa-lock fa-3x mb-2"></i>
+                        <h4 class="mb-0">Caixa Fechado</h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-center text-muted mb-4">Para iniciar as vendas, abra o caixa informando o saldo inicial em dinheiro.</p>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Saldo Inicial (R$)</label>
+                            <input type="number" class="form-control form-control-lg text-end" @bind="saldoInicial" step="0.01" min="0" />
                         </div>
-
-                        <button class="btn btn-success px-5 py-2" @onclick="AbrirCaixa">
-                            <i class="fas fa-lock-open me-2"></i> Abrir Caixa
+                        <button class="btn btn-success btn-lg w-100" @onclick="AbrirCaixaAsync">
+                            <i class="fas fa-key me-2"></i> Abrir Caixa
                         </button>
                     </div>
                 </div>
@@ -53,19 +46,38 @@
         else
         {
             <div class="col-md-4">
-                <div class="card bg-primary text-white shadow-sm mb-3">
+                <div class="card shadow-sm mb-4 border-success">
+                    <div class="card-header bg-success text-white fw-bold d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-lock-open me-2"></i> Caixa Aberto</span>
+                        <span class="badge bg-light text-dark">#@caixaAtual?.Id</span>
+                    </div>
                     <div class="card-body">
-                        <h5 class="card-title">Saldo Previsto no Caixa</h5>
-                        <p class="card-text fs-2 fw-bold text-end">R$ @caixaAtual?.SaldoFinalCalculado.ToString("F2")</p>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="fw-bold">@caixaAtual?.DataAbertura.ToString("dd/MM/yyyy HH:mm")</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Saldo Inicial:</span>
+                            <span class="fw-bold text-primary">R$ @caixaAtual?.SaldoInicial.ToString("F2")</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="fw-bold text-success">R$ @movimentacoes.Where(x => x.Natureza == "Entrada").Sum(x => x.Valor).ToString("F2")</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3 pb-3 border-bottom">
+                            <span class="fw-bold text-danger">R$ @movimentacoes.Where(x => x.Natureza == "Saida").Sum(x => x.Valor).ToString("F2")</span>
+                        </div>
+                        <div class="d-flex justify-content-between fs-5">
+                            <span class="text-dark fw-bold">Saldo Calculado:</span>
+                            <span class="fw-bold text-success">R$ @caixaAtual?.SaldoFinalCalculado.ToString("F2")</span>
+                        </div>
                     </div>
                 </div>
-                
-                <div class="card shadow-sm mb-3">
-                    <div class="card-header bg-warning fw-bold">
-                        <i class="fas fa-exchange-alt me-2"></i> Movimentar Valor
+
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white fw-bold">
+                        <i class="fas fa-exchange-alt me-2"></i> Registrar Movimentação
                     </div>
                     <div class="card-body">
-                         <div class="mb-3">
+                        <div class="mb-3">
                             <label class="form-label">Tipo</label>
                             <select class="form-select" @bind="tipoMovimentacaoSelecionada">
                                 <option value="Sangria">Sangria (Retirada)</option>
@@ -80,7 +92,7 @@
                             <label class="form-label">Observação</label>
                             <input type="text" class="form-control" @bind="observacaoMovimentacao" />
                         </div>
-                        <button class="btn btn-warning w-100 fw-bold" @onclick="RegistrarSangriaReforco">Gravar</button>
+                        <button class="btn btn-warning w-100 fw-bold" @onclick="RegistrarSangriaReforcoAsync">Gravar</button>
                     </div>
                 </div>
 
@@ -94,7 +106,7 @@
                             <span class="input-group-text">R$</span>
                             <input type="number" class="form-control text-end" @bind="saldoInformadoFinal" step="0.01" />
                         </div>
-                        <button class="btn btn-outline-danger w-100" @onclick="FecharCaixa">Efetuar Fechamento</button>
+                        <button class="btn btn-outline-danger w-100" @onclick="FecharCaixaAsync">Efetuar Fechamento</button>
                     </div>
                 </div>
             </div>
@@ -168,20 +180,21 @@
 
     private string CurrentUserId = "1"; // Mocked Worker ID
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        CarregarSituacaoCaixa();
+        await CarregarSituacaoCaixaAsync();
     }
 
-    private void CarregarSituacaoCaixa()
+    private async Task CarregarSituacaoCaixaAsync()
     {
-        var result = CaixaLogic.ObterCaixaAberto();
+        var result = await CaixaLogic.ObterCaixaAbertoAsync();
         CaixaAberto = result.Sucesso;
 
         if (CaixaAberto)
         {
             caixaAtual = result.CaixaAtual;
-            movimentacoes = MovimentacaoCaixaService.Find($"CaixaId = '{caixaAtual?.Id}'");
+            var list = await MovimentacaoCaixaService.Find($"CaixaId = '{caixaAtual?.Id}'");
+            movimentacoes = list ?? new List<MMovimentacaoCaixa>();
             // Set suggested final balance to calculated balance
             saldoInformadoFinal = caixaAtual?.SaldoFinalCalculado ?? 0;
         }
@@ -192,15 +205,15 @@
         }
     }
 
-    private void AbrirCaixa()
+    private async Task AbrirCaixaAsync()
     {
         LimparAlerta();
-        var result = CaixaLogic.AbrirCaixa(CurrentUserId, saldoInicial, "Opeador logado via PDV");
+        var result = await CaixaLogic.AbrirCaixaAsync(CurrentUserId, saldoInicial, "Opeador logado via PDV");
         
         if (result.Sucesso)
         {
             ExibirAlerta(result.Mensagem, "alert-success");
-            CarregarSituacaoCaixa();
+            await CarregarSituacaoCaixaAsync();
         }
         else
         {
@@ -208,7 +221,7 @@
         }
     }
 
-    private void RegistrarSangriaReforco()
+    private async Task RegistrarSangriaReforcoAsync()
     {
         LimparAlerta();
         if (valorMovimentacao <= 0)
@@ -220,7 +233,7 @@
         string natureza = tipoMovimentacaoSelecionada == "Sangria" ? "Saida" : "Entrada";
         
         // Log movement and adjust balance via logic
-        CaixaLogic.RegistrarMovimentacao(
+        await CaixaLogic.RegistrarMovimentacaoAsync(
             caixaAtual!.Id.ToString(),
             CurrentUserId,
             tipoMovimentacaoSelecionada,
@@ -234,19 +247,19 @@
         
         valorMovimentacao = 0;
         observacaoMovimentacao = "";
-        CarregarSituacaoCaixa();
+        await CarregarSituacaoCaixaAsync();
     }
 
-    private void FecharCaixa()
+    private async Task FecharCaixaAsync()
     {
         LimparAlerta();
-        var result = CaixaLogic.FecharCaixa(caixaAtual!.Id.ToString(), CurrentUserId, saldoInformadoFinal, "Fechamento manual");
+        var result = await CaixaLogic.FecharCaixaAsync(caixaAtual!.Id.ToString(), CurrentUserId, saldoInformadoFinal, "Fechamento manual");
         
         if (result.Sucesso)
         {
              ExibirAlerta(result.Mensagem, "alert-success");
              saldoInicial = 0;
-             CarregarSituacaoCaixa();
+             await CarregarSituacaoCaixaAsync();
         }
         else
         {
@@ -265,4 +278,3 @@
         mensagemAlerta = "";
     }
 }
-

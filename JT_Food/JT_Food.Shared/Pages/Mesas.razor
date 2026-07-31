@@ -1,7 +1,9 @@
-@page "/mesas"
+﻿@page "/mesas"
 @using JT_Classes.Restaurante
-@using JT_Food.Shared.Services
+@using JT_Servicos.Restaurante
 @using JT_Food.Shared.Components
+
+@inject MesaService MesaService
 
 <PageTitle>Gestão de Mesas - JT Food</PageTitle>
 
@@ -16,7 +18,7 @@
     <GridMesas Mesas="mesas" IsLoading="loading" OnEdit="EditarMesa" OnDelete="ExcluirMesa" />
 </div>
 
-<ModalMesa @ref="modalMesa" Mesa="mesaSelecionada" OnSaved="CarregarMesas" />
+<ModalMesa @ref="modalMesa" Mesa="mesaSelecionada" OnSaved="CarregarMesasAsync" />
 
 @code {
     private List<Mesa>? mesas;
@@ -24,15 +26,15 @@
     private Mesa mesaSelecionada = new();
     private ModalMesa modalMesa = default!;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        CarregarMesas();
+        await CarregarMesasAsync();
     }
 
-    private void CarregarMesas()
+    private async Task CarregarMesasAsync()
     {
         loading = true;
-        mesas = MesaService.GetAll();
+        mesas = await MesaService.GetAll();
         loading = false;
         StateHasChanged();
     }
@@ -49,14 +51,11 @@
         modalMesa.Open();
     }
 
-    private void ExcluirMesa(Mesa mesa)
+    private async Task ExcluirMesa(Mesa mesa)
     {
-        if (MesaService.Delete(mesa.Id))
+        if (await MesaService.Delete(mesa.Id))
         {
-            CarregarMesas();
+            await CarregarMesasAsync();
         }
     }
 }
-
-
-

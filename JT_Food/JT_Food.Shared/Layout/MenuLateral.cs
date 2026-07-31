@@ -14,19 +14,21 @@ namespace JT_Food.Shared.Layout
             {
                 new SModuloMenu
                 {
-                    NomeModulo = "Restaurante",
+                    NomeModulo = "JT_Food",
                     Icone = "bi-shop",
                     Modulo = eModuloSistema.Restaurante,
                     Itens = new List<SItemMenu>
                     {
-                        new SItemMenu { Titulo = "Home", Texto = "Home", Url = "/", Icone = "fas fa-home", MatchAll = true },
-                        new SItemMenu { Titulo = "Comandas", Texto = "Comandas", Url = "/comandas", Icone = "fas fa-clipboard-list" },
-                        new SItemMenu { Titulo = "KDS (Cozinha)", Texto = "KDS", Url = "/kds", Icone = "fas fa-tv" },
-                        new SItemMenu { Titulo = "Menu", Texto = "Menu", Url = "/menu", Icone = "fas fa-utensils" },
-                        new SItemMenu { Titulo = "Receitas", Texto = "Receitas", Url = "/receita", Icone = "fas fa-book-open" },
-                        new SItemMenu { Titulo = "Estoque", Texto = "Estoque", Url = "/estoque", Icone = "fas fa-boxes" },
-                        new SItemMenu { Titulo = "Produção", Texto = "Produção", Url = "/producao", Icone = "fas fa-blender" },
-                        new SItemMenu { Titulo = "Caixa", Texto = "Caixa", Url = "/caixa", Icone = "fas fa-cash-register" }
+                        new SItemMenu { Titulo = "Home", Texto = "Home", Url = "/", Icone = "bi-house-door", MatchAll = true },
+                        new SItemMenu { Titulo = "Mesas", Texto = "Mesas", Url = "/mesas", Icone = "bi-table" },
+                        new SItemMenu { Titulo = "Comandas", Texto = "Comandas", Url = "/comandas", Icone = "bi-card-checklist" },
+                        new SItemMenu { Titulo = "KDS (Cozinha)", Texto = "KDS", Url = "/kds", Icone = "bi-display" },
+                        new SItemMenu { Titulo = "Menu", Texto = "Menu", Url = "/menu", Icone = "bi-journal-text" },
+                        new SItemMenu { Titulo = "Receitas", Texto = "Receitas", Url = "/receita", Icone = "bi-book" },
+                        new SItemMenu { Titulo = "Estoque", Texto = "Estoque", Url = "/estoque", Icone = "bi-box-seam" },
+                        new SItemMenu { Titulo = "Compras", Texto = "Compras", Url = "/compras", Icone = "bi-cart" },
+                        new SItemMenu { Titulo = "Produção", Texto = "Produção", Url = "/producao", Icone = "bi-gear-wide-connected" },
+                        new SItemMenu { Titulo = "Caixa", Texto = "Caixa", Url = "/caixa", Icone = "bi-cash-coin" }
                     }
                 }
             };

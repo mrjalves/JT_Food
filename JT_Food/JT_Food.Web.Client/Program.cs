@@ -5,7 +5,7 @@ using JT_Aplicacao;
 using JT_Aplicacao.Config;
 using JT_Classes.Acessos;
 using JT_UserInterface.Shared;
-
+using JT_Food.Shared;
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
 var secaoConfig = builder.Configuration.GetSection("Config");
@@ -41,7 +41,5 @@ builder.Services.AddScoped<JT_Classes.Acessos.ISecureStorageService, JT_Food.Sha
 
 builder.Services.AddJTUserInterface();
 
-builder.Services.AddScoped<JT_UserInterface.Shared.Services.Interfaces.Comum.IMenuProvider, JT_Food.Shared.Layout.MenuLateral>();
-builder.Services.AddScoped<JT_UserInterface.Shared.Services.Interfaces.Comum.IConfiguracaoTabProvider, JT_Food.Shared.Services.RestauranteConfigTabProvider>();
-
+builder.Services.AddJTFoodServices();
 await builder.Build().RunAsync();

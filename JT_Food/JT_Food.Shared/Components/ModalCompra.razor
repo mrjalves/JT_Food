@@ -1,7 +1,9 @@
-@using JT_Classes.Restaurante
-@using JT_Food.Shared.Services
+﻿@using JT_Classes.Restaurante
+@using JT_Servicos.Restaurante
 @using JT_Food.Shared.BusinessLogic
 @using JT_UserInterface.Shared.Components.Core
+@inject JT_Servicos.Restaurante.InsumoService InsumoService
+@inject ComercialLogic ComercialLogic
 
 <Modal @ref="modalRef" Title="Nova Compra (Entrada de Estoque)" SizeCssClass="modal-lg" EntidadeContexto="Compra">
     <BodyContent>
@@ -81,7 +83,17 @@
     </BodyContent>
     <FooterContent>
         <button type="button" class="btn btn-secondary" @onclick="Close">Cancelar</button>
-        <button type="button" class="btn btn-primary" @onclick="Finalizar">Salvar</button>
+        <button type="button" class="btn btn-primary" @onclick="FinalizarAsync" disabled="@isSalvando">
+            @if (isSalvando)
+            {
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                <span>Salvando...</span>
+            }
+            else
+            {
+                <span>Salvar</span>
+            }
+        </button>
     </FooterContent>
 </Modal>
 
@@ -93,12 +105,13 @@
     private MItemCompra itemTemp = new();
     private string insumoSelecionadoId = "";
     private List<MInsumo> insumosDisponiveis = new();
+    private bool isSalvando = false;
     
     private Modal modalRef = default!;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        insumosDisponiveis = InsumoService.GetAll();
+        insumosDisponiveis = await InsumoService.GetAll() ?? new List<MInsumo>();
     }
 
     public void Open()
@@ -131,9 +144,12 @@
         }
     }
 
-    private async Task Finalizar()
+    private async Task FinalizarAsync()
     {
-        var result = ComercialLogic.FinalizarCompra(Compra, Itens);
+        isSalvando = true;
+        var result = await ComercialLogic.FinalizarCompraAsync(Compra, Itens);
+        isSalvando = false;
+        
         if (result.Sucesso)
         {
             await OnSaved.InvokeAsync();
@@ -141,3 +157,4 @@
         }
     }
 }
+

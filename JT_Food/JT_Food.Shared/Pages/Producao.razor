@@ -1,34 +1,41 @@
-@page "/producao"
+﻿@page "/producao"
 @using JT_Classes.Acessos
 @using JT_Classes.Restaurante
-@using JT_Food.Shared.Services
 @using JT_Food.Shared.BusinessLogic
+@using JT_Servicos.Restaurante
 @using JT_UserInterface.Shared.Components
-@inject CurrentUserState UserState
-<PageTitle>Produção e Baixa de Insumos - JT Food</PageTitle>
+@inject ProducaoLogic ProducaoLogic
+@inject ProdutoRestauranteService ProdutoService
+@inject JT_Servicos.Restaurante.ProducaoService ProducaoService
+@inject JT_Classes.Acessos.CurrentUserState UserState
 
-<div class="container-fluid py-4">
-    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2">Painel de Produção (FIFO)</h1>
+<div class="container-fluid p-3">
+    <div class="row mb-3">
+        <div class="col">
+            <h3 class="mb-0">ProduÃ§Ã£o</h3>
+            <p class="text-muted">Registro de produÃ§Ã£o e baixa automÃ¡tica de insumos.</p>
+        </div>
     </div>
 
     @if (!string.IsNullOrEmpty(mensagemAlerta))
     {
         <div class="alert @classeAlerta alert-dismissible fade show" role="alert">
             @mensagemAlerta
-            <button type="button" class="btn-close" @onclick="LimparAlerta"></button>
+            <button type="button" class="btn-close" @onclick="() => mensagemAlerta = null"></button>
         </div>
     }
 
     <div class="row">
-        <div class="col-md-6">
-            <div class="card shadow-sm">
+        <!-- Coluna de Registro -->
+        <div class="col-md-5 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">Nova ProduÃ§Ã£o</h5>
+                    <p class="card-text text-muted">A produÃ§Ã£o consumirÃ¡ insumos baseados no mÃ©todo FIFO (lote mais antigo primeiro).</p>
+                </div>
                 <div class="card-body">
-                    <h5 class="card-title">Nova Produção</h5>
-                    <p class="card-text text-muted">A produção consumirá insumos baseados no método FIFO (lote mais antigo primeiro).</p>
-
                     <div class="mb-3">
-                        <label class="form-label">Produto a Produzir (Requer Receita)</label>
+                        <label class="form-label">Produto</label>
                         <select class="form-select" @bind="produtoSelecionadoId">
                             <option value="">Selecione um Produto...</option>
                             @foreach (var prod in produtosComReceita)
@@ -38,41 +45,47 @@
                         </select>
                     </div>
 
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label class="form-label">Quantidade Produzida</label>
-                        <input type="number" class="form-control" @bind="quantidadeProduzida" min="1" step="1" />
+                        <input type="number" class="form-control" @bind="quantidadeProduzida" min="0.1" step="0.1" />
                     </div>
 
-                    <button class="btn btn-primary w-100" @onclick="RegistrarProducao" disabled="@isProcessando">
+                    <button class="btn btn-primary w-100" @onclick="RegistrarProducaoAsync" disabled="@isProcessando">
                         @if (isProcessando)
                         {
-                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                             <span>Processando...</span>
                         }
                         else
                         {
-                            <i class="fas fa-bolt me-2"></i> <span>Registrar Produção</span>
+                            <i class="fas fa-industry me-2"></i><span>Registrar ProduÃ§Ã£o e Baixar Estoque</span>
                         }
                     </button>
                 </div>
             </div>
         </div>
-        
-        <div class="col-md-6">
-            <div class="card shadow-sm">
+
+        <!-- Coluna de HistÃ³rico -->
+        <div class="col-md-7 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Ãšltimas ProduÃ§Ãµes</h5>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="CarregarHistoricoAsync">
+                        <i class="fas fa-sync-alt"></i> Atualizar
+                    </button>
+                </div>
                 <div class="card-body">
-                    <h5 class="card-title">Últimas Produções</h5>
                     @if (historicoProducao.Count == 0)
                     {
-                        <p class="text-muted">Nenhum registro de produção recente.</p>
+                        <p class="text-muted">Nenhum registro de produÃ§Ã£o recente.</p>
                     }
                     else
                     {
                         <div class="table-responsive">
-                            <table class="table table-sm table-striped">
+                            <table class="table table-hover align-middle">
                                 <thead>
                                     <tr>
-                                        <th>Data</th>
+                                        <th>Data/Hora</th>
                                         <th>Produto</th>
                                         <th>Qtd</th>
                                         <th>Custo Calc.</th>
@@ -104,51 +117,52 @@
     
     private string produtoSelecionadoId = "";
     private double quantidadeProduzida = 1;
-
+    
     private bool isProcessando = false;
-    private string mensagemAlerta = "";
-    private string classeAlerta = "alert-success";
-
+    private string? mensagemAlerta = null;
+    private string classeAlerta = "alert-info";
+    
     private string CurrentUserId = "1"; // TODO: Bind to Auth later.
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        CarregarDados();
+        CurrentUserId = UserState.UsuarioID.ToString();
+        await CarregarDadosIniciaisAsync();
     }
 
-    private void CarregarDados()
+    private async Task CarregarDadosIniciaisAsync()
     {
-        // Pega todos os produtos que possuem receita associada (flag) ou que estão vinculados a MReceita
-        // Para simplificar, pegamos todos, mas o correto seria filtrar por PossuiReceita == true
-        produtosComReceita = ProdutoService.GetAll().Where(r => r.UserId == UserState.UsuarioID.ToString() ).ToList();
-        historicoProducao = ProducaoService.GetAll().Where(p => p.UserId == UserState.UsuarioID.ToString()).ToList();
+        produtosComReceita = await ProdutoService.Find($"UserId = '{UserState.UsuarioID}'") ?? new List<MProduto>();
+        await CarregarHistoricoAsync();
     }
 
-    private async Task RegistrarProducao()
+    private async Task CarregarHistoricoAsync()
     {
-        LimparAlerta();
-        
+        historicoProducao = await ProducaoService.Find($"OperadorId = '{UserState.UsuarioID}'") ?? new List<MProducao>();
+    }
+
+    private async Task RegistrarProducaoAsync()
+    {
         if (string.IsNullOrEmpty(produtoSelecionadoId) || quantidadeProduzida <= 0)
         {
-            ExibirAlerta("Selecione um produto e uma quantidade válida.", "alert-warning");
+            ExibirAlerta("Selecione um produto e uma quantidade vÃ¡lida.", "alert-warning");
             return;
         }
 
         isProcessando = true;
+        mensagemAlerta = null;
         StateHasChanged();
 
-        // Simulate a slight delay to block UI (and show spinner) during calculation.
-        await Task.Delay(300); 
-
-        var resultado = ProducaoLogic.ProcessarProducao(produtoSelecionadoId, quantidadeProduzida, CurrentUserId);
+        var resultado = await ProducaoLogic.ProcessarProducaoAsync(produtoSelecionadoId, quantidadeProduzida, CurrentUserId);
 
         if (resultado.Sucesso)
         {
             ExibirAlerta(resultado.Mensagem, "alert-success");
-            // Refresh history
-            CarregarDados();
-            quantidadeProduzida = 1;
+            
+            // Limpa form e recarrega histÃ³rico
             produtoSelecionadoId = "";
+            quantidadeProduzida = 1;
+            await CarregarHistoricoAsync();
         }
         else
         {
@@ -159,16 +173,10 @@
         StateHasChanged();
     }
 
-    private void ExibirAlerta(string mensagem, string classe)
+    private void ExibirAlerta(string mensagem, string classeCss)
     {
         mensagemAlerta = mensagem;
-        classeAlerta = classe;
-    }
-
-    private void LimparAlerta()
-    {
-        mensagemAlerta = "";
+        classeAlerta = classeCss;
     }
 }
-
 

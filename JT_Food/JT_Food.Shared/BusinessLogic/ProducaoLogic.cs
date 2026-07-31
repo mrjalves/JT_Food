@@ -1,144 +1,153 @@
-using JT_Aplicacao.Classes;
-using JT_UserInterface.Shared.Services.Comum;
 using JT_Classes.Restaurante;
-using JT_Food.Shared.Services;
+using JT_Servicos.Restaurante;
 
 namespace JT_Food.Shared.BusinessLogic
 {
-    public static class ProducaoLogic
+    public class ProducaoLogic
     {
-        /// <summary>
-        /// Processa a produção de um item que tem receita e dá baixa nos insumos utilizando FIFO baseados nos lotes disponíveis.
-        /// </summary>
-        public static (bool Sucesso, string Mensagem) ProcessarProducao(string produtoId, double quantidadeProduzida, string operadorId)
-        {
-            var produto = ProdutoService.GetById(Convert.ToInt32(produtoId));
-            if (produto == null) return (false, "Produto não encontrado.");
+        private readonly ProdutoRestauranteService _produtoService;
+        private readonly ReceitaService _receitaService;
+        private readonly LoteInsumoService _loteInsumoService;
+        private readonly ProducaoService _producaoService;
+        private readonly MemoriaCalculoService _memoriaCalculoService;
+        private readonly AdicionaisItemComandaService _adicionaisItemComandaService;
 
-            // Get the Recipe items for this product
-            var receitas = ReceitaService.Find(new Dictionary<string, object> { { "ProdutoId", produtoId } });
+        public ProducaoLogic(
+            ProdutoRestauranteService produtoService,
+            ReceitaService receitaService,
+            LoteInsumoService loteInsumoService,
+            ProducaoService producaoService,
+            MemoriaCalculoService memoriaCalculoService,
+            AdicionaisItemComandaService adicionaisItemComandaService)
+        {
+            _produtoService = produtoService;
+            _receitaService = receitaService;
+            _loteInsumoService = loteInsumoService;
+            _producaoService = producaoService;
+            _memoriaCalculoService = memoriaCalculoService;
+            _adicionaisItemComandaService = adicionaisItemComandaService;
+        }
+
+        public async Task<(bool Sucesso, string Mensagem)> ProcessarProducaoAsync(string produtoId, double quantidadeProduzida, string ResponsavelId)
+        {
+            var produto = await _produtoService.GetById(Convert.ToInt32(produtoId));
+            if (produto == null) return (false, "Produto não encontrado.");
+            if (!produto.PossuiReceita) return (true, "Produto sem receita. Sem necessidade de baixa de insumos.");
+
+            var receitas = await _receitaService.Find($"ProdutoId = '{produtoId}'");
             if (receitas == null || !receitas.Any()) return (false, "Nenhuma receita cadastrada para este produto.");
 
-            double custoTotalProducao = 0;
-            List<MLoteInsumo> lotesAtualizados = new List<MLoteInsumo>();
-            List<MMemoriaCalculo> memoriasCalculo = new List<MMemoriaCalculo>();
+            double custoProducaoTotal = 0;
+            var lotesAtualizados = new List<MLoteInsumo>();
+            var memoriasCalculo = new List<MMemoriaCalculo>();
 
             foreach (var rec in receitas)
             {
                 double quantidadeNecessariaTotal = rec.Quantidade * quantidadeProduzida;
                 double quantidadeFaltante = quantidadeNecessariaTotal;
 
-                // Retrieve all unexhausted batches for this ingredient, ordered by DataEntrada (FIFO)
-                // Firestore não suporta o filtro complexo e ORDER BY via dicionário, então filtramos/ordenamos na memória
-                var lotesInsumo = LoteInsumoService.Find(new Dictionary<string, object> { { "InsumoId", rec.InsumoId } });
-                
-                if (lotesInsumo == null || !lotesInsumo.Any())
-                {
-                    return (false, $"Sem estoque para o insumo: {rec.NomeInsumo ?? rec.InsumoId}");
-                }
-
-                // Filtrar apenas lotes com estoque > 0 e ordenar por DataEntrada (FIFO)
-                var lotesFiltrados = lotesInsumo
-                    .Where(l => l.QuantidadeDisponivel > 0)
-                    .OrderBy(l => l.DataEntrada)
-                    .ToList();
-
-                if (!lotesFiltrados.Any())
-                {
-                    return (false, $"Sem estoque disponível para o insumo: {rec.NomeInsumo ?? rec.InsumoId}");
-                }
-
-                foreach (var lote in lotesFiltrados)
-                {
-                    if (quantidadeFaltante <= 0) break;
-
-                    double quantidadeConsumirDoLote = Math.Min(lote.QuantidadeDisponivel, quantidadeFaltante);
-                    
-                    lote.QuantidadeDisponivel -= quantidadeConsumirDoLote;
-                    if (lote.QuantidadeDisponivel == 0)
-                    {
-                        lote.Status = "Finalizado";
-                    }
-
-                    double custoFracao = quantidadeConsumirDoLote * lote.CustoUnitario;
-                    custoTotalProducao += custoFracao;
-                    quantidadeFaltante -= quantidadeConsumirDoLote;
-
-                    lotesAtualizados.Add(lote);
-
-                    // Create log
-                    memoriasCalculo.Add(new MMemoriaCalculo
-                    {
-                        ItemId = produtoId,
-                        LoteInsumoId = lote.Id.ToString(), // Assumed Id comes from ClasseBase int properties
-                        InsumoId = lote.InsumoId,
-                        QuantidadeConsumida = quantidadeConsumirDoLote,
-                        CustoUnitarioLote = lote.CustoUnitario,
-                        CustoTotalFracao = custoFracao,
-                        Descricao = $"Baixa para produção de {quantidadeProduzida}x {produto.Nome}"
-                    });
-                }
-
                 if (quantidadeFaltante > 0)
                 {
-                    return (false, $"Estoque insuficiente para o insumo {rec.NomeInsumo ?? rec.InsumoId}. Faltam {quantidadeFaltante} {rec.UnidadeMedida}");
+                    var lotesInsumo = await _loteInsumoService.Find($"InsumoId = '{rec.InsumoId}'");
+                    
+                    if (lotesInsumo == null || !lotesInsumo.Any())
+                        return (false, $"Sem estoque para o insumo: {rec.NomeInsumo ?? rec.InsumoId}");
+
+                    var lotesFiltrados = lotesInsumo
+                        .Where(l => l.Status != "Finalizado")
+                        .Where(l => l.QuantidadeDisponivel > 0)
+                        .OrderBy(l => l.DataEntrada)
+                        .ToList();
+
+                    if (!lotesFiltrados.Any())
+                        return (false, $"Sem estoque disponível para o insumo: {rec.NomeInsumo ?? rec.InsumoId}");
+
+                    foreach (var lote in lotesFiltrados)
+                    {
+                        if (quantidadeFaltante <= 0) break;
+
+                        double quantidadeConsumirDoLote = Math.Min(lote.QuantidadeDisponivel, quantidadeFaltante);
+
+                        lote.QuantidadeDisponivel -= quantidadeConsumirDoLote;
+                        if (lote.QuantidadeDisponivel == 0)
+                        {
+                            lote.Status = "Finalizado";
+                        }
+                        
+                        double custoFracao = quantidadeConsumirDoLote * lote.CustoUnitario;
+                        custoProducaoTotal += custoFracao;
+                        quantidadeFaltante -= quantidadeConsumirDoLote;
+
+                        lotesAtualizados.Add(lote);
+                        
+                        // Registrar memoria
+                        memoriasCalculo.Add(new MMemoriaCalculo
+                        {
+                            DataProcessamento = DateTime.UtcNow,
+                            LoteInsumoId = lote.Id.ToString(),
+                            InsumoId = lote.InsumoId,
+                            QuantidadeConsumida = quantidadeConsumirDoLote,
+                            CustoUnitarioLote = lote.CustoUnitario,
+                            CustoTotalFracao = custoFracao,
+                            Descricao = $"Baixa para produção de {quantidadeProduzida}x {produto.Nome}"
+                        });
+                    }
+
+                    if (quantidadeFaltante > 0)
+                    {
+                        return (false, $"Estoque insuficiente para o insumo {rec.NomeInsumo ?? rec.InsumoId}. Faltam {quantidadeFaltante} {rec.UnidadeMedida}");
+                    }
                 }
             }
 
-            // All ingredients processed successfully, now persist to DB
             foreach (var lote in lotesAtualizados)
             {
-                LoteInsumoService.Save(lote);
+                await _loteInsumoService.SaveAsync(lote);
             }
 
             double precoVendaTotalLote = (double)produto.Preco * quantidadeProduzida;
-            double lucroLote = precoVendaTotalLote - custoTotalProducao;
+            double margemLucro = precoVendaTotalLote > 0 ? ((precoVendaTotalLote - custoProducaoTotal) / precoVendaTotalLote) * 100 : 0;
 
             var producao = new MProducao
             {
-                UserId = operadorId, // Assuming UserId
                 ProdutoId = produtoId,
                 NomeProduto = produto.Nome,
+                DataProducao = DateTime.UtcNow,
                 QuantidadeProduzida = quantidadeProduzida,
-                ResponsavelId = operadorId,
-                CustoTotalCalculado = custoTotalProducao,
-                CustoUnitarioSugerido = quantidadeProduzida > 0 ? (custoTotalProducao / quantidadeProduzida) : 0,
-                PrecoVendaTotal = precoVendaTotalLote,
-                LucroLote = lucroLote,
-                Observacoes = "Produzido via regra de consumo FIFO"
+                CustoTotalCalculado = custoProducaoTotal,
+                LucroLote = margemLucro,
+                ResponsavelId = ResponsavelId
             };
-            ProducaoService.Save(producao);
+
+            await _producaoService.SaveAsync(producao);
 
             foreach (var mem in memoriasCalculo)
             {
                 mem.ReferenciaId = producao.Id.ToString();
-                MemoriaCalculoService.Save(mem);
+                await _memoriaCalculoService.SaveAsync(mem);
             }
 
-            return (true, $"Produção finalizada com sucesso! Custo: R$ {custoTotalProducao:F2}, Lucro: R$ {lucroLote:F2}");
+            return (true, $"Produção registrada com sucesso. Custo total: R$ {custoProducaoTotal:F2}");
         }
 
-        /// <summary>
-        /// Processa os adicionais vinculados a um MItemComanda, dando baixa FIFO nos insumos
-        /// de cada adicional que possui receita, somando ao custo da receita principal.
-        /// </summary>
-        public static (bool Sucesso, string Mensagem, double CustoAdicionais) ProcessarAdicionaisItem(string itemComandaId, string operadorId)
+        public async Task<(bool Sucesso, string Mensagem, double CustoAdicionais)> ProcessarAdicionaisItemAsync(string itemComandaId, string ResponsavelId)
         {
-            var adicionais = AdicionaisItemComandaService.Find(new Dictionary<string, object> { { "ItemComandaId", itemComandaId } });
+            var adicionais = await _adicionaisItemComandaService.Find($"ItemComandaId = '{itemComandaId}'");
             if (adicionais == null || !adicionais.Any())
                 return (true, "Nenhum adicional a processar.", 0);
 
             double custoTotalAdicionais = 0;
+            var memoriasCalculo = new List<MMemoriaCalculo>();
+            var lotesAtualizados = new List<MLoteInsumo>();
 
             foreach (var adicional in adicionais)
             {
-                var produto = ProdutoService.GetById(Convert.ToInt32(adicional.ProdutoId));
+                var produto = await _produtoService.GetById(Convert.ToInt32(adicional.ProdutoId));
                 if (produto == null) continue;
 
-                // Só dá baixa em estoque se o produto adicional tiver receita
                 if (!produto.PossuiReceita) continue;
 
-                var receitas = ReceitaService.Find(new Dictionary<string, object> { { "ProdutoId", adicional.ProdutoId } });
+                var receitas = await _receitaService.Find($"ProdutoId = '{adicional.ProdutoId}'");
                 if (receitas == null || !receitas.Any()) continue;
 
                 foreach (var rec in receitas)
@@ -146,56 +155,68 @@ namespace JT_Food.Shared.BusinessLogic
                     double quantidadeNecessaria = rec.Quantidade * adicional.Quantidade;
                     double quantidadeFaltante = quantidadeNecessaria;
 
-                    var allLotes = LoteInsumoService.Find(new Dictionary<string, object> { { "InsumoId", rec.InsumoId } });
-
+                    var allLotes = await _loteInsumoService.Find($"InsumoId = '{rec.InsumoId}'");
+                    
                     if (allLotes == null || !allLotes.Any())
                         return (false, $"Sem estoque para o insumo do adicional: {rec.NomeInsumo ?? rec.InsumoId}", 0);
 
-                    var lotesDisponiveis = allLotes
+                    var lotesFiltrados = allLotes
+                        .Where(l => l.Status != "Finalizado")
                         .Where(l => l.QuantidadeDisponivel > 0)
                         .OrderBy(l => l.DataEntrada)
                         .ToList();
 
-                    if (!lotesDisponiveis.Any())
-                        return (false, $"Sem estoque para o insumo do adicional: {rec.NomeInsumo ?? rec.InsumoId}", 0);
+                    if (!lotesFiltrados.Any())
+                        return (false, $"Sem estoque disponível para o insumo do adicional: {rec.NomeInsumo ?? rec.InsumoId}", 0);
 
-                    foreach (var lote in lotesDisponiveis)
+                    foreach (var lote in lotesFiltrados)
                     {
                         if (quantidadeFaltante <= 0) break;
 
-                        double qtdConsumida = Math.Min(lote.QuantidadeDisponivel, quantidadeFaltante);
-                        lote.QuantidadeDisponivel -= qtdConsumida;
-                        if (lote.QuantidadeDisponivel == 0) lote.Status = "Finalizado";
+                        double qtyConsumo = Math.Min(lote.QuantidadeDisponivel, quantidadeFaltante);
+                        
+                        lote.QuantidadeDisponivel -= qtyConsumo;
+                        if (lote.QuantidadeDisponivel == 0)
+                            lote.Status = "Finalizado";
 
-                        double custoFracao = qtdConsumida * lote.CustoUnitario;
+                        double custoFracao = qtyConsumo * lote.CustoUnitario;
                         custoTotalAdicionais += custoFracao;
-                        quantidadeFaltante -= qtdConsumida;
+                        quantidadeFaltante -= qtyConsumo;
 
-                        LoteInsumoService.Save(lote);
+                        lotesAtualizados.Add(lote);
 
-                        MemoriaCalculoService.Save(new MMemoriaCalculo
+                        memoriasCalculo.Add(new MMemoriaCalculo
                         {
-                            ItemId = itemComandaId,
+                            DataProcessamento = DateTime.UtcNow,
                             LoteInsumoId = lote.Id.ToString(),
                             InsumoId = lote.InsumoId,
-                            QuantidadeConsumida = qtdConsumida,
+                            QuantidadeConsumida = qtyConsumo,
                             CustoUnitarioLote = lote.CustoUnitario,
                             CustoTotalFracao = custoFracao,
-                            Descricao = $"Baixa para adicional '{produto.Nome}' no ItemComanda #{itemComandaId}"
+                            Descricao = $"Baixa para adicional {adicional.NomeProduto} (Item {itemComandaId})"
                         });
                     }
 
                     if (quantidadeFaltante > 0)
-                        return (false, $"Estoque insuficiente para {rec.NomeInsumo ?? rec.InsumoId} (adicional {produto.Nome}).", 0);
+                    {
+                         return (false, $"Estoque insuficiente para o adicional {adicional.NomeProduto}. Falta insumo {rec.NomeInsumo ?? rec.InsumoId}", 0);
+                    }
                 }
             }
 
-            return (true, $"Adicionais processados. Custo extra: R$ {custoTotalAdicionais:F2}", custoTotalAdicionais);
+            foreach (var lote in lotesAtualizados)
+            {
+                await _loteInsumoService.SaveAsync(lote);
+            }
+
+            foreach (var mem in memoriasCalculo)
+            {
+                mem.ReferenciaId = "Adicional-" + itemComandaId;
+                await _memoriaCalculoService.SaveAsync(mem);
+            }
+
+            return (true, "Adicionais baixados com sucesso.", custoTotalAdicionais);
         }
     }
 }
-
-
-
-
 

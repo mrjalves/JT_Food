@@ -1,7 +1,8 @@
-@page "/compras"
+﻿@page "/compras"
 @using JT_Classes.Restaurante
-@using JT_Food.Shared.Services
+@using JT_Servicos.Restaurante
 @using JT_Food.Shared.Components
+@inject CompraRestauranteService CompraService
 
 <PageTitle>Entrada de Estoque (Compras) - JT Food</PageTitle>
 
@@ -16,30 +17,29 @@
     <GridCompras Compras="compras" IsLoading="loading" />
 </div>
 
-<ModalCompra @ref="modalCompra" OnSaved="CarregarCompras" />
+<ModalCompra @ref="modalCompra" OnSaved="CarregarComprasAsync" />
 
 @code {
     private List<MCompra>? compras;
     private bool loading = true;
     private ModalCompra modalCompra = default!;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        CarregarCompras();
+        await CarregarComprasAsync();
     }
 
-    private void CarregarCompras()
+    private async Task CarregarComprasAsync()
     {
         loading = true;
-        compras = CompraService.GetAll();
+        compras = await CompraService.GetAll();
         loading = false;
         StateHasChanged();
     }
 
-    private async Task NovaCompra()
+    private void NovaCompra()
     {
         modalCompra.Open();
     }
 }
-
 

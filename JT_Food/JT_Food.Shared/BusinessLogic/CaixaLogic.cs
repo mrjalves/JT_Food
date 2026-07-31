@@ -1,13 +1,27 @@
-using JT_Classes.Restaurante;
-using JT_Food.Shared.Services;
+﻿using JT_Classes.Restaurante;
+using JT_Servicos.Restaurante;
 
 namespace JT_Food.Shared.BusinessLogic
 {
-    public static class CaixaLogic
+    public class CaixaLogic
     {
-        public static (bool Sucesso, string Mensagem, MCaixa? CaixaAtual) ObterCaixaAberto()
+        private readonly CaixaService _caixaService;
+        private readonly MovimentacaoCaixaService _movimentacaoCaixaService;
+        private readonly PagamentoComandaService _pagamentoComandaService;
+
+        public CaixaLogic(
+            CaixaService caixaService,
+            MovimentacaoCaixaService movimentacaoCaixaService,
+            PagamentoComandaService pagamentoComandaService)
         {
-            var caixas = CaixaService.Find(new Dictionary<string, object> { { "Status", "Aberto" } });
+            _caixaService = caixaService;
+            _movimentacaoCaixaService = movimentacaoCaixaService;
+            _pagamentoComandaService = pagamentoComandaService;
+        }
+
+        public async Task<(bool Sucesso, string Mensagem, MCaixa? CaixaAtual)> ObterCaixaAbertoAsync()
+        {
+            var caixas = await _caixaService.Find("Status = 'Aberto'");
             if (caixas != null && caixas.Any())
             {
                 return (true, "Caixa aberto encontrado.", caixas.FirstOrDefault());
@@ -16,9 +30,9 @@ namespace JT_Food.Shared.BusinessLogic
             return (false, "Nenhum caixa aberto neste momento.", null);
         }
 
-        public static (bool Sucesso, string Mensagem) AbrirCaixa(string operadorId, double saldoInicial, string? observacao)
+        public async Task<(bool Sucesso, string Mensagem)> AbrirCaixaAsync(string operadorId, double saldoInicial, string? observacao)
         {
-            var situacaoAtual = ObterCaixaAberto();
+            var situacaoAtual = await ObterCaixaAbertoAsync();
             if (situacaoAtual.Sucesso)
             {
                 return (false, "Já existe um caixa aberto. Feche-o primeiro.");
@@ -34,20 +48,20 @@ namespace JT_Food.Shared.BusinessLogic
                 Observacao = observacao
             };
 
-            bool salvou = CaixaService.Save(novoCaixa);
+            bool salvou = await _caixaService.SaveAsync(novoCaixa) > 0;
             
             if (salvou)
             {
-                RegistrarMovimentacao(novoCaixa.Id.ToString(), operadorId, "Abertura", "Entrada", saldoInicial, "Dinheiro", "Abertura de Caixa");
+                await RegistrarMovimentacaoAsync(novoCaixa.Id.ToString(), operadorId, "Abertura", "Entrada", saldoInicial, "Dinheiro", "Abertura de Caixa");
                 return (true, "Caixa aberto com sucesso.");
             }
 
             return (false, "Erro ao abrir o caixa.");
         }
 
-        public static (bool Sucesso, string Mensagem) FecharCaixa(string caixaId, string operadorId, double saldoInformado, string? observacao)
+        public async Task<(bool Sucesso, string Mensagem)> FecharCaixaAsync(string caixaId, string operadorId, double saldoInformado, string? observacao)
         {
-            var caixa = CaixaService.GetById(Convert.ToInt32(caixaId));
+            var caixa = await _caixaService.GetById(Convert.ToInt32(caixaId));
             if (caixa == null || caixa.Status != "Aberto")
             {
                 return (false, "Caixa inválido ou já fechado.");
@@ -59,33 +73,33 @@ namespace JT_Food.Shared.BusinessLogic
             caixa.Status = "Fechado";
             caixa.Observacao += $"\nFechamento: {observacao}";
 
-            bool salvou = CaixaService.Save(caixa);
+            bool salvou = await _caixaService.SaveAsync(caixa) > 0;
             if (salvou)
             {
-                RegistrarMovimentacao(caixa.Id.ToString(), operadorId, "Fechamento", "Saida", saldoInformado, "Dinheiro", "Fechamento de Caixa");
+                await RegistrarMovimentacaoAsync(caixa.Id.ToString(), operadorId, "Fechamento", "Saida", saldoInformado, "Dinheiro", "Fechamento de Caixa");
                 return (true, "Caixa fechado com sucesso.");
             }
 
             return (false, "Erro ao fechar o caixa.");
         }
 
-        public static (bool Sucesso, string Mensagem) TrocarOperadorCaixa(string caixaId, string antigoOperadorId, string novoOperadorId)
+        public async Task<(bool Sucesso, string Mensagem)> TrocarOperadorCaixaAsync(string caixaId, string antigoOperadorId, string novoOperadorId)
         {
-             var caixa = CaixaService.GetById(Convert.ToInt32(caixaId));
+            var caixa = await _caixaService.GetById(Convert.ToInt32(caixaId));
             if (caixa == null || caixa.Status != "Aberto")
             {
                 return (false, "Caixa inválido ou fechado.");
             }
             
             caixa.Observacao += $"\nTroca de operador. Saiu:{antigoOperadorId} Entrou:{novoOperadorId} as {DateTime.UtcNow:dd/MM/yyyy HH:mm}";
-            CaixaService.Save(caixa);
+            await _caixaService.SaveAsync(caixa);
 
-            RegistrarMovimentacao(caixa.Id.ToString(), novoOperadorId, "TrocaOperador", "Calculo", 0.0, "-", $"Assumiu o caixa de {antigoOperadorId}");
+            await RegistrarMovimentacaoAsync(caixa.Id.ToString(), novoOperadorId, "TrocaOperador", "Calculo", 0.0, "-", $"Assumiu o caixa de {antigoOperadorId}");
 
             return (true, "Troca de operador registrada com sucesso.");
         }
 
-        public static void RegistrarMovimentacao(string caixaId, string operadorId, string tipoMovimentacao, string natureza, double valor, string formaPagamento, string? descricao = null, string? comandaId = null)
+        public async Task RegistrarMovimentacaoAsync(string caixaId, string operadorId, string tipoMovimentacao, string natureza, double valor, string formaPagamento, string? descricao = null, string? comandaId = null)
         {
             var mov = new MMovimentacaoCaixa
             {
@@ -100,18 +114,18 @@ namespace JT_Food.Shared.BusinessLogic
                 DataHora = DateTime.UtcNow
             };
 
-            MovimentacaoCaixaService.Save(mov);
+            await _movimentacaoCaixaService.SaveAsync(mov);
 
             // Update running total
             if (natureza == "Entrada" || natureza == "Saida")
             {
-                 var caixa = CaixaService.GetById(Convert.ToInt32(caixaId));
+                 var caixa = await _caixaService.GetById(Convert.ToInt32(caixaId));
                  if (caixa != null && tipoMovimentacao != "Abertura" && tipoMovimentacao != "Fechamento")
                  {
                      if (natureza == "Entrada") caixa.SaldoFinalCalculado += valor;
                      if (natureza == "Saida") caixa.SaldoFinalCalculado -= valor;
 
-                     CaixaService.Save(caixa);
+                     await _caixaService.SaveAsync(caixa);
                  }
             }
         }
@@ -120,13 +134,13 @@ namespace JT_Food.Shared.BusinessLogic
         /// Registra um pagamento parcial na comanda e lança a movimentação no caixa aberto.
         /// Suporta rateio de conta com múltiplas formas de pagamento.
         /// </summary>
-        public static (bool Sucesso, string Mensagem) RegistrarPagamentoParcial(
+        public async Task<(bool Sucesso, string Mensagem)> RegistrarPagamentoParcialAsync(
             string comandaId, string formaPagamento, double valor, string operadorId, string? observacao = null)
         {
             if (valor <= 0)
                 return (false, "O valor do pagamento deve ser maior que zero.");
 
-            var resultCaixa = ObterCaixaAberto();
+            var resultCaixa = await ObterCaixaAbertoAsync();
             if (!resultCaixa.Sucesso)
                 return (false, "Nenhum caixa aberto. Abra o caixa antes de registrar pagamentos.");
 
@@ -140,12 +154,12 @@ namespace JT_Food.Shared.BusinessLogic
                 Observacao = observacao
             };
 
-            bool salvo = PagamentoComandaService.Save(pagamento);
+            bool salvo = await _pagamentoComandaService.SaveAsync(pagamento) > 0;
             if (!salvo)
                 return (false, "Erro ao gravar o pagamento parcial.");
 
             // Registrar a entrada no caixa para manter o saldo calculado
-            RegistrarMovimentacao(
+            await RegistrarMovimentacaoAsync(
                 resultCaixa.CaixaAtual!.Id.ToString(),
                 operadorId,
                 "Venda",
@@ -163,10 +177,10 @@ namespace JT_Food.Shared.BusinessLogic
         /// Verifica se a soma dos pagamentos registrados cobre o total da comanda.
         /// A comanda só pode ser baixada quando SaldoPendente &lt;= 0.
         /// </summary>
-        public static (bool Quitada, double TotalPago, double SaldoPendente) VerificarComandaQuitada(
+        public async Task<(bool Quitada, double TotalPago, double SaldoPendente)> VerificarComandaQuitadaAsync(
             string comandaId, double totalComanda)
         {
-            var pagamentos = PagamentoComandaService.Find(new Dictionary<string, object> { { "ComandaId", comandaId } });
+            var pagamentos = await _pagamentoComandaService.Find($"ComandaId = '{comandaId}'");
             double totalPago = pagamentos?.Sum(p => p.Valor) ?? 0;
             double saldoPendente = totalComanda - totalPago;
 
@@ -177,4 +191,3 @@ namespace JT_Food.Shared.BusinessLogic
         }
     }
 }
-

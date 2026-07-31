@@ -1,4 +1,4 @@
-﻿using JT_Aplicacao.Config;
+using JT_Aplicacao.Config;
 using JT_Classes.Acessos;
 using JT_Food.Shared;
 using JT_Food.Web.Components;
@@ -47,6 +47,28 @@ builder.Services.AddScoped(sp =>
 builder.Services.AddJTUserInterface();
 builder.Services.AddScoped<ISecureStorageService, JT_Food.Shared.Services.WebSecureStorageService>();
 builder.Services.AddJTFoodServices();
+
+// Acionar o migrador de banco de dados para os módulos que o JT_Food utiliza
+var stringConexao = builder.Configuration["Config:Conexao:StringConexao"];
+var tipoBanco = builder.Configuration["Config:Conexao:TipoBanco"] ?? "SqlServer";
+
+if (!string.IsNullOrWhiteSpace(stringConexao))
+{
+    var configCliente = new JT_Aplicacao.Config.ConfigCliente
+    {
+        StringConexao = stringConexao,
+        TipoBanco = tipoBanco,
+        ModulosAtivos = new List<JT_Aplicacao.Classes.eModuloSistema>
+        {
+            JT_Aplicacao.Classes.eModuloSistema.Gestao,
+            JT_Aplicacao.Classes.eModuloSistema.Restaurante,
+            JT_Aplicacao.Classes.eModuloSistema.Food
+        }
+    };
+
+    var orquestrador = new JT_Infra_Data.Schemas.ModuloMigrationOrchestrator();
+    orquestrador.Executar("JT_Food_Auto", configCliente);
+}
 
 var app = builder.Build();
 

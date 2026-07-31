@@ -1,18 +1,22 @@
-@using JT_Classes.Restaurante
-@using JT_Food.Shared.Services
+﻿@using JT_Classes.Restaurante
+@using JT_Servicos.Restaurante
 @using JT_UserInterface.Shared.Components.Core
+
+@inject MesaService MesaService
+@inject ComandaService ComandaService
 
 <Modal @ref="modalRef" Title="@($"Dados da Comanda #" + Comanda.Id)" EntidadeContexto="Comanda">
     <BodyContent>
         <div class="mb-3">
-            <label class="form-label">Cliente</label>
+            <label class="form-label">Nome do Cliente</label>
             <input type="text" class="form-control" @bind="Comanda.NomeCliente" />
         </div>
+
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label class="form-label">Mesa</label>
                 <select class="form-select" @bind="Comanda.MesaId">
-                    <option value="">Sem Mesa</option>
+                    <option value="">(Sem Mesa)</option>
                     @foreach (var m in mesas)
                     {
                         <option value="@m.Id">@m.Identificacao</option>
@@ -22,37 +26,39 @@
             <div class="col-md-6 mb-3">
                 <label class="form-label">Status</label>
                 <select class="form-select" @bind="Comanda.Status">
-                    <option value="Aberta">Aberta</option>
-                    <option value="Fechada">Fechada</option>
-                    <option value="Cancelada">Cancelada</option>
+                    <option value="Aberto">Aberto</option>
+                    <option value="Fechado">Fechado</option>
+                    <option value="Cancelado">Cancelado</option>
                 </select>
             </div>
         </div>
+
+        <div class="d-flex justify-content-end gap-2 mt-4">
+            <button class="btn btn-secondary" @onclick="Close">Cancelar</button>
+            <button class="btn btn-primary" @onclick="Salvar">Salvar</button>
+        </div>
     </BodyContent>
-    <FooterContent>
-        <button type="button" class="btn btn-secondary" @onclick="Close">Cancelar</button>
-        <button type="button" class="btn btn-primary" @onclick="Save">Salvar</button>
-    </FooterContent>
 </Modal>
 
 @code {
     [Parameter] public Comanda Comanda { get; set; } = new();
     [Parameter] public EventCallback OnSaved { get; set; }
-
+    
     private Modal modalRef = default!;
     private List<Mesa> mesas = new();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        mesas = MesaService.GetAll().Where(x => x.Status == StatusMesa.Livre || x.Id.ToString() == Comanda.MesaId).ToList();
+        var todasMesas = await MesaService.GetAll();
+        mesas = todasMesas.Where(x => x.Status == StatusMesa.Livre || x.Id.ToString() == Comanda.MesaId).ToList();
     }
 
     public void Open() => modalRef.Open();
     public void Close() => modalRef.Close();
 
-    private async Task Save()
+    private async Task Salvar()
     {
-        if (ComandaService.Save(Comanda))
+        if (await ComandaService.SaveAsync(Comanda) > 0)
         {
             await OnSaved.InvokeAsync();
             Close();
