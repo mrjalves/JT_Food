@@ -1,12 +1,10 @@
-﻿using JT_Aplicacao.Config;
-using JT_Classes.Acessos;
-using JT_Food.Shared.Layout;
-using JT_UserInterface.Shared.Services.Interfaces.Comum;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using System.Net.Http;
 using JT_Food.Shared.BusinessLogic;
-using JT_Food.Shared.Services;
+using JT_Food.Shared.Layout;
+using JT_Servicos.Interfaces;
+using JT_Servicos.Restaurante;
+using JT_UserInterface.Shared.Services.Interfaces.Comum;
+using JT_UserInterface.Shared.Services.Providers;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace JT_Food.Shared
 {
@@ -17,6 +15,10 @@ namespace JT_Food.Shared
             services.AddScoped<IMenuProvider, MenuLateral>();
             services.AddScoped<IModuloMenuProvider, MenuLateral>();
             services.AddScoped<IConfiguracaoTabProvider, RestauranteConfigTabProvider>();
+
+            // Serviços de Configuração
+            services.AddScoped<MFoodConfiguracaoService>();
+            services.AddScoped<IMFoodConfiguracaoService, MFoodConfiguracaoService>();
 
             // Serviços do Módulo Restaurante
             services.AddScoped<JT_Servicos.Restaurante.MesaService>();
@@ -47,5 +49,3 @@ namespace JT_Food.Shared
         }
     }
 }
-
-

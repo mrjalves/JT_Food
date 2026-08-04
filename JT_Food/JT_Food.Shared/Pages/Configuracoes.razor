@@ -1,0 +1,14 @@
+@page "/configuracoes"
+@using JT_Classes.Restaurante
+@using JT_Servicos.Interfaces
+@inherits JT_UserInterface.Shared.Pages.Comum.ConfiguracoesBase<MFoodConfiguracao, IMFoodConfiguracaoService>
+
+<h3 class="mb-4 text-primary">
+    <i class="bi bi-gear-fill me-2"></i>@ObterTituloPagina()
+</h3>
+
+@RenderizarFormularioConfiguracoes()
+
+@code {
+    public override string ObterTituloPagina() => "Configurações do Restaurante";
+}
