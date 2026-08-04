@@ -51,10 +51,10 @@ namespace JT_Food
                 }
                 else
                 {
-                    Console.WriteLine("AVISO: appsettings.json nÃ£o encontrado.");
+                    Console.WriteLine("AVISO: appsettings.json não encontrado.");
                 }
 
-                // 2. ConfiguraÃ§Ã£o do Firebase via IOptions
+                // 2. Configuração do Firebase via IOptions
                 var secaoFConfig = builder.Configuration.GetSection("Config:FirebaseConfig");
                 var dadosFConfig = secaoFConfig.Get<FirebaseConfig>();
 
@@ -85,11 +85,11 @@ namespace JT_Food
                     return httpClient;
                 });
 
-                // 4. ServiÃ§os Globais
+                // 4. Serviços Globais
                 JT_UserInterface.Shared.DependencyInjection.AddJTUserInterface(builder.Services);
                 builder.Services.AddSingleton<ISecureStorageService, Services.MauiSecureStorageService>();
 
-                // 5. ServiÃ§os do JT_Food
+                // 5. Serviços do JT_Food
                 builder.Services.AddJTFoodServices();
 
 #if DEBUG
