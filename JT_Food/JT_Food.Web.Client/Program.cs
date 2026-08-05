@@ -30,9 +30,6 @@ builder.Services.AddScoped(sp =>
 
     var configPayload = new JT_Aplicacao.Config.ClientConfigPayload { ClientId = "JT_Food" };
     JT_Aplicacao.Config.Config.Instancia.ClientId = configPayload.ClientId;
-    var json = System.Text.Json.JsonSerializer.Serialize(configPayload);
-    var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
-    httpClient.DefaultRequestHeaders.Add("X-Client-Config", encoded);
 
     return httpClient;
 });
