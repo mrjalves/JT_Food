@@ -4,6 +4,8 @@
 @using JT_Food.Shared.Components
 
 @inject MesaService MesaService
+@inject IJSRuntime JSRuntime
+@implements IDisposable
 
 <PageTitle>Gestão de Mesas - JT Food</PageTitle>
 
@@ -25,6 +27,7 @@
     private bool loading = true;
     private Mesa mesaSelecionada = new();
     private ModalMesa modalMesa = default!;
+    private DotNetObjectReference<Mesas>? _pageRef;
 
     protected override async Task OnInitializedAsync()
     {
@@ -57,5 +60,61 @@
         {
             await CarregarMesasAsync();
         }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _pageRef == null)
+        {
+            _pageRef = DotNetObjectReference.Create(this);
+            try { await JSRuntime.InvokeVoidAsync("JTHotkeys.enableNewHotkeys", _pageRef); } catch { }
+        }
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    [JSInvokable]
+    public async Task OnNovoHotkey()
+    {
+        await InvokeAsync(NovaMesa);
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task HandleAcaoHotkey(string acao)
+    {
+        switch (acao)
+        {
+            case "salvar":
+                if (modalMesa.IsOpen)
+                    await modalMesa.SalvarAsync();
+                break;
+            case "cancelar":
+                if (modalMesa.IsOpen)
+                    modalMesa.Close();
+                break;
+            case "editar":
+                if (mesaSelecionada.Id != 0)
+                    await InvokeAsync(() => EditarMesa(mesaSelecionada));
+                break;
+            case "deletar":
+                if (mesaSelecionada.Id != 0)
+                    await InvokeAsync(() => ExcluirMesa(mesaSelecionada));
+                break;
+        }
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            if (_pageRef != null)
+            {
+                JSRuntime.InvokeVoidAsync("JTHotkeys.disableNewHotkeys");
+                _pageRef.Dispose();
+                _pageRef = null;
+            }
+        }
+        catch { }
     }
 }

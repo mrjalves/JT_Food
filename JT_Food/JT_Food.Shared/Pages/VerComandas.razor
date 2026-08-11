@@ -4,6 +4,8 @@
 @using JT_Food.Shared.Components
 
 @inject ComandaService ComandaService
+@inject IJSRuntime JSRuntime
+@implements IDisposable
 
 <PageTitle>Comandas - JT Food</PageTitle>
 
@@ -25,6 +27,7 @@
     private bool loading = true;
     private Comanda comandaSelecionada = new();
     private ModalComanda modalComanda = default!;
+    private DotNetObjectReference<VerComandas>? _pageRef;
 
     protected override async Task OnInitializedAsync()
     {
@@ -57,5 +60,61 @@
         {
             await CarregarAsync();
         }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _pageRef == null)
+        {
+            _pageRef = DotNetObjectReference.Create(this);
+            try { await JSRuntime.InvokeVoidAsync("JTHotkeys.enableNewHotkeys", _pageRef); } catch { }
+        }
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    [JSInvokable]
+    public async Task OnNovoHotkey()
+    {
+        await InvokeAsync(NovaComanda);
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task HandleAcaoHotkey(string acao)
+    {
+        switch (acao)
+        {
+            case "salvar":
+                if (modalComanda.IsOpen)
+                    await modalComanda.SalvarAsync();
+                break;
+            case "cancelar":
+                if (modalComanda.IsOpen)
+                    modalComanda.Close();
+                break;
+            case "editar":
+                if (comandaSelecionada.Id != 0)
+                    await InvokeAsync(() => EditarComanda(comandaSelecionada));
+                break;
+            case "deletar":
+                if (comandaSelecionada.Id != 0)
+                    await InvokeAsync(() => ExcluirComanda(comandaSelecionada));
+                break;
+        }
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            if (_pageRef != null)
+            {
+                JSRuntime.InvokeVoidAsync("JTHotkeys.disableNewHotkeys");
+                _pageRef.Dispose();
+                _pageRef = null;
+            }
+        }
+        catch { }
     }
 }

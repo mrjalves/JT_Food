@@ -83,7 +83,7 @@ html, body {
     font-family: var(--font-family-base);
     background-color: var(--background-color);
     color: var(--text-color);
-    font-size: 11px; /* Reduz a base global */
+    font-size: 12px; /* Reduz a base global */
 }
 
 a, .btn-link {
