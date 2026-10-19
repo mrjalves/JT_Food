@@ -30,7 +30,7 @@ jobs:
         with:
           repository: mrjalves/JT_ApplicationLayer
           token: ${{ secrets.GH_PAT }}
-          path: JT_ApplicationLayer
+          path: ../JT_ApplicationLayer
           ref: master
 
       # 3. Configura a versão do .NET para a compilação
