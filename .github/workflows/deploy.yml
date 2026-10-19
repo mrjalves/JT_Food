@@ -34,7 +34,17 @@ jobs:
           ref: Master
 
       - name: Prepare JT_ApplicationLayer sibling path
-        run: ln -sfn "$GITHUB_WORKSPACE/JT_ApplicationLayer" "$GITHUB_WORKSPACE/../JT_ApplicationLayer"
+        run: |
+          rm -rf "$GITHUB_WORKSPACE/../JT_ApplicationLayer"
+          mv "$GITHUB_WORKSPACE/JT_ApplicationLayer" "$GITHUB_WORKSPACE/../JT_ApplicationLayer"
+          # Garantir namespaces explícitos em componentes Razor modulares se ausentes
+          for f in "$GITHUB_WORKSPACE/../JT_ApplicationLayer/JT_UserInterface.Shared/Components"/*/*.razor; do
+            [ -f "$f" ] || continue
+            dir=$(basename "$(dirname "$f")")
+            if ! grep -q "@namespace" "$f"; then
+              sed -i "1s/^/@namespace JT_UserInterface.Shared.Components.$dir\n/" "$f"
+            fi
+          done
 
       # 3. Configura a versão do .NET para a compilação
       - name: Setup .NET

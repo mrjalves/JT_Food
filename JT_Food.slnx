@@ -1,4 +1,9 @@
 <Solution>
+  <Project Path="../JT_ApplicationLayer/JT_ApplicationLayer/JT_Aplicacao.csproj" />
+  <Project Path="../JT_ApplicationLayer/JT_Classes/JT_Classes.csproj" />
+  <Project Path="../JT_ApplicationLayer/JT_Infra_Data/JT_Infra_Data.csproj" />
+  <Project Path="../JT_ApplicationLayer/JT_RegraNegocios/JT_RegrasNegocios.csproj" />
+  <Project Path="../JT_ApplicationLayer/JT_Servicos/JT_Servicos.csproj" />
   <Project Path="../JT_ApplicationLayer/JT_UserInterface.Shared/JT_UserInterface.Shared.csproj" />
   <Project Path="JT_Food/JT_Food.Shared/JT_Food.Shared.csproj" />
   <Project Path="JT_Food/JT_Food.Web.Client/JT_Food.Web.Client.csproj" />

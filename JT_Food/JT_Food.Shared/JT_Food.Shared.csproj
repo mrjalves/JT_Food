@@ -24,13 +24,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\JT_ApplicationLayer\JT_UserInterface.Shared\JT_UserInterface.Shared.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\..\..\JT_ApplicationLayer\JT_ApplicationLayer\JT_Aplicacao.csproj" />
     <ProjectReference Include="..\..\..\JT_ApplicationLayer\JT_Classes\JT_Classes.csproj" />
+    <ProjectReference Include="..\..\..\JT_ApplicationLayer\JT_Infra_Data\JT_Infra_Data.csproj" />
+    <ProjectReference Include="..\..\..\JT_ApplicationLayer\JT_RegraNegocios\JT_RegrasNegocios.csproj" />
     <ProjectReference Include="..\..\..\JT_ApplicationLayer\JT_Servicos\JT_Servicos.csproj" />
+    <ProjectReference Include="..\..\..\JT_ApplicationLayer\JT_UserInterface.Shared\JT_UserInterface.Shared.csproj" />
   </ItemGroup>
 
 </Project>
