@@ -25,11 +25,16 @@ if (dadosFConfig != null)
 
 builder.Services.AddScoped(sp =>
 {
-    var baseUrl = builder.Configuration["Config:FirebaseConfig:BaseApiUrl"] ?? "https://localhost:7166";
+    var baseUrl = builder.Configuration["Config:Conexao:BaseApiUrl"]
+               ?? builder.Configuration["Config:FirebaseConfig:BaseApiUrl"]
+               ?? "https://api.jtecsistemas.com.br";
     var httpClient = new HttpClient { BaseAddress = new Uri(baseUrl) };
 
     var configPayload = new JT_Aplicacao.Config.ClientConfigPayload { ClientId = "JT_Food" };
-    JT_Aplicacao.Config.Config.Instancia.ClientId = configPayload.ClientId;
+    if (JT_Aplicacao.Config.Config.Instancia != null)
+    {
+        JT_Aplicacao.Config.Config.Instancia.ClientId = configPayload.ClientId;
+    }
 
     return httpClient;
 });

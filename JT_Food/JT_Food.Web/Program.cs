@@ -3,6 +3,7 @@ using JT_Classes.Acessos;
 using JT_Food.Shared;
 using JT_Food.Web.Components;
 using JT_UserInterface.Shared;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,12 +30,19 @@ if (dadosFConfig != null)
     builder.Services.AddSingleton(FirebaseConfig.Instancia);
 }
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 builder.Services.AddHttpClient();
 builder.Services.AddScoped(sp =>
 {
     var baseUrl = builder.Configuration["Config:Conexao:BaseApiUrl"]
                ?? builder.Configuration["Config:FirebaseConfig:BaseApiUrl"]
-               ?? "https://localhost:7166";
+               ?? "https://api.jtecsistemas.com.br";
     var httpClient = new HttpClient { BaseAddress = new Uri(baseUrl) };
 
     var configPayload = new JT_Aplicacao.Config.ClientConfigPayload { ClientId = "JT_Food" };
@@ -81,6 +89,8 @@ if (!string.IsNullOrWhiteSpace(stringConexao))
 }
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 if (app.Environment.IsDevelopment())
 {

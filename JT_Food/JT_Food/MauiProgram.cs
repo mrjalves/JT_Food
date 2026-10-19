@@ -67,7 +67,7 @@ namespace JT_Food
                 // 3. HttpClient com ajuste para Android Localhost
                 builder.Services.AddScoped(sp =>
                 {
-                    var baseAddressUrl = FirebaseConfig.Instancia?.BaseApiUrl ?? "https://localhost:7166";
+                    var baseAddressUrl = FirebaseConfig.Instancia?.BaseApiUrl ?? "https://api.jtecsistemas.com.br";
 
                     if (DeviceInfo.Platform == DevicePlatform.Android && baseAddressUrl.Contains("localhost"))
                     {
