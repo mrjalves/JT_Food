@@ -14,27 +14,13 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout JT_Food
-        uses: actions/checkout@v4
-        with:
-          path: JT_Food
+      - uses: actions/checkout@v4
 
-      # JT_Food referencia projetos de JT_ApplicationLayer por caminho relativo (../../../JT_ApplicationLayer)
-      # Requer uma Secret chamada GH_PAT (Personal Access Token com permissao 'repo') porque o repo é privado
-      - name: Checkout JT_ApplicationLayer
-        uses: actions/checkout@v4
-        with:
-          repository: mrjalves/JT_ApplicationLayer
-          token: ${{ secrets.GH_PAT }}
-          path: JT_ApplicationLayer
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET }}
 
       - name: Publish
-        working-directory: ./JT_Food
         run: dotnet publish ${{ env.PROJECT }} -c Release -o ./publish -p:ErrorOnDuplicatePublishOutputFiles=false
 
       - name: Configurar SSH
@@ -50,7 +36,6 @@ jobs:
           ssh-keyscan -T 10 -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
 
       - name: Enviar arquivos
-        working-directory: ./JT_Food
         run: |
           rsync -az --delete \
             --exclude 'appsettings.Production.json' \
