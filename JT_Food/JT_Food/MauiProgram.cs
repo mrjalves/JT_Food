@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using JT_Aplicacao;
 using JT_Aplicacao.Config;
 using JT_Classes.Acessos;
@@ -77,7 +77,10 @@ namespace JT_Food
                     var httpClient = new HttpClient { BaseAddress = new Uri(baseAddressUrl) };
                     
                     var configPayload = new ClientConfigPayload { ClientId = "JT_Food" };
-    JT_Aplicacao.Config.Config.Instancia.ClientId = configPayload.ClientId;
+                    if (JT_Aplicacao.Config.Config.Instancia != null)
+                    {
+                        JT_Aplicacao.Config.Config.Instancia.ClientId = configPayload.ClientId;
+                    }
                     var json = System.Text.Json.JsonSerializer.Serialize(configPayload);
                     var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
                     httpClient.DefaultRequestHeaders.Add("X-Client-Config", encoded);

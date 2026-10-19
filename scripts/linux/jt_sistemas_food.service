@@ -1,0 +1,22 @@
+[Unit]
+Description=JT Sistemas - Food Service Web Application (.NET 10)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/jt_food
+ExecStart=/usr/bin/dotnet /var/www/jt_food/JT_Food.Web.dll
+Restart=always
+RestartSec=10
+KillSignal=SIGINT
+SyslogIdentifier=jt_sistemas_food
+
+# Variáveis de ambiente da aplicação
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5041
+
+[Install]
+WantedBy=multi-user.target

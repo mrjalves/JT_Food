@@ -32,11 +32,16 @@ if (dadosFConfig != null)
 builder.Services.AddHttpClient();
 builder.Services.AddScoped(sp =>
 {
-    var baseUrl = builder.Configuration["Config:FirebaseConfig:BaseApiUrl"] ?? "https://localhost:7166";
+    var baseUrl = builder.Configuration["Config:Conexao:BaseApiUrl"]
+               ?? builder.Configuration["Config:FirebaseConfig:BaseApiUrl"]
+               ?? "https://localhost:7166";
     var httpClient = new HttpClient { BaseAddress = new Uri(baseUrl) };
 
     var configPayload = new JT_Aplicacao.Config.ClientConfigPayload { ClientId = "JT_Food" };
-    JT_Aplicacao.Config.Config.Instancia.ClientId = configPayload.ClientId;
+    if (JT_Aplicacao.Config.Config.Instancia != null)
+    {
+        JT_Aplicacao.Config.Config.Instancia.ClientId = configPayload.ClientId;
+    }
 
     return httpClient;
 });
@@ -64,7 +69,15 @@ if (!string.IsNullOrWhiteSpace(stringConexao))
     };
 
     var orquestrador = new JT_Infra_Data.Schemas.ModuloMigrationOrchestrator();
-    orquestrador.Executar("JT_Food_Auto", configCliente);
+    try
+    {
+        orquestrador.Executar("JT_Food_Auto", configCliente);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[MIGRACAO][ERRO] Falha na migração automática: {ex.Message}");
+        Console.WriteLine("[MIGRACAO][AVISO] A aplicação continuará normalmente. Verifique o schema manualmente se necessário.");
+    }
 }
 
 var app = builder.Build();
@@ -80,7 +93,10 @@ else
 }
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.Use(async (context, next) =>
 {
