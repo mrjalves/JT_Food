@@ -23,12 +23,19 @@ if (dadosFConfig != null)
     builder.Services.AddSingleton(FirebaseConfig.Instancia);
 }
 
+builder.Services.AddScoped<JT_Classes.Acessos.ISecureStorageService, JT_Food.Shared.Services.WebSecureStorageService>();
+
+builder.Services.AddJTUserInterface();
+
 builder.Services.AddScoped(sp =>
 {
+    var factory = sp.GetRequiredService<IHttpClientFactory>();
+    var httpClient = factory.CreateClient(string.Empty);
+
     var baseUrl = builder.Configuration["Config:Conexao:BaseApiUrl"]
                ?? builder.Configuration["Config:FirebaseConfig:BaseApiUrl"]
                ?? "https://api.jtecsistemas.com.br";
-    var httpClient = new HttpClient { BaseAddress = new Uri(baseUrl) };
+    httpClient.BaseAddress = new Uri(baseUrl);
 
     var configPayload = new JT_Aplicacao.Config.ClientConfigPayload { ClientId = "JT_Food" };
     if (JT_Aplicacao.Config.Config.Instancia != null)
@@ -36,12 +43,15 @@ builder.Services.AddScoped(sp =>
         JT_Aplicacao.Config.Config.Instancia.ClientId = configPayload.ClientId;
     }
 
+    var json = System.Text.Json.JsonSerializer.Serialize(configPayload);
+    var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
+    if (!httpClient.DefaultRequestHeaders.Contains("X-Client-Config"))
+    {
+        httpClient.DefaultRequestHeaders.Add("X-Client-Config", encoded);
+    }
+
     return httpClient;
 });
-
-builder.Services.AddScoped<JT_Classes.Acessos.ISecureStorageService, JT_Food.Shared.Services.WebSecureStorageService>();
-
-builder.Services.AddJTUserInterface();
 
 builder.Services.AddJTFoodServices();
 await builder.Build().RunAsync();
