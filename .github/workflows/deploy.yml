@@ -1,36 +1,49 @@
 name: Deploy Food
 
-on:
-  push:
-    branches: [main]
+on:  
+  push:    
+    branches: [main, APP]  
   workflow_dispatch:
 
-concurrency:
-  group: deploy-food
+concurrency:  
+  group: deploy-food  
   cancel-in-progress: false
 
-env:
-  PROJECT: src/JT_Food.Web            # ajuste: caminho real do projeto web no repo
-  SERVICE: jt_sistemas_food
-  DEST: /var/www/jt_sistemas_food
-  DOTNET: 9.0.x                       # ajuste para o TargetFramework
+env:  
+  # ATENÇÃO: Verifica se o nome das pastas corresponde exatamente ao teu projeto
+  PROJECT: JT_Food/JT_Food.Web/JT_Food.Web.csproj  
+  SERVICE: jt_sistemas_food  
+  DEST: /var/www/jt_sistemas_food  
+  DOTNET: 10.0.x
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
+jobs:  
+  deploy:    
+    runs-on: ubuntu-latest    
     steps:
-      - uses: actions/checkout@v4
+      # 1. Faz o checkout do repositório principal (Projeto Food)
+      - name: Checkout Application
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-dotnet@v4
+      # 2. Faz o checkout do repositório secundário (ApplicationLayer)
+      - name: Checkout JT_ApplicationLayer
+        uses: actions/checkout@v4
+        with:
+          repository: mrjalves/JT_ApplicationLayer
+          token: ${{ secrets.GH_PAT }}
+          path: JT_ApplicationLayer
+          ref: master
+
+      # 3. Configura a versão do .NET para a compilação
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET }}
 
+      # 4. Publica a aplicação gerando os ficheiros finais
       - name: Publish
-        run: >
-          dotnet publish ${{ env.PROJECT }}
-          -c Release -o ./publish
-          -p:ErrorOnDuplicatePublishOutputFiles=false
+        run: dotnet publish ${{ env.PROJECT }} -c Release -o ./publish -p:ErrorOnDuplicatePublishOutputFiles=false
 
+      # 5. Configura a chave SSH para comunicar de forma segura com o servidor (VPS)
       - name: Configurar SSH
         env:
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
@@ -44,7 +57,8 @@ jobs:
           ssh-keyscan -T 10 -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
           test -s ~/.ssh/known_hosts
 
-      - name: Enviar arquivos
+      # 6. Envia os ficheiros compilados para o teu servidor Linux usando rsync
+      - name: Enviar ficheiros
         run: |
           rsync -az --delete \
             --exclude 'appsettings.json' \
@@ -53,11 +67,11 @@ jobs:
             --exclude '*.db-shm' \
             --exclude '*.db-wal' \
             --exclude 'uploads/' \
-            --exclude 'files/' \
             -e "ssh -p ${{ secrets.VPS_PORT }}" \
             ./publish/ \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.DEST }}/
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ secrets.VPS_PATH || env.DEST }}/
 
+      # 7. Acede ao servidor via SSH para reiniciar a aplicação e verificar se está a correr
       - name: Reiniciar e verificar
         run: |
           ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'bash -s' <<'EOF'
@@ -69,5 +83,6 @@ jobs:
             journalctl -u ${{ env.SERVICE }} -n 50 --no-pager
             exit 1
           fi
-          echo "Serviço ativo."
+          echo "Serviço ativo. Logs de migração:"
+          journalctl -u ${{ env.SERVICE }} -n 30 --no-pager | grep -A5 MIGRACAO || true
           EOF
