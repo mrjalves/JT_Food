@@ -14,10 +14,10 @@
                   OnRowClick="HandleRowClick"
                   UseServerPagination="false">
             <HeaderTemplate>
-                <th>Identificação</th>
+                <th>IdentificaÃ§Ã£o</th>
                 <th>Capacidade</th>
                 <th>Status</th>
-                <th class="text-end">Ações</th>
+                <th class="text-end">AÃ§Ãµes</th>
             </HeaderTemplate>
             <RowTemplate Context="mesa">
                 <td>@mesa.Identificacao</td>
@@ -56,4 +56,4 @@
         StatusMesa.Reservada => "bg-info",
         _ => "bg-secondary"
     };
-}
+}
