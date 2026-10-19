@@ -62,11 +62,12 @@ echo "Regra sudoers criada com sucesso em $SUDOERS_FILE."
 
 echo "=== [5/6] Configuração do Nginx (opcional) ==="
 if [ -d "/etc/nginx" ]; then
+    mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
     if [ -f "$SCRIPT_DIR/nginx-jt_food.conf" ]; then
-        cp "$SCRIPT_DIR/nginx-jt_food.conf" "/etc/nginx/sites-available/jt_food"
-        if [ ! -f "/etc/nginx/sites-enabled/jt_food" ]; then
-            ln -s "/etc/nginx/sites-available/jt_food" "/etc/nginx/sites-enabled/jt_food"
-            echo "Link simbólico criado em /etc/nginx/sites-enabled/jt_food"
+        cp "$SCRIPT_DIR/nginx-jt_food.conf" "/etc/nginx/sites-available/jt_sistemas_food"
+        if [ ! -e "/etc/nginx/sites-enabled/jt_sistemas_food" ]; then
+            ln -s "/etc/nginx/sites-available/jt_sistemas_food" "/etc/nginx/sites-enabled/"
+            echo "Link simbólico criado em /etc/nginx/sites-enabled/jt_sistemas_food"
         fi
         nginx -t && systemctl reload nginx || echo "Verifique as configurações do Nginx manualmente."
     fi
@@ -90,7 +91,7 @@ echo "Serviço systemd  : $SERVICE_NAME"
 echo "Usuário deploy   : $DEPLOY_USER"
 echo ""
 echo "Próximos passos:"
-echo "1. Ajuste o domínio em /etc/nginx/sites-available/jt_food (se aplicável)."
+echo "1. Ajuste o server_name em /etc/nginx/sites-available/jt_sistemas_food e rode: nginx -t && systemctl reload nginx"
 echo "2. Revise $APP_DIR/appsettings.Production.json com as credenciais do banco."
 echo "3. Execute o workflow do GitHub Actions para realizar o primeiro deploy!"
 echo "=============================================================================="
