@@ -30,8 +30,11 @@ jobs:
         with:
           repository: mrjalves/JT_ApplicationLayer
           token: ${{ secrets.GH_PAT }}
-          path: ../JT_ApplicationLayer
+          path: JT_ApplicationLayer
           ref: master
+
+      - name: Prepare JT_ApplicationLayer sibling path
+        run: ln -sfn "$GITHUB_WORKSPACE/JT_ApplicationLayer" "$GITHUB_WORKSPACE/../JT_ApplicationLayer"
 
       # 3. Configura a versão do .NET para a compilação
       - name: Setup .NET
