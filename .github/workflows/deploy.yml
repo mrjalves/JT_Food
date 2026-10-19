@@ -31,7 +31,7 @@ jobs:
           repository: mrjalves/JT_ApplicationLayer
           token: ${{ secrets.GH_PAT }}
           path: JT_ApplicationLayer
-          ref: master
+          ref: Master
 
       - name: Prepare JT_ApplicationLayer sibling path
         run: ln -sfn "$GITHUB_WORKSPACE/JT_ApplicationLayer" "$GITHUB_WORKSPACE/../JT_ApplicationLayer"
