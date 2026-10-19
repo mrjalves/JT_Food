@@ -20,11 +20,12 @@ jobs:
           path: JT_Food
 
       # JT_Food referencia projetos de JT_ApplicationLayer por caminho relativo (../../../JT_ApplicationLayer)
+      # Requer uma Secret chamada GH_PAT (Personal Access Token com permissao 'repo') porque o repo é privado
       - name: Checkout JT_ApplicationLayer
         uses: actions/checkout@v4
         with:
           repository: mrjalves/JT_ApplicationLayer
-          token: ${{ secrets.GH_PAT || github.token }}
+          token: ${{ secrets.GH_PAT }}
           path: JT_ApplicationLayer
 
       - name: Setup .NET
