@@ -2,7 +2,7 @@ name: Deploy Food
 
 on:  
   push:    
-    branches: [main, APP]  
+    branches: [master]  
   workflow_dispatch:
 
 concurrency:  
