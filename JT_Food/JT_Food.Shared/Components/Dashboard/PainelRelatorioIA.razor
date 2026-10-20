@@ -3,54 +3,88 @@
 @inject RelatorioIALogic RelatorioLogic
 @inject IIAAnalyticsService IAService
 
-<div class="painel-relatorio-ia card border-0 shadow-sm" style="border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0 !important;">
-    <div class="card-header text-white p-3 d-flex flex-wrap justify-content-between align-items-center"
-         style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 60%, #4338ca 100%); border-bottom: none;">
-        <div>
-            <h5 class="mb-0 fw-bold"><i class="bi bi-stars text-warning me-2"></i>Consultor Executivo IA — JT_Food Insights</h5>
-            <small class="text-white-50">Diagnósticos inteligentes, otimização de cardápio e previsão de demanda</small>
+<div class="painel-relatorio-ia card border-0 shadow" style="border-radius: 20px; overflow: hidden; border: 1px solid rgba(226, 232, 240, 0.8) !important; background: #ffffff;">
+    <!-- 1. Cabeçalho Executivo Ultra Premium -->
+    <div class="card-header p-4 position-relative text-white"
+         style="background: linear-gradient(135deg, #090d16 0%, #1e1b4b 45%, #312e81 80%, #2563eb 100%); border-bottom: none;">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="ai-spark-box shadow">
+                    <i class="bi bi-stars"></i>
+                </div>
+                <div>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                        <h4 class="mb-0 fw-bold ai-title" style="color: #ffffff !important; letter-spacing: -0.02em;">
+                            Consultor Executivo IA <span class="ai-brand-badge">— JT_Food Insights</span>
+                        </h4>
+                        <span class="badge rounded-pill ai-status-badge">
+                            <span class="ai-pulse-dot"></span> Motor Ativo
+                        </span>
+                    </div>
+                    <p class="mb-0 small ai-subtitle" style="color: rgba(226, 232, 240, 0.9) !important;">
+                        Diagnósticos inteligentes, otimização de cardápio e detecção em tempo real de gargalos operacionais
+                    </p>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-sm btn-ai-refresh shadow-sm"
+                        @onclick='() => ExecutarGeracaoAsync(abaAtiva)'
+                        disabled="@gerando"
+                        title="Atualizar análise com dados em tempo real">
+                    @if (gerando)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1.5" role="status"></span>
+                        <span>Processando Dados...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-arrow-repeat me-1.5"></i>
+                        <span>Atualizar Diagnóstico</span>
+                    }
+                </button>
+            </div>
         </div>
-        <button class="btn btn-sm btn-light text-primary fw-bold shadow-sm rounded-pill px-3"
-                @onclick='() => ExecutarGeracaoAsync(abaAtiva)'
-                disabled="@gerando">
-            @if (gerando)
-            {
-                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                <span>Analisando Dados...</span>
-            }
-            else
-            {
-                <i class="bi bi-arrow-repeat me-1"></i>
-                <span>Atualizar Diagnóstico</span>
-            }
-        </button>
     </div>
 
-    <!-- Botões de Ações Rápidas -->
-    <div class="card-body bg-light border-bottom p-2.5 d-flex flex-wrap gap-2 align-items-center">
-        <button class="btn btn-sm rounded-pill px-3 fw-semibold @(abaAtiva == "geral" ? "btn-primary shadow-sm text-white" : "btn-outline-primary")"
+    <!-- 2. Barra de Abas Estratégicas -->
+    <div class="ai-tabs-bar p-3 d-flex flex-wrap gap-2.5 align-items-center border-bottom bg-slate-50">
+        <button class="ai-tab-btn @(abaAtiva == "geral" ? "active-geral" : "inactive")"
                 @onclick='() => ExecutarGeracaoAsync("geral")'
                 disabled="@gerando">
-            📊 Diagnóstico 360°
+            <i class="bi bi-pie-chart-fill"></i>
+            <span>Diagnóstico 360°</span>
         </button>
-        <button class="btn btn-sm rounded-pill px-3 fw-semibold @(abaAtiva == "combos" ? "btn-danger shadow-sm text-white" : "btn-outline-danger")"
+
+        <button class="ai-tab-btn @(abaAtiva == "combos" ? "active-combos" : "inactive")"
                 @onclick='() => ExecutarGeracaoAsync("combos")'
                 disabled="@gerando">
-            🔥 Sugerir Combos & Happy Hour
+            <i class="bi bi-fire"></i>
+            <span>Sugerir Combos & Happy Hour</span>
         </button>
-        <button class="btn btn-sm rounded-pill px-3 fw-semibold @(abaAtiva == "kds" ? "btn-success shadow-sm text-white" : "btn-outline-success")"
+
+        <button class="ai-tab-btn @(abaAtiva == "kds" ? "active-kds" : "inactive")"
                 @onclick='() => ExecutarGeracaoAsync("kds")'
                 disabled="@gerando">
-            🍳 Gargalos KDS & Compras
+            <i class="bi bi-stopwatch-fill"></i>
+            <span>Gargalos KDS & Compras</span>
         </button>
+
+        <div class="ms-auto d-none d-md-flex align-items-center text-muted small">
+            <i class="bi bi-shield-check text-success me-1"></i>
+            <span>Dados protegidos e consolidados localmente</span>
+        </div>
     </div>
 
-    <!-- Conteúdo do Relatório Gerado -->
-    <div class="card-body p-4">
+    <!-- 3. Área de Conteúdo / Relatório -->
+    <div class="card-body p-4 bg-white">
         @if (!string.IsNullOrEmpty(erroGeracao))
         {
-            <div class="alert alert-info alert-dismissible fade show p-2 mb-3 small" role="alert">
-                <i class="bi bi-info-circle-fill me-1"></i> @erroGeracao
+            <div class="alert alert-info border-0 shadow-sm rounded-3 p-3 mb-4 d-flex align-items-center justify-content-between" role="alert">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-info-circle-fill text-primary fs-5"></i>
+                    <span class="small text-dark fw-medium">@erroGeracao</span>
+                </div>
                 <button type="button" class="btn-close btn-close-sm" @onclick="() => erroGeracao = null"></button>
             </div>
         }
@@ -58,24 +92,33 @@
         @if (gerando)
         {
             <div class="text-center py-5">
-                <div class="spinner-grow text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
-                <h5 class="fw-bold text-dark">A IA está processando as métricas de vendas, KDS e estoque...</h5>
-                <p class="text-muted small">Cruzando dados de lucratividade, giro de mesas e tempos de preparo.</p>
+                <div class="ai-loading-pulse mb-3">
+                    <div class="pulse-ring ring-1"></div>
+                    <div class="pulse-ring ring-2"></div>
+                    <div class="pulse-core">
+                        <i class="bi bi-stars fs-3 text-white"></i>
+                    </div>
+                </div>
+                <h5 class="fw-bold text-dark mt-3 mb-1" style="color: #0f172a !important;">A IA está processando as métricas de vendas, KDS e estoque...</h5>
+                <p class="text-muted small mb-0">Cruzando dados de faturamento, giro de mesas e tempos de preparo da cozinha.</p>
             </div>
         }
         else if (string.IsNullOrEmpty(conteudoRelatorio))
         {
             <div class="text-center py-5 text-muted">
-                <i class="bi bi-robot fs-1 opacity-25"></i>
-                <p class="mt-2 mb-3">Nenhum diagnóstico disponível no momento.</p>
-                <button class="btn btn-primary btn-sm rounded-pill px-3 fw-bold" @onclick='() => ExecutarGeracaoAsync("geral")'>
-                    <i class="bi bi-stars me-1"></i> Gerar Primeiro Relatório
+                <div class="rounded-circle bg-light d-inline-flex p-4 mb-3">
+                    <i class="bi bi-robot fs-1 text-primary opacity-50"></i>
+                </div>
+                <h6 class="fw-bold text-dark mb-1">Nenhum diagnóstico carregado ainda</h6>
+                <p class="small text-muted mb-3">Clique no botão abaixo para gerar uma análise executiva completa dos seus dados.</p>
+                <button class="btn btn-primary px-4 py-2 rounded-pill fw-semibold shadow-sm" @onclick='() => ExecutarGeracaoAsync("geral")'>
+                    <i class="bi bi-stars me-1.5"></i> Gerar Primeiro Relatório
                 </button>
             </div>
         }
         else
         {
-            <div class="relatorio-conteudo p-4 bg-white rounded border shadow-sm">
+            <div class="relatorio-conteudo-wrapper">
                 @((MarkupString)ConverterMarkdownParaHtml(conteudoRelatorio))
             </div>
         }
@@ -83,34 +126,272 @@
 </div>
 
 <style>
-    .relatorio-conteudo {
-        font-family: inherit;
-        line-height: 1.6;
-        color: #334155;
+    /* Estilos Gerais do Painel IA */
+    .painel-relatorio-ia {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04) !important;
     }
-    .relatorio-conteudo h3 {
+
+    .ai-spark-box {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.35rem;
+        flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4) !important;
+    }
+
+    .ai-title {
+        color: #ffffff !important;
         font-size: 1.25rem;
-        font-weight: 700;
-        color: #0f172a;
-        margin-top: 0.5rem;
-        margin-bottom: 0.75rem;
+        line-height: 1.2;
     }
-    .relatorio-conteudo h4 {
-        font-size: 1.05rem;
+
+    .ai-brand-badge {
+        color: #93c5fd !important;
+        font-weight: 500;
+        font-size: 0.95rem;
+    }
+
+    .ai-subtitle {
+        color: #e2e8f0 !important;
+        font-size: 0.85rem;
+        line-height: 1.4;
+    }
+
+    .ai-status-badge {
+        background: rgba(16, 185, 129, 0.25) !important;
+        color: #34d399 !important;
+        border: 1px solid rgba(52, 211, 153, 0.4) !important;
+        font-size: 0.72rem;
         font-weight: 600;
-        color: #2563eb;
-        margin-top: 1.25rem;
-        margin-bottom: 0.5rem;
+        padding: 4px 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
     }
-    .relatorio-conteudo ul {
-        padding-left: 1.25rem;
+
+    .ai-pulse-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background-color: #34d399;
+        box-shadow: 0 0 8px #34d399;
+        display: inline-block;
+        animation: pulseDot 2s infinite;
+    }
+
+    @@keyframes pulseDot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(1.3); }
+    }
+
+    /* Botão Atualizar */
+    .btn-ai-refresh {
+        background: rgba(255, 255, 255, 0.12);
+        color: #ffffff !important;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 9999px;
+        padding: 8px 18px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        backdrop-filter: blur(8px);
+    }
+    .btn-ai-refresh:hover:not(:disabled) {
+        background: #ffffff;
+        color: #1e1b4b !important;
+        border-color: #ffffff;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+    }
+    .btn-ai-refresh:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+    }
+
+    /* Abas de Ação */
+    .ai-tabs-bar {
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .ai-tab-btn {
+        padding: 8px 20px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        border-radius: 9999px;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        border: 1px solid transparent;
+        text-decoration: none;
+    }
+
+    .ai-tab-btn.inactive {
+        background: #ffffff;
+        color: #475569;
+        border-color: #e2e8f0;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+    .ai-tab-btn.inactive:hover:not(:disabled) {
+        background: #f1f5f9;
+        color: #0f172a;
+        border-color: #cbd5e1;
+        transform: translateY(-1px);
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    .ai-tab-btn.active-geral {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        color: #ffffff !important;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+        border-color: transparent;
+    }
+
+    .ai-tab-btn.active-combos {
+        background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+        color: #ffffff !important;
+        box-shadow: 0 4px 14px rgba(234, 88, 12, 0.35);
+        border-color: transparent;
+    }
+
+    .ai-tab-btn.active-kds {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: #ffffff !important;
+        box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+        border-color: transparent;
+    }
+
+    .ai-tab-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    /* Animação do Loader IA */
+    .ai-loading-pulse {
+        position: relative;
+        width: 72px;
+        height: 72px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .pulse-core {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+        z-index: 2;
+    }
+
+    .pulse-ring {
+        position: absolute;
+        border-radius: 50%;
+        border: 2px solid #6366f1;
+        opacity: 0.6;
+        animation: pulseAnim 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+    .ring-1 { width: 64px; height: 64px; animation-delay: 0s; }
+    .ring-2 { width: 80px; height: 80px; animation-delay: 0.6s; }
+
+    @@keyframes pulseAnim {
+        0% { transform: scale(0.6); opacity: 0.8; }
+        100% { transform: scale(1.4); opacity: 0; }
+    }
+
+    /* Conteúdo do Relatório */
+    .relatorio-conteudo-wrapper {
+        font-family: inherit;
+        color: #1e293b;
+        line-height: 1.65;
+    }
+
+    .ai-section-box {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 22px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+        transition: all 0.2s ease;
+    }
+    .ai-section-box:hover {
+        border-color: #cbd5e1;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    .ai-section-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #0f172a !important;
+        margin-bottom: 1rem;
+        padding-bottom: 0.65rem;
+        border-bottom: 2px solid #f1f5f9;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .ai-category-title {
+        font-size: 1.02rem;
+        font-weight: 600;
+        color: #1d4ed8 !important;
+        margin-top: 1.25rem;
+        margin-bottom: 0.65rem;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .ai-insight-list {
+        list-style: none;
+        padding-left: 0;
         margin-bottom: 1rem;
     }
-    .relatorio-conteudo li {
-        margin-bottom: 0.35rem;
+
+    .ai-insight-item {
+        background: #f8fafc;
+        border: 1px solid #f1f5f9;
+        border-radius: 10px;
+        padding: 10px 14px;
+        margin-bottom: 8px;
+        font-size: 0.93rem;
+        color: #334155;
+        transition: all 0.15s ease;
+        line-height: 1.55;
     }
-    .relatorio-conteudo strong {
-        color: #1e293b;
+    .ai-insight-item:hover {
+        background: #ffffff;
+        border-color: #cbd5e1;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+        transform: translateX(2px);
+    }
+
+    .ai-insight-item strong {
+        color: #0f172a !important;
+        font-weight: 600;
+    }
+
+    .ai-meta-tag {
+        font-size: 0.8rem;
+        color: #64748b;
+        font-style: italic;
+        margin-bottom: 1.25rem;
+        display: block;
     }
 </style>
 
@@ -183,6 +464,7 @@
         var lines = markdown.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
         var sb = new System.Text.StringBuilder();
         bool inList = false;
+        bool inSection = false;
 
         foreach (var rawLine in lines)
         {
@@ -201,24 +483,28 @@
             if (line.StartsWith("### "))
             {
                 if (inList) { sb.AppendLine("</ul>"); inList = false; }
+                if (inSection) { sb.AppendLine("</div>"); }
+                
                 string title = FormatarTextoInline(line.Substring(4));
-                sb.AppendLine($"<h3 class=\"mt-3 mb-2 fw-bold text-dark border-bottom pb-2\"><i class=\"bi bi-chevron-right text-primary me-1 fs-6\"></i>{title}</h3>");
+                sb.AppendLine("<div class=\"ai-section-box\">");
+                sb.AppendLine($"<div class=\"ai-section-title\"><i class=\"bi bi-stars text-primary\"></i><span>{title}</span></div>");
+                inSection = true;
             }
             else if (line.StartsWith("#### "))
             {
                 if (inList) { sb.AppendLine("</ul>"); inList = false; }
                 string subtitle = FormatarTextoInline(line.Substring(5));
-                sb.AppendLine($"<h4 class=\"mt-3 mb-2 fw-semibold text-primary fs-6\">{subtitle}</h4>");
+                sb.AppendLine($"<div class=\"ai-category-title\"><i class=\"bi bi-arrow-right-short text-primary fs-5\"></i><span>{subtitle}</span></div>");
             }
             else if (line.StartsWith("- ") || line.StartsWith("* "))
             {
                 if (!inList)
                 {
-                    sb.AppendLine("<ul class=\"mb-3 ps-3\">");
+                    sb.AppendLine("<ul class=\"ai-insight-list\">");
                     inList = true;
                 }
                 string item = FormatarTextoInline(line.Substring(2));
-                sb.AppendLine($"<li class=\"mb-1\">{item}</li>");
+                sb.AppendLine($"<li class=\"ai-insight-item\"><i class=\"bi bi-check-circle-fill text-primary me-2 opacity-75\"></i>{item}</li>");
             }
             else
             {
@@ -226,11 +512,11 @@
                 string p = FormatarTextoInline(line);
                 if (p.StartsWith("<em>") && p.EndsWith("</em>"))
                 {
-                    sb.AppendLine($"<p class=\"text-muted small mb-2\">{p}</p>");
+                    sb.AppendLine($"<span class=\"ai-meta-tag\"><i class=\"bi bi-clock-history me-1\"></i>{p}</span>");
                 }
                 else
                 {
-                    sb.AppendLine($"<p class=\"mb-2\">{p}</p>");
+                    sb.AppendLine($"<p class=\"mb-2 text-dark\">{p}</p>");
                 }
             }
         }
@@ -238,6 +524,10 @@
         if (inList)
         {
             sb.AppendLine("</ul>");
+        }
+        if (inSection)
+        {
+            sb.AppendLine("</div>");
         }
 
         return sb.ToString();

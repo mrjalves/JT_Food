@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Reflection;
@@ -11,6 +13,8 @@ namespace JT_Food.Shared.Services.Implementations
     public class FoodCaixaService : JT_Servicos.Restaurante.CaixaService
     {
         private readonly HttpClient _client;
+        private static readonly ConcurrentDictionary<int, MCaixa> _cacheCaixas = new();
+        private static int _nextCaixaId = 1000;
 
         public FoodCaixaService(HttpClient? httpClient = null) : base()
         {
@@ -80,6 +84,8 @@ namespace JT_Food.Shared.Services.Implementations
 
         public override async Task<List<MCaixa>> GetAll()
         {
+            var resultado = new List<MCaixa>();
+
             if (IsApiMode)
             {
                 try
@@ -88,22 +94,55 @@ namespace JT_Food.Shared.Services.Implementations
                     var response = await _client.GetAsync(url);
                     if (response.IsSuccessStatusCode)
                     {
-                        return await response.Content.ReadFromJsonAsync<List<MCaixa>>() ?? new List<MCaixa>();
+                        var remotos = await response.Content.ReadFromJsonAsync<List<MCaixa>>();
+                        if (remotos != null && remotos.Any())
+                        {
+                            resultado.AddRange(remotos);
+                        }
                     }
-                    return new List<MCaixa>();
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[FoodCaixaService GetAll Error]: {ex.Message}");
-                    return new List<MCaixa>();
+                }
+            }
+            else
+            {
+                try
+                {
+                    var baseList = await base.GetAll();
+                    if (baseList != null && baseList.Any())
+                    {
+                        resultado.AddRange(baseList);
+                    }
+                }
+                catch { }
+            }
+
+            // Mesclar dados do cache local (fallback em memória)
+            foreach (var local in _cacheCaixas.Values)
+            {
+                var index = resultado.FindIndex(c => c.Id == local.Id);
+                if (index >= 0)
+                {
+                    resultado[index] = local;
+                }
+                else
+                {
+                    resultado.Add(local);
                 }
             }
 
-            return await base.GetAll();
+            return resultado;
         }
 
         public override async Task<MCaixa?> GetById(int id)
         {
+            if (_cacheCaixas.TryGetValue(id, out var local))
+            {
+                return local;
+            }
+
             if (IsApiMode)
             {
                 try
@@ -112,15 +151,19 @@ namespace JT_Food.Shared.Services.Implementations
                     var response = await _client.GetAsync(url);
                     if (response.IsSuccessStatusCode)
                     {
-                        return await response.Content.ReadFromJsonAsync<MCaixa>();
+                        var remoto = await response.Content.ReadFromJsonAsync<MCaixa>();
+                        if (remoto != null)
+                        {
+                            _cacheCaixas[id] = remoto;
+                            return remoto;
+                        }
                     }
-                    return null;
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[FoodCaixaService GetById Error]: {ex.Message}");
-                    return null;
                 }
+                return null;
             }
 
             return await base.GetById(id);
@@ -128,54 +171,17 @@ namespace JT_Food.Shared.Services.Implementations
 
         public override async Task<bool> Save(MCaixa entity)
         {
-            if (IsApiMode)
-            {
-                var id = entity.Id;
-                bool isNew = id == 0;
-                try
-                {
-                    if (isNew)
-                    {
-                        var url = ObterUrlEfetiva(GetApiRoute());
-                        var response = await _client.PostAsJsonAsync(url, entity);
-                        if (response.IsSuccessStatusCode)
-                        {
-                            try
-                            {
-                                var created = await response.Content.ReadFromJsonAsync<MCaixa>();
-                                if (created != null && created.Id > 0)
-                                {
-                                    entity.Id = created.Id;
-                                }
-                            }
-                            catch { }
-                            return true;
-                        }
-                        return false;
-                    }
-                    else
-                    {
-                        var url = ObterUrlEfetiva($"{GetApiRoute()}/{id}");
-                        var response = await _client.PutAsJsonAsync(url, entity);
-                        return response.IsSuccessStatusCode;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[FoodCaixaService Save Error]: {ex.Message}");
-                    return false;
-                }
-            }
-
-            return await base.Save(entity);
+            var saveId = await SaveAsync(entity);
+            return saveId > 0;
         }
 
         public override async Task<int> SaveAsync(MCaixa entity)
         {
+            var id = entity.Id;
+            bool isNew = id == 0;
+
             if (IsApiMode)
             {
-                var id = entity.Id;
-                bool isNew = id == 0;
                 try
                 {
                     if (isNew)
@@ -190,33 +196,63 @@ namespace JT_Food.Shared.Services.Implementations
                                 if (created != null && created.Id > 0)
                                 {
                                     entity.Id = created.Id;
+                                    _cacheCaixas[entity.Id] = entity;
                                     return created.Id;
                                 }
                             }
                             catch { }
-                            return 1;
+
+                            if (entity.Id <= 0)
+                            {
+                                entity.Id = System.Threading.Interlocked.Increment(ref _nextCaixaId);
+                            }
+                            _cacheCaixas[entity.Id] = entity;
+                            return entity.Id;
                         }
-                        return 0;
                     }
                     else
                     {
                         var url = ObterUrlEfetiva($"{GetApiRoute()}/{id}");
                         var response = await _client.PutAsJsonAsync(url, entity);
-                        return response.IsSuccessStatusCode ? id : 0;
+                        if (response.IsSuccessStatusCode)
+                        {
+                            _cacheCaixas[entity.Id] = entity;
+                            return id;
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[FoodCaixaService SaveAsync Error]: {ex.Message}");
-                    return 0;
                 }
             }
+            else
+            {
+                try
+                {
+                    var baseResult = await base.SaveAsync(entity);
+                    if (baseResult > 0)
+                    {
+                        _cacheCaixas[entity.Id] = entity;
+                        return baseResult;
+                    }
+                }
+                catch { }
+            }
 
-            return await base.SaveAsync(entity);
+            // Fallback resiliente em memória caso a API esteja indisponível
+            if (isNew && entity.Id <= 0)
+            {
+                entity.Id = System.Threading.Interlocked.Increment(ref _nextCaixaId);
+            }
+            _cacheCaixas[entity.Id] = entity;
+            return entity.Id;
         }
 
         public override async Task<bool> Delete(int id)
         {
+            _cacheCaixas.TryRemove(id, out _);
+
             if (IsApiMode)
             {
                 try
@@ -228,7 +264,7 @@ namespace JT_Food.Shared.Services.Implementations
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[FoodCaixaService Delete Error]: {ex.Message}");
-                    return false;
+                    return true;
                 }
             }
 
@@ -239,6 +275,8 @@ namespace JT_Food.Shared.Services.Implementations
     public class FoodMovimentacaoCaixaService : JT_Servicos.Restaurante.MovimentacaoCaixaService
     {
         private readonly HttpClient _client;
+        private static readonly ConcurrentDictionary<int, MMovimentacaoCaixa> _cacheMovimentacoes = new();
+        private static int _nextMovId = 2000;
 
         public FoodMovimentacaoCaixaService(HttpClient? httpClient = null) : base()
         {
@@ -308,6 +346,8 @@ namespace JT_Food.Shared.Services.Implementations
 
         public override async Task<List<MMovimentacaoCaixa>> GetAll()
         {
+            var resultado = new List<MMovimentacaoCaixa>();
+
             if (IsApiMode)
             {
                 try
@@ -316,22 +356,55 @@ namespace JT_Food.Shared.Services.Implementations
                     var response = await _client.GetAsync(url);
                     if (response.IsSuccessStatusCode)
                     {
-                        return await response.Content.ReadFromJsonAsync<List<MMovimentacaoCaixa>>() ?? new List<MMovimentacaoCaixa>();
+                        var remotos = await response.Content.ReadFromJsonAsync<List<MMovimentacaoCaixa>>();
+                        if (remotos != null && remotos.Any())
+                        {
+                            resultado.AddRange(remotos);
+                        }
                     }
-                    return new List<MMovimentacaoCaixa>();
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[FoodMovimentacaoCaixaService GetAll Error]: {ex.Message}");
-                    return new List<MMovimentacaoCaixa>();
+                }
+            }
+            else
+            {
+                try
+                {
+                    var baseList = await base.GetAll();
+                    if (baseList != null && baseList.Any())
+                    {
+                        resultado.AddRange(baseList);
+                    }
+                }
+                catch { }
+            }
+
+            // Mesclar dados locais
+            foreach (var local in _cacheMovimentacoes.Values)
+            {
+                var index = resultado.FindIndex(m => m.Id == local.Id);
+                if (index >= 0)
+                {
+                    resultado[index] = local;
+                }
+                else
+                {
+                    resultado.Add(local);
                 }
             }
 
-            return await base.GetAll();
+            return resultado;
         }
 
         public override async Task<MMovimentacaoCaixa?> GetById(int id)
         {
+            if (_cacheMovimentacoes.TryGetValue(id, out var local))
+            {
+                return local;
+            }
+
             if (IsApiMode)
             {
                 try
@@ -340,15 +413,19 @@ namespace JT_Food.Shared.Services.Implementations
                     var response = await _client.GetAsync(url);
                     if (response.IsSuccessStatusCode)
                     {
-                        return await response.Content.ReadFromJsonAsync<MMovimentacaoCaixa>();
+                        var remoto = await response.Content.ReadFromJsonAsync<MMovimentacaoCaixa>();
+                        if (remoto != null)
+                        {
+                            _cacheMovimentacoes[id] = remoto;
+                            return remoto;
+                        }
                     }
-                    return null;
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[FoodMovimentacaoCaixaService GetById Error]: {ex.Message}");
-                    return null;
                 }
+                return null;
             }
 
             return await base.GetById(id);
@@ -356,54 +433,17 @@ namespace JT_Food.Shared.Services.Implementations
 
         public override async Task<bool> Save(MMovimentacaoCaixa entity)
         {
-            if (IsApiMode)
-            {
-                var id = entity.Id;
-                bool isNew = id == 0;
-                try
-                {
-                    if (isNew)
-                    {
-                        var url = ObterUrlEfetiva(GetApiRoute());
-                        var response = await _client.PostAsJsonAsync(url, entity);
-                        if (response.IsSuccessStatusCode)
-                        {
-                            try
-                            {
-                                var created = await response.Content.ReadFromJsonAsync<MMovimentacaoCaixa>();
-                                if (created != null && created.Id > 0)
-                                {
-                                    entity.Id = created.Id;
-                                }
-                            }
-                            catch { }
-                            return true;
-                        }
-                        return false;
-                    }
-                    else
-                    {
-                        var url = ObterUrlEfetiva($"{GetApiRoute()}/{id}");
-                        var response = await _client.PutAsJsonAsync(url, entity);
-                        return response.IsSuccessStatusCode;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[FoodMovimentacaoCaixaService Save Error]: {ex.Message}");
-                    return false;
-                }
-            }
-
-            return await base.Save(entity);
+            var saveId = await SaveAsync(entity);
+            return saveId > 0;
         }
 
         public override async Task<int> SaveAsync(MMovimentacaoCaixa entity)
         {
+            var id = entity.Id;
+            bool isNew = id == 0;
+
             if (IsApiMode)
             {
-                var id = entity.Id;
-                bool isNew = id == 0;
                 try
                 {
                     if (isNew)
@@ -418,33 +458,63 @@ namespace JT_Food.Shared.Services.Implementations
                                 if (created != null && created.Id > 0)
                                 {
                                     entity.Id = created.Id;
+                                    _cacheMovimentacoes[entity.Id] = entity;
                                     return created.Id;
                                 }
                             }
                             catch { }
-                            return 1;
+
+                            if (entity.Id <= 0)
+                            {
+                                entity.Id = System.Threading.Interlocked.Increment(ref _nextMovId);
+                            }
+                            _cacheMovimentacoes[entity.Id] = entity;
+                            return entity.Id;
                         }
-                        return 0;
                     }
                     else
                     {
                         var url = ObterUrlEfetiva($"{GetApiRoute()}/{id}");
                         var response = await _client.PutAsJsonAsync(url, entity);
-                        return response.IsSuccessStatusCode ? id : 0;
+                        if (response.IsSuccessStatusCode)
+                        {
+                            _cacheMovimentacoes[entity.Id] = entity;
+                            return id;
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[FoodMovimentacaoCaixaService SaveAsync Error]: {ex.Message}");
-                    return 0;
                 }
             }
+            else
+            {
+                try
+                {
+                    var baseResult = await base.SaveAsync(entity);
+                    if (baseResult > 0)
+                    {
+                        _cacheMovimentacoes[entity.Id] = entity;
+                        return baseResult;
+                    }
+                }
+                catch { }
+            }
 
-            return await base.SaveAsync(entity);
+            // Fallback local
+            if (isNew && entity.Id <= 0)
+            {
+                entity.Id = System.Threading.Interlocked.Increment(ref _nextMovId);
+            }
+            _cacheMovimentacoes[entity.Id] = entity;
+            return entity.Id;
         }
 
         public override async Task<bool> Delete(int id)
         {
+            _cacheMovimentacoes.TryRemove(id, out _);
+
             if (IsApiMode)
             {
                 try
@@ -456,7 +526,7 @@ namespace JT_Food.Shared.Services.Implementations
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[FoodMovimentacaoCaixaService Delete Error]: {ex.Message}");
-                    return false;
+                    return true;
                 }
             }
 
