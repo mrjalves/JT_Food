@@ -1,32 +1,80 @@
-﻿@page "/mesas"
+@page "/mesas"
 @using JT_Classes.Restaurante
 @using JT_Servicos.Restaurante
 @using JT_Food.Shared.Components
-
+@using JT_Food.Shared.Components.Salao
+@using JT_Food.Shared.Domain.Entities
+@using JT_Food.Shared.Services.Interfaces
 @inject MesaService MesaService
+@inject IAuthPerfilService AuthService
 @inject IJSRuntime JSRuntime
 @implements IDisposable
 
-<PageTitle>Gestão de Mesas - JT Food</PageTitle>
+<PageTitle>Salão e Mesas - JT Food</PageTitle>
 
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0 text-gray-800">Mesas e Salão</h1>
-        <button class="btn btn-primary shadow-sm" @onclick="NovaMesa">
-            <i class="fas fa-plus fa-sm text-white-50 me-2"></i> Nova Mesa
-        </button>
+    <!-- Cabeçalho Principal com Modos de Visualização -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800 fw-bold">
+                <i class="bi bi-grid-1x2-fill text-primary me-2"></i>Salão e Mesas
+            </h1>
+            <p class="text-muted small mb-0">Gestão operacional de mesas, comandas agrupadas e construtor visual de salão.</p>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <!-- Alternador de Modos -->
+            <div class="btn-group shadow-sm" role="group">
+                <button type="button"
+                        class="btn @(modoVisualizacao == "mapa" ? "btn-primary" : "btn-outline-primary")"
+                        @onclick='() => modoVisualizacao = "mapa"'>
+                    <i class="bi bi-map-fill me-1"></i> Mapa Operacional
+                </button>
+                @if (AuthService.IsGerente())
+                {
+                    <button type="button"
+                            class="btn @(modoVisualizacao == "construtor" ? "btn-primary" : "btn-outline-primary")"
+                            @onclick='() => modoVisualizacao = "construtor"'>
+                        <i class="bi bi-pencil-square me-1"></i> Construtor de Salão
+                    </button>
+                }
+                <button type="button"
+                        class="btn @(modoVisualizacao == "grid" ? "btn-primary" : "btn-outline-primary")"
+                        @onclick='() => modoVisualizacao = "grid"'>
+                    <i class="bi bi-list-ul me-1"></i> Lista em Tabela
+                </button>
+            </div>
+
+            <button class="btn btn-success shadow-sm" @onclick="NovaMesa">
+                <i class="fas fa-plus fa-sm text-white-50 me-2"></i> Nova Mesa
+            </button>
+        </div>
     </div>
 
-    <GridMesas Mesas="mesas" IsLoading="loading" OnEdit="EditarMesa" OnDelete="ExcluirMesa" />
+    <!-- Renderização Condicional pelo Modo Selecionado -->
+    @if (modoVisualizacao == "mapa")
+    {
+        <MapaInterativoSalao @ref="mapaSalaoRef" OnElementoSelecionado="HandleElementoSelecionado" />
+    }
+    else if (modoVisualizacao == "construtor")
+    {
+        <ConstrutorLayoutMesas />
+    }
+    else
+    {
+        <GridMesas Mesas="mesas" IsLoading="loading" OnEdit="EditarMesa" OnDelete="ExcluirMesa" />
+    }
 </div>
 
-<ModalMesa @ref="modalMesa" Mesa="mesaSelecionada" OnSaved="CarregarMesasAsync" />
+<ModalMesa @ref="modalMesa" Mesa="mesaSelecionada" OnSaved="RecarregarAsync" />
 
 @code {
-    private List<Mesa>? mesas;
+    private List<JT_Classes.Restaurante.Mesa>? mesas;
     private bool loading = true;
-    private Mesa mesaSelecionada = new();
+    private JT_Classes.Restaurante.Mesa mesaSelecionada = new();
     private ModalMesa modalMesa = default!;
+    private MapaInterativoSalao? mapaSalaoRef;
+    private string modoVisualizacao = "mapa";
     private DotNetObjectReference<Mesas>? _pageRef;
 
     protected override async Task OnInitializedAsync()
@@ -42,24 +90,55 @@
         StateHasChanged();
     }
 
-    private async Task NovaMesa()
+    private async Task RecarregarAsync()
     {
-        mesaSelecionada = new Mesa();
-        modalMesa.Open();
+        await CarregarMesasAsync();
+        if (mapaSalaoRef != null)
+        {
+            await mapaSalaoRef.CarregarAmbientesAsync();
+        }
     }
 
-    private async Task EditarMesa(Mesa mesa)
+    private void NovaMesa()
+    {
+        mesaSelecionada = new JT_Classes.Restaurante.Mesa();
+        modalMesa.Open("dados");
+    }
+
+    private void EditarMesa(JT_Classes.Restaurante.Mesa mesa)
     {
         mesaSelecionada = mesa;
-        modalMesa.Open();
+        modalMesa.Open("comandas");
     }
 
-    private async Task ExcluirMesa(Mesa mesa)
+    private async Task ExcluirMesa(JT_Classes.Restaurante.Mesa mesa)
     {
         if (await MesaService.Delete(mesa.Id))
         {
-            await CarregarMesasAsync();
+            await RecarregarAsync();
         }
+    }
+
+    private async Task HandleElementoSelecionado(ElementoSalao elemento)
+    {
+        // Se for um elemento com capacidade (mesa/balcão)
+        var mesaCorrespondente = mesas?.FirstOrDefault(m => string.Equals(m.Identificacao, elemento.Identificacao, StringComparison.OrdinalIgnoreCase));
+        
+        if (mesaCorrespondente == null)
+        {
+            // Cria no banco se não existia
+            mesaCorrespondente = new JT_Classes.Restaurante.Mesa
+            {
+                Identificacao = elemento.Identificacao,
+                Capacidade = elemento.Capacidade,
+                Status = elemento.Status
+            };
+            await MesaService.SaveAsync(mesaCorrespondente);
+            mesas = await MesaService.GetAll();
+        }
+
+        mesaSelecionada = mesaCorrespondente;
+        modalMesa.Open("comandas");
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -76,31 +155,6 @@
     public async Task OnNovoHotkey()
     {
         await InvokeAsync(NovaMesa);
-        StateHasChanged();
-    }
-
-    [JSInvokable]
-    public async Task HandleAcaoHotkey(string acao)
-    {
-        switch (acao)
-        {
-            case "salvar":
-                if (modalMesa.IsOpen)
-                    await modalMesa.SalvarAsync();
-                break;
-            case "cancelar":
-                if (modalMesa.IsOpen)
-                    modalMesa.Close();
-                break;
-            case "editar":
-                if (mesaSelecionada.Id != 0)
-                    await InvokeAsync(() => EditarMesa(mesaSelecionada));
-                break;
-            case "deletar":
-                if (mesaSelecionada.Id != 0)
-                    await InvokeAsync(() => ExcluirMesa(mesaSelecionada));
-                break;
-        }
         StateHasChanged();
     }
 

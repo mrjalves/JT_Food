@@ -1,4 +1,4 @@
-﻿@page "/kds"
+@page "/kds"
 @using JT_Classes.Restaurante
 @using JT_Food.Shared.BusinessLogic
 @using JT_Servicos.Restaurante
@@ -8,14 +8,30 @@
 @implements IDisposable
 
 <div class="kds-container container-fluid p-3">
-    <div class="row mb-4 align-items-center">
-        <div class="col">
-            <h2 class="mb-0">KDS <small class="text-muted fs-5">(Kitchen Display System)</small></h2>
-            <small class="text-muted">Atualização automática a cada 30s. Última: @ultimaAtualizacao.ToString("HH:mm:ss")</small>
+    <div class="row mb-3 align-items-center">
+        <div class="col-12 col-md-6 mb-2 mb-md-0">
+            <h2 class="mb-0 fw-bold"><i class="bi bi-display me-2 text-primary"></i>KDS <small class="text-muted fs-6">(Kitchen Display System)</small></h2>
+            <small class="text-muted">Atualização automática ativa. Última: @ultimaAtualizacao.ToString("HH:mm:ss")</small>
         </div>
-        <div class="col-auto">
-            <button class="btn btn-outline-secondary" @onclick="CarregarKdsAsync">
-                <i class="fas fa-sync-alt me-2"></i>Atualizar Agora
+        <div class="col-12 col-md-6 d-flex justify-content-md-end align-items-center gap-2">
+            <!-- Filtro de Setor -->
+            <div class="btn-group btn-group-sm">
+                <button class="btn @(setorSelecionado == "Todos" ? "btn-dark" : "btn-outline-dark")" @onclick='() => FiltrarSetor("Todos")'>
+                    Todos
+                </button>
+                <button class="btn @(setorSelecionado == "Cozinha" ? "btn-primary" : "btn-outline-primary")" @onclick='() => FiltrarSetor("Cozinha")'>
+                    🍳 Cozinha
+                </button>
+                <button class="btn @(setorSelecionado == "Bar" ? "btn-info text-white" : "btn-outline-info")" @onclick='() => FiltrarSetor("Bar")'>
+                    🍺 Bar
+                </button>
+                <button class="btn @(setorSelecionado == "Chapa" ? "btn-warning text-dark" : "btn-outline-warning")" @onclick='() => FiltrarSetor("Chapa")'>
+                    🍔 Chapa
+                </button>
+            </div>
+
+            <button class="btn btn-outline-secondary btn-sm" @onclick="CarregarKdsAsync">
+                <i class="fas fa-sync-alt me-1"></i> Atualizar
             </button>
         </div>
     </div>
@@ -204,6 +220,7 @@
     private List<MItemComanda> itensEmPreparo = new();
     private Dictionary<string, string> mesaPorComanda = new();
     private Dictionary<string, List<MAdicionaisItemComanda>> adicionaisPorItem = new();
+    private string setorSelecionado = "Todos";
     private string? mensagemAlerta;
     private DateTime ultimaAtualizacao = DateTime.Now;
     private System.Threading.Timer? timer;
@@ -224,12 +241,18 @@
         }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
 
+    private async Task FiltrarSetor(string setor)
+    {
+        setorSelecionado = setor;
+        await CarregarKdsAsync();
+    }
+
     private async Task CarregarKdsAsync()
     {
         isCarregando = true;
         try
         {
-            var todos = await KdsLogic.ObterItensAtivosKDSAsync();
+            var todos = await KdsLogic.ObterItensAtivosKDSAsync(setorSelecionado);
 
             itensPendentes = todos.Where(x => x.Status == "Confirmado" || x.Status == "Pendente").ToList();
             itensEmPreparo = todos.Where(x => x.Status == "Em Produção").ToList();

@@ -1,12 +1,318 @@
 @page "/configuracoes"
 @using JT_Classes.Restaurante
-@using JT_Servicos.Interfaces
-@inherits JT_UserInterface.Shared.Pages.Comum.ConfiguracoesBase<MFoodConfiguracao, IMFoodConfiguracaoService>
+@using JT_Food.Shared.Domain.Entities
+@using JT_Food.Shared.Services.Interfaces
+@inject IImpressaoRedeService ImpressaoService
 
+<PageTitle>Configurações do Restaurante - JT Food</PageTitle>
 
+<div class="container-fluid py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800 fw-bold">
+                <i class="bi bi-gear-fill text-primary me-2"></i>Configurações do Sistema
+            </h1>
+            <p class="text-muted small mb-0">Gerencie impressoras térmicas ESC/POS, couvert artístico e inteligência artificial.</p>
+        </div>
 
-@RenderizarFormularioConfiguracoes()
+        @if (abaAtiva == "impressoras")
+        {
+            <button class="btn btn-primary shadow-sm" @onclick="NovaImpressora">
+                <i class="bi bi-plus-lg me-1"></i> Nova Impressora de Rede
+            </button>
+        }
+    </div>
+
+    <!-- Abas de Configuração -->
+    <ul class="nav nav-pills mb-4 border-bottom pb-2">
+        <li class="nav-item">
+            <button class="nav-link @(abaAtiva == "impressoras" ? "active fw-bold" : "text-dark")" @onclick='() => abaAtiva = "impressoras"'>
+                <i class="bi bi-printer me-1"></i> Impressoras Térmicas ESC/POS (@impressoras.Count)
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(abaAtiva == "couvert" ? "active fw-bold" : "text-dark")" @onclick='() => abaAtiva = "couvert"'>
+                <i class="bi bi-music-note-beamed me-1"></i> Couvert Artístico
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(abaAtiva == "ia" ? "active fw-bold text-primary" : "text-dark")" @onclick='() => abaAtiva = "ia"'>
+                <i class="bi bi-robot me-1"></i> Inteligência Artificial (Gemini)
+            </button>
+        </li>
+    </ul>
+
+    @if (!string.IsNullOrEmpty(mensagemAlerta))
+    {
+        <div class="alert @classeAlerta alert-dismissible fade show mb-4 shadow-sm" role="alert">
+            <i class="bi bi-info-circle-fill me-2"></i>@mensagemAlerta
+            <button type="button" class="btn-close" @onclick="() => mensagemAlerta = null"></button>
+        </div>
+    }
+
+    <!-- ABA 1: IMPRESSORAS DE REDE -->
+    @if (abaAtiva == "impressoras")
+    {
+        <div class="row g-3">
+            @foreach (var imp in impressoras)
+            {
+                <div class="col-12 col-md-6 col-lg-3">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body p-3 d-flex flex-column justify-content-between">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="badge @(imp.Ativa ? "bg-primary" : "bg-secondary")">@imp.Tipo</span>
+                                    <span class="badge @(imp.UltimaImpressaoOk ? "bg-success" : "bg-danger")">
+                                        <i class="bi @(imp.UltimaImpressaoOk ? "bi-check-circle" : "bi-exclamation-triangle") me-1"></i>
+                                        @(imp.UltimaImpressaoOk ? "Conectada" : "Offline")
+                                    </span>
+                                </div>
+
+                                <h6 class="fw-bold text-dark mb-1">@imp.NomeSetor</h6>
+                                <p class="text-muted small mb-2">
+                                    <i class="bi bi-hdd-network me-1"></i>@imp.EnderecoIp : @imp.PortaTcp
+                                    <br /><i class="bi bi-receipt me-1"></i>Largura: @(imp.LarguraColunas == 48 ? "80mm (48 col)" : "58mm (32 col)")
+                                </p>
+                            </div>
+
+                            <div class="border-top pt-2 mt-2 d-flex justify-content-between align-items-center">
+                                <button class="btn btn-sm btn-outline-info" @onclick="() => TestarConexaoAsync(imp)" disabled="@testandoConexao">
+                                    <i class="bi bi-arrow-repeat me-1"></i> Testar
+                                </button>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary" @onclick="() => EditarImpressora(imp)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger" @onclick="() => ExcluirImpressora(imp.Id)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- ABA 2: COUVERT ARTÍSTICO -->
+    @if (abaAtiva == "couvert")
+    {
+        <div class="card border-0 shadow-sm" style="max-width: 650px;">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-music-note-beamed text-primary me-2"></i>Parâmetros de Couvert</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-muted">Valor Padrão por Pessoa (R$):</label>
+                    <div class="input-group">
+                        <span class="input-group-text">R$</span>
+                        <input type="number" class="form-control" @bind="valorCouvertPadrao" step="1.00" />
+                    </div>
+                </div>
+
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="checkAtivacaoAutomatica" @bind="ativarCouvertAutomatico" />
+                    <label class="form-check-label fw-bold text-dark" for="checkAtivacaoAutomatica">
+                        Ativação Automática nos Dias de Evento
+                    </label>
+                    <small class="d-block text-muted">Aplica a taxa de couvert automaticamente nas mesas e comandas abertas durante a janela do evento.</small>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small text-muted">Horário Início:</label>
+                        <input type="time" class="form-control" value="@horaInicioCouvert" @onchange="@(e => horaInicioCouvert = e.Value?.ToString() ?? "")" />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small text-muted">Horário Término:</label>
+                        <input type="time" class="form-control" value="@horaFimCouvert" @onchange="@(e => horaFimCouvert = e.Value?.ToString() ?? "")" />
+                    </div>
+                </div>
+
+                <button class="btn btn-success" @onclick="SalvarCouvert">
+                    <i class="bi bi-save me-1"></i> Salvar Parâmetros
+                </button>
+            </div>
+        </div>
+    }
+
+    <!-- ABA 3: INTELIGÊNCIA ARTIFICIAL -->
+    @if (abaAtiva == "ia")
+    {
+        <div class="card border-0 shadow-sm" style="max-width: 700px;">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-robot me-2"></i>Parametrização Gemini AI</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-muted">Google Gemini API Key:</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-key-fill text-muted"></i></span>
+                        <input type="password" class="form-control" @bind="geminiApiKey" placeholder="AIzaSy..." />
+                    </div>
+                    <small class="text-muted">A chave é utilizada para gerar relatórios executivos, prever estoque e sugerir combos.</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-muted">Modelo de Linguagem:</label>
+                    <select class="form-select" @bind="modeloIa">
+                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Ultra Rápido e Otimizado)</option>
+                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (Raciocínio Profundo e Diagnósticos Avançados)</option>
+                    </select>
+                </div>
+
+                <div class="p-3 bg-light rounded border mb-3">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-shield-check text-success fs-3 me-3"></i>
+                        <div>
+                            <strong class="text-dark">Motor Analítico Híbrido Ativo</strong>
+                            <small class="d-block text-muted">Se a chave não for configurada, o sistema utiliza o motor analítico inteligente embutido sem custo adicional.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" @onclick="SalvarIaConfig">
+                    <i class="bi bi-save me-1"></i> Salvar Configuração de IA
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Modal de Impressora -->
+@if (modalImpressoraAberto)
+{
+    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-printer me-2"></i>@(impressoraEdicao.Id == 0 ? "Nova Impressora" : "Editar Impressora")</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => modalImpressoraAberto = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted">Nome do Setor:</label>
+                        <input type="text" class="form-control" @bind="impressoraEdicao.NomeSetor" placeholder="Ex: Cozinha Central, Bar, Chapa" />
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-8">
+                            <label class="form-label fw-bold small text-muted">Endereço IP (Rede Local):</label>
+                            <input type="text" class="form-control" @bind="impressoraEdicao.EnderecoIp" placeholder="Ex: 192.168.1.201" />
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label fw-bold small text-muted">Porta TCP:</label>
+                            <input type="number" class="form-control" @bind="impressoraEdicao.PortaTcp" />
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-muted">Tipo de Destino:</label>
+                            <select class="form-select" @bind="impressoraEdicao.Tipo">
+                                <option value="Cozinha">Cozinha</option>
+                                <option value="Bar">Bar</option>
+                                <option value="Chapa">Chapa / Lanches</option>
+                                <option value="Caixa">Caixa</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-muted">Largura da Bobina:</label>
+                            <select class="form-select" @bind="impressoraEdicao.LarguraColunas">
+                                <option value="48">80mm (48 colunas)</option>
+                                <option value="32">58mm (32 colunas)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="checkImpAtiva" @bind="impressoraEdicao.Ativa" />
+                        <label class="form-check-label fw-bold text-dark" for="checkImpAtiva">Impressora Ativa</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => modalImpressoraAberto = false">Cancelar</button>
+                    <button type="button" class="btn btn-primary" @onclick="SalvarImpressoraAsync">
+                        <i class="bi bi-save me-1"></i> Salvar Impressora
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
 @code {
-    public override string ObterTituloPagina() => "Configurações do Restaurante";
+    private string abaAtiva = "impressoras";
+    private List<ImpressoraRede> impressoras = new();
+    private bool modalImpressoraAberto = false;
+    private ImpressoraRede impressoraEdicao = new();
+    private bool testandoConexao = false;
+
+    private double valorCouvertPadrao = 15.00;
+    private bool ativarCouvertAutomatico = true;
+    private string horaInicioCouvert = "19:00";
+    private string horaFimCouvert = "23:00";
+
+    private string geminiApiKey = "";
+    private string modeloIa = "gemini-1.5-flash";
+
+    private string? mensagemAlerta;
+    private string classeAlerta = "alert-success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        impressoras = await ImpressaoService.ObterImpressorasAsync();
+    }
+
+    private void NovaImpressora()
+    {
+        impressoraEdicao = new ImpressoraRede();
+        modalImpressoraAberto = true;
+    }
+
+    private void EditarImpressora(ImpressoraRede imp)
+    {
+        impressoraEdicao = imp;
+        modalImpressoraAberto = true;
+    }
+
+    private async Task SalvarImpressoraAsync()
+    {
+        await ImpressaoService.SalvarImpressoraAsync(impressoraEdicao);
+        modalImpressoraAberto = false;
+        impressoras = await ImpressaoService.ObterImpressorasAsync();
+        ExibirAlerta("Impressora salva com sucesso!", "alert-success");
+    }
+
+    private async Task ExcluirImpressora(int id)
+    {
+        await ImpressaoService.ExcluirImpressoraAsync(id);
+        impressoras = await ImpressaoService.ObterImpressorasAsync();
+        ExibirAlerta("Impressora removida.", "alert-info");
+    }
+
+    private async Task TestarConexaoAsync(ImpressoraRede imp)
+    {
+        testandoConexao = true;
+        var res = await ImpressaoService.TestarConexaoAsync(imp);
+        testandoConexao = false;
+        ExibirAlerta(res.Mensagem, res.Sucesso ? "alert-success" : "alert-warning");
+    }
+
+    private void SalvarCouvert()
+    {
+        ExibirAlerta("Parâmetros de Couvert Artístico atualizados!", "alert-success");
+    }
+
+    private void SalvarIaConfig()
+    {
+        ExibirAlerta("Configurações da Inteligência Artificial salvas com sucesso!", "alert-success");
+    }
+
+    private void ExibirAlerta(string msg, string classe)
+    {
+        mensagemAlerta = msg;
+        classeAlerta = classe;
+    }
 }

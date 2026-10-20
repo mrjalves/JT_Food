@@ -173,3 +173,89 @@ stateDiagram-v2
   $$\text{Saldo Final Calculado} = \text{Saldo Inicial} + \text{Total Entradas} - \text{Total Saídas}$$
   $$\text{Diferença (Quebra/Sobra)} = \text{Saldo Final Informado} - \text{Saldo Final Calculado}$$
   Os valores são consolidados no registro `MCaixa` com timestamp de encerramento.
+
+---
+
+## 7. Construtor Visual de Layout do Restaurante
+
+O módulo de salão interativo ([Mesas.razor](file:///c:/Users/sirja/source/repos/mrjalves/JT_Food/JT_Food/JT_Food.Shared/Pages/Mesas.razor)) opera em dois modos distintos:
+
+### 7.1. Modo Construtor (Exclusivo Gerente)
+* **Editor Visual Drag-and-Drop:** Permite arrastar mesas e elementos estruturais no canvas utilizando coordenadas percentuais $(X\%, Y\%)$ salvas via `IMesaLayoutService`.
+* **Caixa de Ferramentas:** Inserção imediata de:
+  * Mesas Quadradas (2 e 4 lugares)
+  * Mesas Redondas (2 e 4 lugares)
+  * Mesas Retangulares (6 e 8 lugares)
+  * Elementos estruturais: Balcão/Bar, Palco do Couvert Artístico, Frente de Caixa e Paredes/Divisórias.
+* **Painel Inspetor:** Ajuste de número/identificação da mesa, capacidade de pessoas, rotação ($0^\circ, 90^\circ, 180^\circ, 270^\circ$) e largura/altura.
+* **Ambientes Múltiplos:** Abas dinâmicas para gerenciar o layout de múltiplos setores (*Salão Principal*, *Varanda*, *Deck Externo*, *Piso Superior*).
+
+### 7.2. Mapa Operacional em Tempo Real (Garçom e Caixa)
+* Representação visual instantânea com semáforo de status:
+  * 🟢 **Verde (Livre):** Mesa desocupada, pronta para receber novos clientes.
+  * 🔵 **Azul (Ocupada):** Mesa em atendimento, exibindo quantidade de comandas ativas e subtotal acumulado.
+  * 🟡 **Amarelo (Alerta de Inatividade):** Mesa sem novos pedidos há mais de $X$ minutos.
+  * 🔴 **Vermelho (Aguardando Pagamento):** Conta solicitada ou em fechamento na frente de caixa.
+
+---
+
+## 8. Lançamento Rápido de Pedidos e Gestão de Comandas da Mesa
+
+Projetado especificamente para uso com uma só mão em smartphones e tablets de garçons ([LancamentoRapido.razor](file:///c:/Users/sirja/source/repos/mrjalves/JT_Food/JT_Food/JT_Food.Shared/Components/Pedidos/LancamentoRapido.razor)):
+
+### 8.1. Fluxos de Pedido
+1. **Pedido Direto na Mesa:** Itens computados diretamente para a conta coletiva da mesa.
+2. **Sub-comandas Individuais da Mesa:** Cada cliente na mesa possui a sua própria comanda individual vinculada (ex.: `Mesa 08` $\rightarrow$ `Comanda #12 - Pedro`, `Comanda #15 - Sofia`), facilitando a divisão individual no fechamento.
+3. **Identificação Flexível:** Abertura por Número do Cartão Físico (`#105`), Nome do Cliente (`"Lucas"`) ou ambos.
+
+### 8.2. Interface Tátil Ágil
+* Barra de categorias rápidas com rolagem horizontal: **🔥 Promoções**, **🍺 Bebidas**, **🍟 Porções**, **🍔 Lanches**, **🍽️ Pratos** e **🍰 Sobremesas**.
+* Steppers de incremento `+` e `-` com seleção de etiquetas pré-configuradas (*Sem cebola*, *Bem passado*, *Gelo e limão*, *Copos separados*).
+* Botão flutuante **Enviar Pedido**, que simultaneamente grava o pedido, direciona os itens para as impressoras térmicas setoriais e projeta os pedidos na esteira do KDS.
+
+---
+
+## 9. Motor de Promoções, Happy Hour e Combos
+
+Centralizado em [PromocaoLogic.cs](file:///c:/Users/sirja/source/repos/mrjalves/JT_Food/JT_Food/JT_Food.Shared/BusinessLogic/PromocaoLogic.cs) e gerenciado em [Menu.razor](file:///c:/Users/sirja/source/repos/mrjalves/JT_Food/JT_Food/JT_Food.Shared/Pages/Menu.razor):
+
+* **Desconto Direto (De / Por):** Preço promocional fixo ativo manualmente.
+* **Happy Hour Automático por Horário/Dia:** Preços reduzidos ativados automaticamente com base no dia da semana e janela de horário (ex.: *Quarta e Quinta das 17h00 às 20h00*).
+* **Combos e Pacotes:** Agrupamentos de itens com valor promocional fechado (ex.: *Hambúrguer Artesanal + Batata Frita + Refrigerante Lata* por R$ 38,00).
+
+---
+
+## 10. Couvert Artístico e Fechamento Detalhado
+
+Parametrizado em [Configuracoes.razor](file:///c:/Users/sirja/source/repos/mrjalves/JT_Food/JT_Food/JT_Food.Shared/Pages/Configuracoes.razor) e operado em [FechamentoPedido.razor](file:///c:/Users/sirja/source/repos/mrjalves/JT_Food/JT_Food/JT_Food.Shared/Pages/FechamentoPedido.razor):
+
+* **Ativação:** Manual no ato de abertura/fechamento ou automática com base no horário programado de apresentações ao vivo.
+* **Critério de Cobrança:** Multiplicação pelo número de pessoas sentadas à mesa ou cobrança individual por comanda.
+* **Isenção com 1 Clique:** Opção imediata de isenção ou remoção do couvert antes da emissão da pré-conta.
+* **Divisão de Conta:** Divisão automática entre $N$ pagantes e suporte a pagamentos combinados (ex.: R$ 50,00 no PIX + saldo no Débito).
+* **Pré-conta ESC/POS:** Emissão térmica do resumo para conferência na mesa antes da liquidação final.
+
+---
+
+## 11. Direcionamento para Impressoras Térmicas e KDS
+
+* Cadastro de impressoras térmicas via TCP/IP na porta `9100` em [Configuracoes.razor](file:///c:/Users/sirja/source/repos/mrjalves/JT_Food/JT_Food/JT_Food.Shared/Pages/Configuracoes.razor).
+* Cada categoria ou produto possui sua impressora de destino vinculada.
+* Ao confirmar o pedido, o serviço `IImpressaoRedeService` gera os comandos ESC/POS e envia para a impressora do setor:
+  * **Bar:** Comanda de bebidas para o barman.
+  * **Cozinha / Chapa:** Comanda de pratos quentes e lanches + projeção no monitor KDS.
+* Tratamento de falhas de conexão com alerta visual e retenção na fila para reenvio.
+
+---
+
+## 12. Dashboard com Relatórios Executivos por IA
+
+Disponível no painel inicial ([Home.razor](file:///c:/Users/sirja/source/repos/mrjalves/JT_Food/JT_Food/JT_Food.Shared/Pages/Home.razor)):
+
+* **Autenticação Rápida por PIN:** Garçom opera com interface focada e barra inferior mobile; Gerente desbloqueia relatórios executivos e configurações completas.
+* **Cards de KPIs em Tempo Real:** Faturamento Bruto, Faturamento Líquido, Ticket Médio, Total de Couvert, Total de Descontos e Ocupação do Salão.
+* **Painel de IA (Gemini / Motor Local):**
+  * Geração sob demanda de diagnósticos sobre produtos de maior margem e rotatividade.
+  * Recomendações de combos e campanhas para horários ociosos.
+  * Previsão de reposição de insumos com base no ritmo de consumo e estoque mínimo.
+

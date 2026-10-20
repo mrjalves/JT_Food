@@ -1,52 +1,100 @@
-﻿@using JT_Classes.Restaurante
+@using JT_Classes.Restaurante
+@using JT_Food.Shared.Components.Pedidos
+@using JT_Food.Shared.Domain.Entities
+@using JT_Food.Shared.Domain.Enums
+@using JT_Food.Shared.Services.Interfaces
 @using JT_Servicos.Restaurante
 @using JT_UserInterface.Shared.Components.Core
-
 @inject MesaService MesaService
 
-<Modal @ref="modalRef" Title="@(Mesa.Id == 0 ? "Nova Mesa" : "Editar Mesa")" EntidadeContexto="Mesa">
+<Modal @ref="modalRef" Title="@(Mesa.Id == 0 ? "Nova Mesa" : $"Operação: {Mesa.Identificacao} ({Mesa.Status})")" EntidadeContexto="Mesa">
     <BodyContent>
-        <EditForm Model="Mesa" OnValidSubmit="Salvar">
-            <DataAnnotationsValidator />
-            
-            <div class="mb-3">
-                <label class="form-label">Identificação</label>
-                <input type="text" class="form-control" @bind="Mesa.Identificacao" placeholder="Ex: Mesa 01, Balcão 2" />
-                <ValidationMessage For="@(() => Mesa.Identificacao)" />
-            </div>
+        @if (Mesa.Id > 0)
+        {
+            <!-- Abas de Operação da Mesa -->
+            <ul class="nav nav-tabs mb-3">
+                <li class="nav-item">
+                    <button class="nav-link @(abaAtiva == "comandas" ? "active fw-bold" : "")" @onclick='() => abaAtiva = "comandas"'>
+                        <i class="bi bi-diagram-3 me-1"></i> Comandas da Mesa
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link @(abaAtiva == "pedido" ? "active fw-bold text-primary" : "")" @onclick='() => abaAtiva = "pedido"'>
+                        <i class="bi bi-cart-plus me-1"></i> Lançar Pedido
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link @(abaAtiva == "dados" ? "active fw-bold text-secondary" : "")" @onclick='() => abaAtiva = "dados"'>
+                        <i class="bi bi-gear me-1"></i> Dados da Mesa
+                    </button>
+                </li>
+            </ul>
+        }
 
-            <div class="mb-3">
-                <label class="form-label">Capacidade</label>
-                <input type="number" class="form-control" @bind="Mesa.Capacidade" />
-            </div>
+        @if (abaAtiva == "comandas" && Mesa.Id > 0)
+        {
+            <GestorComandasMesa MesaIdentificacao="@Mesa.Identificacao"
+                                OnSelecionarComanda="SelecionarComandaParaPedido" />
+        }
+        else if (abaAtiva == "pedido" && Mesa.Id > 0)
+        {
+            <LancamentoRapido MesaIdentificacao="@Mesa.Identificacao"
+                              ComandaAtiva="comandaParaPedido"
+                              OnTrocarComanda='() => abaAtiva = "comandas"'
+                              OnPedidoEnviado="HandlePedidoEnviado" />
+        }
+        else
+        {
+            <EditForm Model="Mesa" OnValidSubmit="Salvar">
+                <DataAnnotationsValidator />
+                
+                <div class="mb-3">
+                    <label class="form-label">Identificação</label>
+                    <input type="text" class="form-control" @bind="Mesa.Identificacao" placeholder="Ex: Mesa 01, Balcão 2" />
+                    <ValidationMessage For="@(() => Mesa.Identificacao)" />
+                </div>
 
-            <div class="mb-3">
-                <label class="form-label">Status Atual</label>
-                <select class="form-select" @bind="Mesa.Status">
-                    <option value="@StatusMesa.Livre">Livre</option>
-                    <option value="@StatusMesa.Ocupada">Ocupada</option>
-                    <option value="@StatusMesa.AguardandoPagamento">Aguardando Pagamento</option>
-                    <option value="@StatusMesa.Reservada">Reservada</option>
-                </select>
-            </div>
+                <div class="mb-3">
+                    <label class="form-label">Capacidade (Lugares)</label>
+                    <input type="number" class="form-control" @bind="Mesa.Capacidade" min="1" max="50" />
+                </div>
 
-            <div class="d-flex justify-content-end gap-2 mt-4">
-                <button type="button" class="btn btn-secondary" @onclick="Close">Cancelar</button>
-                <button type="submit" class="btn btn-success">
-                    <i class="fas fa-save me-1"></i> Salvar
-                </button>
-            </div>
-        </EditForm>
+                <div class="mb-3">
+                    <label class="form-label">Status Atual</label>
+                    <select class="form-select" @bind="Mesa.Status">
+                        <option value="@StatusMesaConsts.Livre">Livre</option>
+                        <option value="@StatusMesaConsts.Ocupada">Ocupada</option>
+                        <option value="@StatusMesaConsts.AguardandoPagamento">Aguardando Pagamento</option>
+                        <option value="@StatusMesaConsts.Reservada">Reservada</option>
+                    </select>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <button type="button" class="btn btn-secondary" @onclick="Close">Fechar</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save me-1"></i> Salvar Mesa
+                    </button>
+                </div>
+            </EditForm>
+        }
     </BodyContent>
 </Modal>
 
 @code {
-    [Parameter] public Mesa Mesa { get; set; } = new();
+    [Parameter] public JT_Classes.Restaurante.Mesa Mesa { get; set; } = new();
     [Parameter] public EventCallback OnSaved { get; set; }
     
     private Modal modalRef = default!;
+    private string abaAtiva = "comandas";
+    private JT_Food.Shared.Domain.Entities.Comanda? comandaParaPedido;
 
-    public void Open() => modalRef.Open();
+    public void Open(string abaInicial = "comandas")
+    {
+        abaAtiva = Mesa.Id == 0 ? "dados" : abaInicial;
+        comandaParaPedido = null;
+        modalRef.Open();
+    }
+
     public void Close() => modalRef.Close();
     public bool IsOpen => modalRef.IsOpen;
 
@@ -59,5 +107,22 @@
             await OnSaved.InvokeAsync();
             Close();
         }
+    }
+
+    private void SelecionarComandaParaPedido(JT_Classes.Restaurante.Comanda c)
+    {
+        comandaParaPedido = new JT_Food.Shared.Domain.Entities.Comanda
+        {
+            Id = c.Id,
+            NomeCliente = c.NomeCliente,
+            MesaId = c.MesaId,
+            Subtotal = c.Total
+        };
+        abaAtiva = "pedido";
+    }
+
+    private async Task HandlePedidoEnviado()
+    {
+        await OnSaved.InvokeAsync();
     }
 }

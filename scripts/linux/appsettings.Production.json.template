@@ -13,6 +13,10 @@
       "BaseApiUrl": "https://api.jtecsistemas.com.br",
       "TipoBanco": "SqlServer",
       "StringConexao": "Data Source=dadosjtech.database.windows.net;Initial Catalog=jtechdados;Persist Security Info=True;User ID=sirjalves;Password=@Maiden08Berry;Pooling=False;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;"
+    },
+    "Gemini": {
+      "ApiKey": "",
+      "Modelo": "gemini-1.5-flash"
     }
   }
 }

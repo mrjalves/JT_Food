@@ -1,19 +1,23 @@
-﻿@page "/comandas"
+@page "/comandas"
 @using JT_Classes.Restaurante
-@using JT_Servicos.Restaurante
 @using JT_Food.Shared.Components
-
-@inject ComandaService ComandaService
+@using JT_Food.Shared.Services.Interfaces
+@inject IComandaService ComandaService
 @inject IJSRuntime JSRuntime
 @implements IDisposable
 
-<PageTitle>Comandas - JT Food</PageTitle>
+<PageTitle>Comandas e Atendimento - JT Food</PageTitle>
 
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0 text-gray-800">Comandas e Pedidos</h1>
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800 fw-bold">
+                <i class="bi bi-card-checklist text-primary me-2"></i>Comandas e Atendimento
+            </h1>
+            <p class="text-muted small mb-0">Pesquise por número do cartão, cliente ou mesa e gerencie pedidos.</p>
+        </div>
         <button class="btn btn-primary shadow-sm" @onclick="NovaComanda">
-            <i class="fas fa-plus fa-sm text-white-50 me-2"></i> Nova Comanda
+            <i class="fas fa-plus fa-sm text-white-50 me-2"></i> Nova Comanda Flexível
         </button>
     </div>
 
@@ -37,26 +41,26 @@
     private async Task CarregarAsync()
     {
         loading = true;
-        comandas = await ComandaService.GetAll();
+        comandas = await ComandaService.GetAllAsync();
         loading = false;
         StateHasChanged();
     }
 
-    private async Task NovaComanda()
+    private void NovaComanda()
     {
         comandaSelecionada = new Comanda { UserId = "1", DataAbertura = DateTime.UtcNow };
-        modalComanda.Open();
+        modalComanda.Open("dados");
     }
 
-    private async Task EditarComanda(Comanda c)
+    private void EditarComanda(Comanda c)
     {
         comandaSelecionada = c;
-        modalComanda.Open();
+        modalComanda.Open("pedidos");
     }
 
     private async Task ExcluirComanda(Comanda c)
     {
-        if (await ComandaService.Delete(c.Id))
+        if (await ComandaService.DeleteAsync(c.Id))
         {
             await CarregarAsync();
         }
@@ -76,31 +80,6 @@
     public async Task OnNovoHotkey()
     {
         await InvokeAsync(NovaComanda);
-        StateHasChanged();
-    }
-
-    [JSInvokable]
-    public async Task HandleAcaoHotkey(string acao)
-    {
-        switch (acao)
-        {
-            case "salvar":
-                if (modalComanda.IsOpen)
-                    await modalComanda.SalvarAsync();
-                break;
-            case "cancelar":
-                if (modalComanda.IsOpen)
-                    modalComanda.Close();
-                break;
-            case "editar":
-                if (comandaSelecionada.Id != 0)
-                    await InvokeAsync(() => EditarComanda(comandaSelecionada));
-                break;
-            case "deletar":
-                if (comandaSelecionada.Id != 0)
-                    await InvokeAsync(() => ExcluirComanda(comandaSelecionada));
-                break;
-        }
         StateHasChanged();
     }
 

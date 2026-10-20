@@ -1,5 +1,7 @@
 using JT_Food.Shared.BusinessLogic;
 using JT_Food.Shared.Layout;
+using JT_Food.Shared.Services.Implementations;
+using JT_Food.Shared.Services.Interfaces;
 using JT_Servicos.Interfaces;
 using JT_Servicos.Restaurante;
 using JT_UserInterface.Shared.Services.Interfaces.Comum;
@@ -20,7 +22,7 @@ namespace JT_Food.Shared
             services.AddScoped<MFoodConfiguracaoService>();
             services.AddScoped<IMFoodConfiguracaoService, MFoodConfiguracaoService>();
 
-            // Serviços do Módulo Restaurante
+            // Serviços do Módulo Restaurante (Banco / API)
             services.AddScoped<JT_Servicos.Restaurante.MesaService>();
             services.AddScoped<JT_Servicos.Restaurante.ComandaService>();
             services.AddScoped<JT_Servicos.Restaurante.ProdutoRestauranteService>();
@@ -37,13 +39,24 @@ namespace JT_Food.Shared
             services.AddScoped<JT_Servicos.Restaurante.ReceitaService>();
             services.AddScoped<JT_Servicos.Restaurante.ProducaoService>();
             services.AddScoped<JT_Servicos.Restaurante.MemoriaCalculoService>();
+            services.AddScoped<JT_Servicos.Restaurante.ItemCompraService>();
 
-            // Logica de Negocios
+            // Lógica de Negócios
+            services.AddScoped<PromocaoLogic>();
+            services.AddScoped<LayoutSalaoLogic>();
             services.AddScoped<CaixaLogic>();
             services.AddScoped<ProducaoLogic>();
             services.AddScoped<KDSLogic>();
             services.AddScoped<ComercialLogic>();
-            services.AddScoped<JT_Servicos.Restaurante.ItemCompraService>();
+            services.AddScoped<RelatorioIALogic>();
+
+            // Serviços Operacionais JT_Food Core
+            services.AddScoped<IComandaService, ComandaOperacionalService>();
+            services.AddScoped<ICardapioService, CardapioService>();
+            services.AddScoped<IMesaLayoutService, MesaLayoutService>();
+            services.AddScoped<IImpressaoRedeService, EscPosPrintService>();
+            services.AddScoped<IAuthPerfilService, AuthPerfilService>();
+            services.AddScoped<IIAAnalyticsService, GeminiRelatorioService>();
 
             return services;
         }

@@ -1,4 +1,9 @@
-﻿using JT_Classes.Restaurante;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using JT_Classes.Restaurante;
+using JT_Food.Shared.Domain.Enums;
+using JT_Food.Shared.Services.Interfaces;
 using JT_Servicos.Restaurante;
 
 namespace JT_Food.Shared.BusinessLogic
@@ -8,15 +13,24 @@ namespace JT_Food.Shared.BusinessLogic
         private readonly CaixaService _caixaService;
         private readonly MovimentacaoCaixaService _movimentacaoCaixaService;
         private readonly PagamentoComandaService _pagamentoComandaService;
+        private readonly ComandaService _comandaService;
+        private readonly MesaService _mesaService;
+        private readonly IMesaLayoutService _mesaLayoutService;
 
         public CaixaLogic(
             CaixaService caixaService,
             MovimentacaoCaixaService movimentacaoCaixaService,
-            PagamentoComandaService pagamentoComandaService)
+            PagamentoComandaService pagamentoComandaService,
+            ComandaService comandaService,
+            MesaService mesaService,
+            IMesaLayoutService mesaLayoutService)
         {
             _caixaService = caixaService;
             _movimentacaoCaixaService = movimentacaoCaixaService;
             _pagamentoComandaService = pagamentoComandaService;
+            _comandaService = comandaService;
+            _mesaService = mesaService;
+            _mesaLayoutService = mesaLayoutService;
         }
 
         public async Task<(bool Sucesso, string Mensagem, MCaixa? CaixaAtual)> ObterCaixaAbertoAsync()
@@ -116,7 +130,7 @@ namespace JT_Food.Shared.BusinessLogic
 
             await _movimentacaoCaixaService.SaveAsync(mov);
 
-            // Update running total
+            // Atualiza saldo final calculado do caixa
             if (natureza == "Entrada" || natureza == "Saida")
             {
                  var caixa = await _caixaService.GetById(Convert.ToInt32(caixaId));
@@ -130,10 +144,6 @@ namespace JT_Food.Shared.BusinessLogic
             }
         }
 
-        /// <summary>
-        /// Registra um pagamento parcial na comanda e lança a movimentação no caixa aberto.
-        /// Suporta rateio de conta com múltiplas formas de pagamento.
-        /// </summary>
         public async Task<(bool Sucesso, string Mensagem)> RegistrarPagamentoParcialAsync(
             string comandaId, string formaPagamento, double valor, string operadorId, string? observacao = null)
         {
@@ -158,7 +168,6 @@ namespace JT_Food.Shared.BusinessLogic
             if (!salvo)
                 return (false, "Erro ao gravar o pagamento parcial.");
 
-            // Registrar a entrada no caixa para manter o saldo calculado
             await RegistrarMovimentacaoAsync(
                 resultCaixa.CaixaAtual!.Id.ToString(),
                 operadorId,
@@ -173,10 +182,6 @@ namespace JT_Food.Shared.BusinessLogic
             return (true, $"Pagamento de R$ {valor:F2} via {formaPagamento} registrado.");
         }
 
-        /// <summary>
-        /// Verifica se a soma dos pagamentos registrados cobre o total da comanda.
-        /// A comanda só pode ser baixada quando SaldoPendente &lt;= 0.
-        /// </summary>
         public async Task<(bool Quitada, double TotalPago, double SaldoPendente)> VerificarComandaQuitadaAsync(
             string comandaId, double totalComanda)
         {
@@ -184,10 +189,64 @@ namespace JT_Food.Shared.BusinessLogic
             double totalPago = pagamentos?.Sum(p => p.Valor) ?? 0;
             double saldoPendente = totalComanda - totalPago;
 
-            // Tolerância de 1 centavo para evitar problemas de ponto flutuante
             bool quitada = saldoPendente <= 0.01;
-
             return (quitada, totalPago, saldoPendente < 0 ? 0 : saldoPendente);
+        }
+
+        public (double TotalPorPessoa, double ValorCouvertTotal, double ValorServicoTotal) CalcularDivisaoConta(
+            double subtotalItens,
+            int quantidadePessoas,
+            bool cobrarCouvert,
+            double valorCouvertUnitario,
+            bool cobrarServico,
+            double percentualServico,
+            double desconto)
+        {
+            int pessoas = Math.Max(1, quantidadePessoas);
+            double totalCouvert = cobrarCouvert ? (valorCouvertUnitario * pessoas) : 0.0;
+            double totalServico = cobrarServico ? (subtotalItens * (percentualServico / 100.0)) : 0.0;
+            double totalFinal = Math.Max(0, subtotalItens + totalCouvert + totalServico - desconto);
+            double porPessoa = totalFinal / pessoas;
+
+            return (Math.Round(porPessoa, 2), Math.Round(totalCouvert, 2), Math.Round(totalServico, 2));
+        }
+
+        public async Task<(bool Sucesso, string Mensagem)> FinalizarComandaELiberarMesaAsync(int comandaId)
+        {
+            var comanda = await _comandaService.GetById(comandaId);
+            if (comanda == null) return (false, "Comanda não encontrada.");
+
+            var (quitada, totalPago, saldoPendente) = await VerificarComandaQuitadaAsync(comanda.Id.ToString(), comanda.Total);
+            if (!quitada)
+            {
+                return (false, $"Não é possível fechar a comanda. Saldo pendente: R$ {saldoPendente:F2}");
+            }
+
+            comanda.Status = "Fechada";
+            comanda.DataFechamento = DateTime.UtcNow;
+            await _comandaService.SaveAsync(comanda);
+
+            // Verificar se ainda há outras comandas abertas na mesa
+            if (!string.IsNullOrWhiteSpace(comanda.MesaId))
+            {
+                var outrasComandas = await _comandaService.Find($"MesaId = '{comanda.MesaId}' AND Status = 'Aberta'");
+                if (outrasComandas == null || !outrasComandas.Any())
+                {
+                    // Libera a mesa no banco
+                    var mesas = await _mesaService.Find($"Identificacao = '{comanda.MesaId}'");
+                    var mesa = mesas?.FirstOrDefault();
+                    if (mesa != null)
+                    {
+                        mesa.Status = StatusMesaConsts.Livre;
+                        await _mesaService.SaveAsync(mesa);
+                    }
+
+                    // Libera no mapa do salão
+                    await _mesaLayoutService.AtualizarStatusOperacionalAsync(comanda.MesaId, StatusMesaConsts.Livre, 0, 0);
+                }
+            }
+
+            return (true, $"Comanda #{comanda.Id} encerrada com sucesso!");
         }
     }
 }

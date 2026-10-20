@@ -1,12 +1,560 @@
 @page "/menu"
+@using JT_Food.Shared.Domain.Entities
+@using JT_Food.Shared.Domain.Enums
+@using JT_Food.Shared.Services.Interfaces
+@inject ICardapioService CardapioService
+@inject IImpressaoRedeService ImpressaoService
 
-<PageTitle>Menu de Produtos - JT Food</PageTitle>
+<PageTitle>Gestão de Cardápio & Promoções - JT Food</PageTitle>
 
 <div class="container-fluid py-4">
-    <h3>Menu de Produtos</h3>
-    <p>Gerencie os pratos, bebidas e sobremesas disponíveis para os clientes.</p>
+    <!-- Cabeçalho -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800 fw-bold">
+                <i class="bi bi-journal-text text-primary me-2"></i>Gestão de Cardápio & Promoções
+            </h1>
+            <p class="text-muted small mb-0">Cadastre produtos, configure impressoras de destino, combos e horários de Happy Hour.</p>
+        </div>
+
+        <div class="d-flex gap-2">
+            @if (abaPrincipal == "produtos")
+            {
+                <button class="btn btn-primary shadow-sm" @onclick="NovoProduto">
+                    <i class="bi bi-plus-lg me-1"></i> Novo Produto
+                </button>
+            }
+            else if (abaPrincipal == "regras")
+            {
+                <button class="btn btn-danger shadow-sm" @onclick="NovaRegraPromocao">
+                    <i class="bi bi-fire me-1"></i> Nova Regra de Promoção
+                </button>
+            }
+            else
+            {
+                <button class="btn btn-secondary shadow-sm" @onclick="NovaCategoria">
+                    <i class="bi bi-plus-lg me-1"></i> Nova Categoria
+                </button>
+            }
+        </div>
+    </div>
+
+    <!-- Abas Principais -->
+    <ul class="nav nav-pills mb-4 border-bottom pb-2">
+        <li class="nav-item">
+            <button class="nav-link @(abaPrincipal == "produtos" ? "active fw-bold" : "text-dark")" @onclick='() => abaPrincipal = "produtos"'>
+                <i class="bi bi-egg-fried me-1"></i> Produtos do Cardápio (@produtos.Count)
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(abaPrincipal == "regras" ? "active fw-bold text-danger" : "text-dark")" @onclick='() => abaPrincipal = "regras"'>
+                <i class="bi bi-fire me-1"></i> Motor de Promoções & Happy Hour (@regrasPromocao.Count)
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(abaPrincipal == "categorias" ? "active fw-bold" : "text-dark")" @onclick='() => abaPrincipal = "categorias"'>
+                <i class="bi bi-tags me-1"></i> Categorias & Roteamento (@categorias.Count)
+            </button>
+        </li>
+    </ul>
+
+    <!-- ABA 1: PRODUTOS -->
+    @if (abaPrincipal == "produtos")
+    {
+        <!-- Barra de Filtro de Categorias e Busca -->
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div class="d-flex flex-wrap gap-1">
+                    <button class="btn btn-sm rounded-pill @(filtroGrupo == null ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick="() => SelecionarGrupo(null)">
+                        Todos
+                    </button>
+                    <button class="btn btn-sm rounded-pill @(filtroGrupo == CategoriaCardapioEnum.Bebidas ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick="() => SelecionarGrupo(CategoriaCardapioEnum.Bebidas)">
+                        🍺 Bebidas
+                    </button>
+                    <button class="btn btn-sm rounded-pill @(filtroGrupo == CategoriaCardapioEnum.Porcoes ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick="() => SelecionarGrupo(CategoriaCardapioEnum.Porcoes)">
+                        🍟 Porções
+                    </button>
+                    <button class="btn btn-sm rounded-pill @(filtroGrupo == CategoriaCardapioEnum.Lanches ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick="() => SelecionarGrupo(CategoriaCardapioEnum.Lanches)">
+                        🍔 Lanches
+                    </button>
+                    <button class="btn btn-sm rounded-pill @(filtroGrupo == CategoriaCardapioEnum.Pratos ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick="() => SelecionarGrupo(CategoriaCardapioEnum.Pratos)">
+                        🍽️ Pratos
+                    </button>
+                    <button class="btn btn-sm rounded-pill @(filtroGrupo == CategoriaCardapioEnum.Sobremesas ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick="() => SelecionarGrupo(CategoriaCardapioEnum.Sobremesas)">
+                        🍰 Sobremesas
+                    </button>
+                    <button class="btn btn-sm rounded-pill @(filtroGrupo == CategoriaCardapioEnum.TaxasCouvert ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick="() => SelecionarGrupo(CategoriaCardapioEnum.TaxasCouvert)">
+                        🎵 Couvert
+                    </button>
+                </div>
+
+                <div class="input-group input-group-sm" style="max-width: 280px;">
+                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" class="form-control border-start-0" placeholder="Filtrar por nome..." @bind="buscaProduto" @bind:event="oninput" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Grade de Produtos -->
+        <div class="row g-3">
+            @foreach (var prod in ProdutosExibidos)
+            {
+                <div class="col-12 col-md-6 col-lg-4 col-xl-3">
+                    <div class="card h-100 border-0 shadow-sm @(!prod.Disponivel ? "opacity-50" : "")">
+                        <div class="card-body p-3 d-flex flex-column justify-content-between">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="badge bg-light text-primary border">@prod.Grupo</span>
+                                    @if (prod.EmPromocao)
+                                    {
+                                        <span class="badge bg-danger"><i class="bi bi-fire me-1"></i>PROMOÇÃO</span>
+                                    }
+                                </div>
+
+                                <h6 class="fw-bold text-dark mb-1">@prod.Nome</h6>
+                                <p class="text-muted small mb-2 text-truncate-2" style="font-size: 0.8rem; min-height: 2.4rem;">
+                                    @prod.Descricao
+                                </p>
+                            </div>
+
+                            <div class="border-top pt-2 mt-2">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>
+                                        @if (prod.EmPromocao && prod.PrecoPromocional.HasValue)
+                                        {
+                                            <small class="text-decoration-line-through text-muted d-block" style="font-size: 0.75rem;">
+                                                De R$ @prod.PrecoBase.ToString("F2")
+                                            </small>
+                                            <span class="fs-5 fw-bold text-danger">Por R$ @prod.PrecoPromocional.Value.ToString("F2")</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="fs-5 fw-bold text-success">R$ @prod.PrecoBase.ToString("F2")</span>
+                                        }
+                                    </div>
+                                    <span class="badge bg-secondary opacity-75" title="Impressora de Destino">
+                                        <i class="bi bi-printer me-1"></i>@(ObterNomeImpressora(prod.ImpressoraDestinoId))
+                                    </span>
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <button class="btn btn-sm @(prod.Disponivel ? "btn-outline-success" : "btn-outline-warning")"
+                                            @onclick="() => AlternarDisponibilidade(prod.Id)" title="Pausar ou Ativar Venda">
+                                        <i class="bi @(prod.Disponivel ? "bi-check-circle-fill" : "bi-pause-circle-fill") me-1"></i>
+                                        @(prod.Disponivel ? "Disponível" : "Pausado")
+                                    </button>
+
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" @onclick="() => EditarProduto(prod)" title="Editar">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" @onclick="() => ExcluirProduto(prod.Id)" title="Excluir">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- ABA 2: REGRAS DE PROMOÇÃO & HAPPY HOUR -->
+    @if (abaPrincipal == "regras")
+    {
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-fire text-danger me-2"></i>Regras de Happy Hour & Combos Ativos</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Título</th>
+                                <th>Tipo</th>
+                                <th>Regra / Desconto</th>
+                                <th>Janela de Horário</th>
+                                <th>Status</th>
+                                <th class="text-end">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in regrasPromocao)
+                            {
+                                <tr>
+                                    <td>
+                                        <strong>@r.Titulo</strong>
+                                        <small class="d-block text-muted">@r.Descricao</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge @(r.Tipo == TipoRegraPromocao.HappyHour ? "bg-warning text-dark" : "bg-info text-dark")">
+                                            @r.Tipo
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (r.PrecoPromocionalFixo.HasValue)
+                                        {
+                                            <span class="text-success fw-bold">Preço Fixo: R$ @r.PrecoPromocionalFixo.Value.ToString("F2")</span>
+                                        }
+                                        else if (r.DescontoPercentual.HasValue)
+                                        {
+                                            <span class="text-danger fw-bold">Desconto: @r.DescontoPercentual.Value% OFF</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (r.Tipo == TipoRegraPromocao.HappyHour)
+                                        {
+                                            <small class="d-block text-dark fw-semibold">
+                                                <i class="bi bi-clock me-1"></i>@(r.HoraInicio?.ToString(@"hh\:mm")) às @(r.HoraFim?.ToString(@"hh\:mm"))
+                                            </small>
+                                            <small class="text-muted">Dias: @string.Join(", ", r.DiasSemana.Select(d => FormatarDiaSemana(d)))</small>
+                                        }
+                                        else
+                                        {
+                                            <small class="text-muted">Horário Livre / Combo</small>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" checked="@r.Ativa" @onchange="() => AlternarStatusRegra(r)" />
+                                        </div>
+                                    </td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => ExcluirRegra(r.Id)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ABA 3: CATEGORIAS & ROTEAMENTO -->
+    @if (abaPrincipal == "categorias")
+    {
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-tags text-primary me-2"></i>Categorias do Cardápio & Impressoras</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Ordem</th>
+                                <th>Nome Categoria</th>
+                                <th>Grupo do Sistema</th>
+                                <th>Impressora Destino Padrão</th>
+                                <th class="text-end">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var c in categorias)
+                            {
+                                <tr>
+                                    <td class="fw-bold">@c.Ordem</td>
+                                    <td>
+                                        <i class="bi @c.Icone me-2 text-primary"></i>
+                                        <strong>@c.Nome</strong>
+                                    </td>
+                                    <td><span class="badge bg-light text-dark border">@c.Grupo</span></td>
+                                    <td>
+                                        <span class="badge bg-secondary">
+                                            <i class="bi bi-printer me-1"></i>@(ObterNomeImpressora(c.ImpressoraDestinoId))
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => ExcluirCategoria(c.Id)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
 </div>
 
-@code {
+<!-- Modal de Edição / Criação de Produto -->
+@if (modalProdutoAberto)
+{
+    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-egg-fried me-2"></i>@(produtoEdicao.Id == 0 ? "Novo Produto" : "Editar Produto")</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => modalProdutoAberto = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-8">
+                            <label class="form-label fw-bold small text-muted">Nome do Produto:</label>
+                            <input type="text" class="form-control" @bind="produtoEdicao.Nome" placeholder="Ex: Chopp Artesanal 500ml" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-bold small text-muted">Grupo / Classificação:</label>
+                            <select class="form-select" @bind="produtoEdicao.Grupo">
+                                <option value="@CategoriaCardapioEnum.Bebidas">🍺 Bebidas</option>
+                                <option value="@CategoriaCardapioEnum.Porcoes">🍟 Porções</option>
+                                <option value="@CategoriaCardapioEnum.Lanches">🍔 Lanches</option>
+                                <option value="@CategoriaCardapioEnum.Pratos">🍽️ Pratos</option>
+                                <option value="@CategoriaCardapioEnum.Sobremesas">🍰 Sobremesas</option>
+                                <option value="@CategoriaCardapioEnum.TaxasCouvert">🎵 Taxas / Couvert</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small text-muted">Descrição Completa:</label>
+                            <textarea class="form-control" rows="2" @bind="produtoEdicao.Descricao" placeholder="Ingredientes e detalhes do prato..."></textarea>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-bold small text-muted">Preço Base (R$):</label>
+                            <input type="number" class="form-control text-end" @bind="produtoEdicao.PrecoBase" step="0.50" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-bold small text-muted">Preço Promocional "De / Por":</label>
+                            <input type="number" class="form-control text-end" @bind="produtoEdicao.PrecoPromocional" step="0.50" />
+                        </div>
+                        <div class="col-12 col-md-4 d-flex align-items-end">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="checkPromo" @bind="produtoEdicao.EmPromocao" />
+                                <label class="form-check-label fw-bold text-danger" for="checkPromo">Ativar Preço Promocional</label>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-bold small text-muted">Impressora Destino:</label>
+                            <select class="form-select" @bind="produtoEdicao.ImpressoraDestinoId">
+                                <option value="">(Impressora Padrão)</option>
+                                @foreach (var imp in impressoras)
+                                {
+                                    <option value="@imp.Id">@imp.NomeSetor (@imp.Tipo)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-bold small text-muted">Tempo Médio de Preparo (min):</label>
+                            <input type="number" class="form-control" @bind="produtoEdicao.TempoMedioPreparoMinutos" min="0" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => modalProdutoAberto = false">Cancelar</button>
+                    <button type="button" class="btn btn-success" @onclick="SalvarProdutoAsync">
+                        <i class="bi bi-save me-1"></i> Salvar Produto
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
+<!-- Modal de Regra de Promoção -->
+@if (modalRegraAberto)
+{
+    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-fire me-2"></i>Nova Regra de Promoção / Happy Hour</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => modalRegraAberto = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-bold small text-muted">Título da Promoção:</label>
+                            <input type="text" class="form-control" @bind="regraEdicao.Titulo" placeholder="Ex: Happy Hour Chopp 500ml" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small text-muted">Tipo da Promoção:</label>
+                            <select class="form-select" @bind="regraEdicao.Tipo">
+                                <option value="@TipoRegraPromocao.HappyHour">⏰ Happy Hour por Horário/Dia</option>
+                                <option value="@TipoRegraPromocao.DescontoDireto">🏷️ Desconto Direto no Produto</option>
+                                <option value="@TipoRegraPromocao.Combo">🍔🍟 Combo Promocional</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-bold small text-muted">Preço Fixo Promocional (R$):</label>
+                            <input type="number" class="form-control text-end" @bind="regraEdicao.PrecoPromocionalFixo" step="0.50" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-bold small text-muted">Ou % de Desconto:</label>
+                            <input type="number" class="form-control text-end" @bind="regraEdicao.DescontoPercentual" min="1" max="99" />
+                        </div>
+                        @if (regraEdicao.Tipo == TipoRegraPromocao.HappyHour)
+                        {
+                            <div class="col-6">
+                                <label class="form-label fw-bold small text-muted">Hora Início:</label>
+                                <input type="time" class="form-control" value="@regraEdicao.HoraInicio?.ToString(@"hh\:mm")"
+                                       @onchange="e => regraEdicao.HoraInicio = TimeSpan.TryParse(e.Value?.ToString(), out var ts) ? ts : null" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-bold small text-muted">Hora Fim:</label>
+                                <input type="time" class="form-control" value="@regraEdicao.HoraFim?.ToString(@"hh\:mm")"
+                                       @onchange="e => regraEdicao.HoraFim = TimeSpan.TryParse(e.Value?.ToString(), out var ts) ? ts : null" />
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => modalRegraAberto = false">Cancelar</button>
+                    <button type="button" class="btn btn-danger" @onclick="SalvarRegraAsync">
+                        <i class="bi bi-check-lg me-1"></i> Salvar Regra
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string abaPrincipal = "produtos";
+    private List<ProdutoCardapio> produtos = new();
+    private List<CategoriaMenu> categorias = new();
+    private List<RegraPromocao> regrasPromocao = new();
+    private List<ImpressoraRede> impressoras = new();
+
+    private CategoriaCardapioEnum? filtroGrupo = null;
+    private string buscaProduto = "";
+
+    private bool modalProdutoAberto = false;
+    private ProdutoCardapio produtoEdicao = new();
+
+    private bool modalRegraAberto = false;
+    private RegraPromocao regraEdicao = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDadosAsync();
+    }
+
+    private async Task CarregarDadosAsync()
+    {
+        produtos = await CardapioService.ObterProdutosAsync();
+        categorias = await CardapioService.ObterCategoriasAsync();
+        regrasPromocao = await CardapioService.ObterRegrasPromocaoAsync();
+        impressoras = await ImpressaoService.ObterImpressorasAsync();
+    }
+
+    private IEnumerable<ProdutoCardapio> ProdutosExibidos
+    {
+        get
+        {
+            var query = produtos.AsEnumerable();
+            if (filtroGrupo.HasValue)
+                query = query.Where(p => p.Grupo == filtroGrupo.Value);
+            if (!string.IsNullOrWhiteSpace(buscaProduto))
+            {
+                string t = buscaProduto.Trim().ToLowerInvariant();
+                query = query.Where(p => p.Nome.ToLowerInvariant().Contains(t) || p.Descricao.ToLowerInvariant().Contains(t));
+            }
+            return query;
+        }
+    }
+
+    private void SelecionarGrupo(CategoriaCardapioEnum? grupo)
+    {
+        filtroGrupo = grupo;
+    }
+
+    private string ObterNomeImpressora(int? id)
+    {
+        if (!id.HasValue) return "Padrão";
+        var imp = impressoras.FirstOrDefault(i => i.Id == id.Value);
+        return imp?.Tipo ?? "Padrão";
+    }
+
+    private async Task AlternarDisponibilidade(int produtoId)
+    {
+        await CardapioService.AlternarDisponibilidadeProdutoAsync(produtoId);
+        produtos = await CardapioService.ObterProdutosAsync();
+    }
+
+    private void NovoProduto()
+    {
+        produtoEdicao = new ProdutoCardapio();
+        modalProdutoAberto = true;
+    }
+
+    private void EditarProduto(ProdutoCardapio prod)
+    {
+        produtoEdicao = prod;
+        modalProdutoAberto = true;
+    }
+
+    private async Task SalvarProdutoAsync()
+    {
+        await CardapioService.SalvarProdutoAsync(produtoEdicao);
+        modalProdutoAberto = false;
+        produtos = await CardapioService.ObterProdutosAsync();
+    }
+
+    private async Task ExcluirProduto(int id)
+    {
+        await CardapioService.ExcluirProdutoAsync(id);
+        produtos = await CardapioService.ObterProdutosAsync();
+    }
+
+    private void NovaRegraPromocao()
+    {
+        regraEdicao = new RegraPromocao();
+        modalRegraAberto = true;
+    }
+
+    private async Task SalvarRegraAsync()
+    {
+        await CardapioService.SalvarRegraPromocaoAsync(regraEdicao);
+        modalRegraAberto = false;
+        regrasPromocao = await CardapioService.ObterRegrasPromocaoAsync();
+    }
+
+    private async Task AlternarStatusRegra(RegraPromocao regra)
+    {
+        regra.Ativa = !regra.Ativa;
+        await CardapioService.SalvarRegraPromocaoAsync(regra);
+    }
+
+    private async Task ExcluirRegra(int id)
+    {
+        await CardapioService.ExcluirRegraPromocaoAsync(id);
+        regrasPromocao = await CardapioService.ObterRegrasPromocaoAsync();
+    }
+
+    private void NovaCategoria()
+    {
+        // Criação de categoria
+    }
+
+    private async Task ExcluirCategoria(int id)
+    {
+        await CardapioService.ExcluirCategoriaAsync(id);
+        categorias = await CardapioService.ObterCategoriasAsync();
+    }
+
+    private string FormatarDiaSemana(int dia) => dia switch
+    {
+        0 => "Dom",
+        1 => "Seg",
+        2 => "Ter",
+        3 => "Qua",
+        4 => "Qui",
+        5 => "Sex",
+        6 => "Sáb",
+        _ => ""
+    };
 }

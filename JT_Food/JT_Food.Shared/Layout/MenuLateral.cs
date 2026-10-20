@@ -1,15 +1,58 @@
-using JT_Aplicacao.Classes;
-using JT_Aplicacao.UserInterface;
-using JT_UserInterface.Shared.Services.Interfaces.Comum;
 using System.Collections.Generic;
 using System.Linq;
+using JT_Aplicacao.Classes;
+using JT_Aplicacao.UserInterface;
+using JT_Food.Shared.Domain.Enums;
+using JT_Food.Shared.Services.Interfaces;
+using JT_UserInterface.Shared.Services.Interfaces.Comum;
 
 namespace JT_Food.Shared.Layout
 {
     public class MenuLateral : IModuloMenuProvider, IMenuProvider
     {
+        private readonly IAuthPerfilService _authService;
+
+        public MenuLateral(IAuthPerfilService authService)
+        {
+            _authService = authService;
+        }
+
         public List<SModuloMenu> GetModulos()
         {
+            var perfil = _authService.ObterPerfilAtual();
+            var itens = new List<SItemMenu>();
+
+            if (perfil == PerfilAcesso.Garcom)
+            {
+                // Interface do Garçom: Acessos focados no atendimento rápido móvel
+                itens.Add(new SItemMenu { Titulo = "Mesas", Texto = "Mesas", Url = "/mesas", Icone = "bi-table" });
+                itens.Add(new SItemMenu { Titulo = "Comandas", Texto = "Comandas", Url = "/comandas", Icone = "bi-card-checklist" });
+                itens.Add(new SItemMenu { Titulo = "KDS (Cozinha)", Texto = "KDS", Url = "/kds", Icone = "bi-display" });
+            }
+            else if (perfil == PerfilAcesso.Caixa)
+            {
+                // Interface do Caixa: Fechamentos, mesas e comandas
+                itens.Add(new SItemMenu { Titulo = "Home", Texto = "Home", Url = "/", Icone = "bi-house-door", MatchAll = true });
+                itens.Add(new SItemMenu { Titulo = "Mesas", Texto = "Mesas", Url = "/mesas", Icone = "bi-table" });
+                itens.Add(new SItemMenu { Titulo = "Comandas", Texto = "Comandas", Url = "/comandas", Icone = "bi-card-checklist" });
+                itens.Add(new SItemMenu { Titulo = "Caixa", Texto = "Caixa", Url = "/caixa", Icone = "bi-cash-coin" });
+            }
+            else
+            {
+                // Interface do Gerente: Painel administrativo completo
+                itens.Add(new SItemMenu { Titulo = "Dashboard IA", Texto = "Home", Url = "/", Icone = "bi-house-door", MatchAll = true });
+                itens.Add(new SItemMenu { Titulo = "Mesas & Salão", Texto = "Mesas", Url = "/mesas", Icone = "bi-table" });
+                itens.Add(new SItemMenu { Titulo = "Comandas", Texto = "Comandas", Url = "/comandas", Icone = "bi-card-checklist" });
+                itens.Add(new SItemMenu { Titulo = "KDS (Cozinha)", Texto = "KDS", Url = "/kds", Icone = "bi-display" });
+                itens.Add(new SItemMenu { Titulo = "Cardápio & Promoções", Texto = "Menu", Url = "/menu", Icone = "bi-journal-text" });
+                itens.Add(new SItemMenu { Titulo = "Receitas", Texto = "Receitas", Url = "/receita", Icone = "bi-book" });
+                itens.Add(new SItemMenu { Titulo = "Estoque", Texto = "Estoque", Url = "/estoque", Icone = "bi-box-seam" });
+                itens.Add(new SItemMenu { Titulo = "Compras", Texto = "Compras", Url = "/compras", Icone = "bi-cart" });
+                itens.Add(new SItemMenu { Titulo = "Produção", Texto = "Produção", Url = "/producao", Icone = "bi-gear-wide-connected" });
+                itens.Add(new SItemMenu { Titulo = "Caixa", Texto = "Caixa", Url = "/caixa", Icone = "bi-cash-coin" });
+                itens.Add(new SItemMenu { Titulo = "Configurações", Texto = "Configurações", Url = "/configuracoes", Icone = "bi-gear" });
+            }
+
             return new List<SModuloMenu>
             {
                 new SModuloMenu
@@ -17,19 +60,7 @@ namespace JT_Food.Shared.Layout
                     NomeModulo = "JT_Food",
                     Icone = "bi-shop",
                     Modulo = eModuloSistema.Restaurante,
-                    Itens = new List<SItemMenu>
-                    {
-                        new SItemMenu { Titulo = "Home", Texto = "Home", Url = "/", Icone = "bi-house-door", MatchAll = true },
-                        new SItemMenu { Titulo = "Mesas", Texto = "Mesas", Url = "/mesas", Icone = "bi-table" },
-                        new SItemMenu { Titulo = "Comandas", Texto = "Comandas", Url = "/comandas", Icone = "bi-card-checklist" },
-                        new SItemMenu { Titulo = "KDS (Cozinha)", Texto = "KDS", Url = "/kds", Icone = "bi-display" },
-                        new SItemMenu { Titulo = "Menu", Texto = "Menu", Url = "/menu", Icone = "bi-journal-text" },
-                        new SItemMenu { Titulo = "Receitas", Texto = "Receitas", Url = "/receita", Icone = "bi-book" },
-                        new SItemMenu { Titulo = "Estoque", Texto = "Estoque", Url = "/estoque", Icone = "bi-box-seam" },
-                        new SItemMenu { Titulo = "Compras", Texto = "Compras", Url = "/compras", Icone = "bi-cart" },
-                        new SItemMenu { Titulo = "Produção", Texto = "Produção", Url = "/producao", Icone = "bi-gear-wide-connected" },
-                        new SItemMenu { Titulo = "Caixa", Texto = "Caixa", Url = "/caixa", Icone = "bi-cash-coin" }
-                    }
+                    Itens = itens
                 }
             };
         }

@@ -1,0 +1,393 @@
+@using JT_Classes.Restaurante
+@using JT_Food.Shared.BusinessLogic
+@using JT_Food.Shared.Domain.Entities
+@using JT_Food.Shared.Domain.Enums
+@using JT_Food.Shared.Services.Interfaces
+@inject ICardapioService CardapioService
+@inject ComercialLogic ComercialLogic
+@inject IComandaService ComandaService
+@inject IJSRuntime JSRuntime
+
+<div class="lancamento-rapido card border-0 shadow-sm">
+    <!-- 1. Cabeçalho Fixo de Contexto -->
+    <div class="card-header bg-dark text-white p-3 d-flex justify-content-between align-items-center">
+        <div>
+            <span class="badge bg-primary fs-6 me-2">
+                <i class="bi bi-geo-alt-fill me-1"></i>@(string.IsNullOrEmpty(MesaIdentificacao) ? "Balcão / Sem Mesa" : MesaIdentificacao)
+            </span>
+            <span class="text-light fw-bold">
+                @(ComandaAtiva != null ? ComandaAtiva.DisplayIdentificacao : "Nova Comanda Geral")
+            </span>
+        </div>
+        @if (OnTrocarComanda.HasDelegate)
+        {
+            <button class="btn btn-sm btn-outline-light" @onclick="() => OnTrocarComanda.InvokeAsync()">
+                <i class="bi bi-arrow-repeat me-1"></i>Trocar
+            </button>
+        }
+    </div>
+
+    <!-- 2. Barra de Categorias Rápidas -->
+    <div class="bg-light p-2 border-bottom category-bar d-flex gap-2 overflow-x-auto">
+        <button class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(categoriaSelecionada == null ? "btn-primary" : "btn-outline-dark")"
+                @onclick="() => SelecionarCategoria(null)">
+            ✨ Todos
+        </button>
+        <button class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(categoriaSelecionada == CategoriaCardapioEnum.Lanches && apenasPromocoes ? "btn-danger text-white" : "btn-outline-danger")"
+                @onclick="AtivarFiltroPromocoes">
+            🔥 Promoções
+        </button>
+        <button class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(categoriaSelecionada == CategoriaCardapioEnum.Bebidas && !apenasPromocoes ? "btn-primary" : "btn-outline-dark")"
+                @onclick="() => SelecionarCategoria(CategoriaCardapioEnum.Bebidas)">
+            🍺 Bebidas
+        </button>
+        <button class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(categoriaSelecionada == CategoriaCardapioEnum.Porcoes && !apenasPromocoes ? "btn-primary" : "btn-outline-dark")"
+                @onclick="() => SelecionarCategoria(CategoriaCardapioEnum.Porcoes)">
+            🍟 Porções
+        </button>
+        <button class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(categoriaSelecionada == CategoriaCardapioEnum.Lanches && !apenasPromocoes ? "btn-primary" : "btn-outline-dark")"
+                @onclick="() => SelecionarCategoria(CategoriaCardapioEnum.Lanches)">
+            🍔 Lanches
+        </button>
+        <button class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(categoriaSelecionada == CategoriaCardapioEnum.Pratos && !apenasPromocoes ? "btn-primary" : "btn-outline-dark")"
+                @onclick="() => SelecionarCategoria(CategoriaCardapioEnum.Pratos)">
+            🍽️ Pratos
+        </button>
+        <button class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(categoriaSelecionada == CategoriaCardapioEnum.Sobremesas && !apenasPromocoes ? "btn-primary" : "btn-outline-dark")"
+                @onclick="() => SelecionarCategoria(CategoriaCardapioEnum.Sobremesas)">
+            🍰 Sobremesas
+        </button>
+    </div>
+
+    <!-- 3. Alertas / Mensagens -->
+    @if (!string.IsNullOrEmpty(mensagemFeedback))
+    {
+        <div class="alert @classeFeedback alert-dismissible fade show m-2 p-2" role="alert">
+            <small>@mensagemFeedback</small>
+            <button type="button" class="btn-close btn-close-sm" @onclick="() => mensagemFeedback = null"></button>
+        </div>
+    }
+
+    <!-- 4. Grelha de Produtos -->
+    <div class="card-body p-3 product-list" style="max-height: 52vh; overflow-y: auto;">
+        @if (carregando)
+        {
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="text-muted mt-2">Carregando cardápio...</p>
+            </div>
+        }
+        else if (!produtosFiltrados.Any())
+        {
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-search fs-1 opacity-50"></i>
+                <p class="mt-2">Nenhum produto encontrado nesta categoria.</p>
+            </div>
+        }
+        else
+        {
+            <div class="row g-2">
+                @foreach (var prod in produtosFiltrados)
+                {
+                    int qtd = itensSelecionados.GetValueOrDefault(prod.Id, 0);
+                    double precoUnitario = precosVigentes.GetValueOrDefault(prod.Id, prod.PrecoBase);
+
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <div class="card h-100 border @(qtd > 0 ? "border-primary bg-primary bg-opacity-10 shadow-sm" : "border-light-subtle")">
+                            <div class="card-body p-2 d-flex flex-column justify-content-between">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <div class="fw-bold text-dark text-truncate" style="max-width: 200px;" title="@prod.Nome">
+                                            @prod.Nome
+                                        </div>
+                                        <small class="text-muted d-block text-truncate" style="max-width: 200px;">
+                                            @prod.Descricao
+                                        </small>
+                                    </div>
+                                    <div class="text-end">
+                                        @if (prod.EmPromocao || precoUnitario < prod.PrecoBase)
+                                        {
+                                            <small class="text-decoration-line-through text-muted d-block" style="font-size: 0.75rem;">
+                                                R$ @prod.PrecoBase.ToString("F2")
+                                            </small>
+                                            <span class="badge bg-danger">R$ @precoUnitario.ToString("F2")</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="fw-bold text-success">R$ @precoUnitario.ToString("F2")</span>
+                                        }
+                                    </div>
+                                </div>
+
+                                <!-- Botões Stepper + e - -->
+                                <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-secondary" @onclick="() => AlterarQuantidade(prod.Id, -1)" disabled="@(qtd <= 0)">
+                                            <i class="bi bi-dash"></i>
+                                        </button>
+                                        <span class="btn btn-outline-secondary disabled fw-bold px-3 text-dark">
+                                            @qtd
+                                        </span>
+                                        <button class="btn btn-outline-primary" @onclick="() => AlterarQuantidade(prod.Id, 1)">
+                                            <i class="bi bi-plus"></i>
+                                        </button>
+                                    </div>
+
+                                    @if (qtd > 0)
+                                    {
+                                        <button class="btn btn-sm btn-light border text-primary" @onclick="() => AbrirModalObservacoes(prod)">
+                                            <i class="bi bi-chat-left-text me-1"></i>
+                                            @(!string.IsNullOrEmpty(observacoesPorProduto.GetValueOrDefault(prod.Id)) ? "Obs ✔" : "Obs")
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- 5. Rodapé Fixo: Resumo e Enviar Pedido -->
+    <div class="card-footer bg-white border-top p-3 d-flex justify-content-between align-items-center">
+        <div>
+            <span class="text-muted d-block" style="font-size: 0.85rem;">Itens selecionados: <strong>@TotalItensSelecionados</strong></span>
+            <span class="fs-4 fw-bold text-primary">R$ @TotalGeral.ToString("F2")</span>
+        </div>
+        <button class="btn btn-success btn-lg px-4 shadow-sm"
+                @onclick="EnviarPedidoAsync"
+                disabled="@(TotalItensSelecionados == 0 || enviandoPedido)">
+            @if (enviandoPedido)
+            {
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                <span>Enviando...</span>
+            }
+            else
+            {
+                <i class="bi bi-send-check-fill me-2"></i>
+                <span>Enviar Pedido</span>
+            }
+        </button>
+    </div>
+</div>
+
+<!-- Modal de Observações Rápidas -->
+@if (produtoEmObservacao != null)
+{
+    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fs-6"><i class="bi bi-chat-left-dots me-2"></i>Observações: @produtoEmObservacao.Nome</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="FecharModalObservacoes"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label fw-bold text-muted">Etiquetas Rápidas:</label>
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        @foreach (var tag in produtoEmObservacao.ObservacoesSugeridas)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" @onclick="() => InserirTagObservacao(tag)">
+                                + @tag
+                            </button>
+                        }
+                    </div>
+                    <label class="form-label fw-bold text-muted">Observação do Item:</label>
+                    <textarea class="form-control" rows="3" @bind="textoObservacaoAtual" placeholder="Ex: Sem cebola, carne bem passada..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="FecharModalObservacoes">Cancelar</button>
+                    <button type="button" class="btn btn-primary" @onclick="SalvarObservacaoAtual">Salvar Observação</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .category-bar::-webkit-scrollbar {
+        height: 4px;
+    }
+    .category-bar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+    }
+</style>
+
+@code {
+    [Parameter] public string? MesaIdentificacao { get; set; }
+    [Parameter] public JT_Food.Shared.Domain.Entities.Comanda? ComandaAtiva { get; set; }
+    [Parameter] public EventCallback OnTrocarComanda { get; set; }
+    [Parameter] public EventCallback OnPedidoEnviado { get; set; }
+
+    private List<ProdutoCardapio> todosProdutos = new();
+    private List<ProdutoCardapio> produtosFiltrados = new();
+    private Dictionary<int, double> precosVigentes = new();
+    private Dictionary<int, int> itensSelecionados = new();
+    private Dictionary<int, string> observacoesPorProduto = new();
+
+    private CategoriaCardapioEnum? categoriaSelecionada = null;
+    private bool apenasPromocoes = false;
+    private bool carregando = true;
+    private bool enviandoPedido = false;
+
+    private ProdutoCardapio? produtoEmObservacao = null;
+    private string textoObservacaoAtual = "";
+    private string? mensagemFeedback;
+    private string classeFeedback = "alert-success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarCardapioAsync();
+    }
+
+    private async Task CarregarCardapioAsync()
+    {
+        carregando = true;
+        todosProdutos = await CardapioService.ObterProdutosAsync(apenasDisponiveis: true);
+        precosVigentes.Clear();
+        foreach (var p in todosProdutos)
+        {
+            precosVigentes[p.Id] = await CardapioService.ObterPrecoVigenteAsync(p);
+        }
+        FiltrarProdutos();
+        carregando = false;
+    }
+
+    private void SelecionarCategoria(CategoriaCardapioEnum? grupo)
+    {
+        categoriaSelecionada = grupo;
+        apenasPromocoes = false;
+        FiltrarProdutos();
+    }
+
+    private void AtivarFiltroPromocoes()
+    {
+        apenasPromocoes = true;
+        categoriaSelecionada = CategoriaCardapioEnum.Lanches; // ou sem categoria
+        FiltrarProdutos();
+    }
+
+    private void FiltrarProdutos()
+    {
+        var query = todosProdutos.AsEnumerable();
+        if (apenasPromocoes)
+        {
+            query = query.Where(p => p.EmPromocao || precosVigentes.GetValueOrDefault(p.Id, p.PrecoBase) < p.PrecoBase);
+        }
+        else if (categoriaSelecionada.HasValue)
+        {
+            query = query.Where(p => p.Grupo == categoriaSelecionada.Value);
+        }
+
+        produtosFiltrados = query.ToList();
+    }
+
+    private void AlterarQuantidade(int produtoId, int delta)
+    {
+        int atual = itensSelecionados.GetValueOrDefault(produtoId, 0);
+        int nova = atual + delta;
+        if (nova <= 0)
+        {
+            itensSelecionados.Remove(produtoId);
+            observacoesPorProduto.Remove(produtoId);
+        }
+        else
+        {
+            itensSelecionados[produtoId] = nova;
+        }
+    }
+
+    private int TotalItensSelecionados => itensSelecionados.Values.Sum();
+
+    private double TotalGeral => itensSelecionados.Sum(kv =>
+    {
+        double unit = precosVigentes.GetValueOrDefault(kv.Key, 0);
+        return unit * kv.Value;
+    });
+
+    private void AbrirModalObservacoes(ProdutoCardapio prod)
+    {
+        produtoEmObservacao = prod;
+        textoObservacaoAtual = observacoesPorProduto.GetValueOrDefault(prod.Id, "");
+    }
+
+    private void FecharModalObservacoes()
+    {
+        produtoEmObservacao = null;
+        textoObservacaoAtual = "";
+    }
+
+    private void InserirTagObservacao(string tag)
+    {
+        if (string.IsNullOrWhiteSpace(textoObservacaoAtual))
+            textoObservacaoAtual = tag;
+        else
+            textoObservacaoAtual += $", {tag}";
+    }
+
+    private void SalvarObservacaoAtual()
+    {
+        if (produtoEmObservacao != null)
+        {
+            if (string.IsNullOrWhiteSpace(textoObservacaoAtual))
+                observacoesPorProduto.Remove(produtoEmObservacao.Id);
+            else
+                observacoesPorProduto[produtoEmObservacao.Id] = textoObservacaoAtual.Trim();
+        }
+        FecharModalObservacoes();
+    }
+
+    private async Task EnviarPedidoAsync()
+    {
+        if (TotalItensSelecionados == 0) return;
+
+        enviandoPedido = true;
+        mensagemFeedback = null;
+
+        var listaItens = new List<ItemPedido>();
+        foreach (var kv in itensSelecionados)
+        {
+            var prod = todosProdutos.FirstOrDefault(p => p.Id == kv.Key);
+            if (prod != null)
+            {
+                double unit = precosVigentes.GetValueOrDefault(prod.Id, prod.PrecoBase);
+                listaItens.Add(new ItemPedido
+                {
+                    ProdutoId = prod.Id,
+                    NomeProduto = prod.Nome,
+                    Quantidade = kv.Value,
+                    PrecoUnitario = unit,
+                    Observacao = observacoesPorProduto.GetValueOrDefault(prod.Id),
+                    ImpressoraDestinoId = prod.ImpressoraDestinoId
+                });
+            }
+        }
+
+        int? comandaId = ComandaAtiva?.Id;
+        var resultado = await ComercialLogic.LancarPedidoAsync(
+            MesaIdentificacao,
+            comandaId,
+            listaItens,
+            garcomId: "1",
+            nomeGarcom: "Operador",
+            observacaoGeral: null
+        );
+
+        enviandoPedido = false;
+
+        if (resultado.Sucesso)
+        {
+            classeFeedback = "alert-success";
+            mensagemFeedback = resultado.Mensagem;
+            itensSelecionados.Clear();
+            observacoesPorProduto.Clear();
+            await OnPedidoEnviado.InvokeAsync();
+        }
+        else
+        {
+            classeFeedback = "alert-danger";
+            mensagemFeedback = resultado.Mensagem;
+        }
+    }
+}

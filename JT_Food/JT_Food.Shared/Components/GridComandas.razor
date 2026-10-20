@@ -1,43 +1,99 @@
 @using JT_Classes.Restaurante
 @using JT_Food.Shared.Services
 @using JT_UserInterface.Shared.Components.Core
+@inject NavigationManager Navigation
 
 <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-        <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-receipt me-2 text-primary"></i>Controle de Comandas</h5>
-        <div class="btn-group me-2">
-            <button class="btn btn-sm btn-outline-info active">Todas</button>
-            <button class="btn btn-sm btn-outline-info">Abertas</button>
+    <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h5 class="mb-0 fw-bold text-dark">
+            <i class="bi bi-receipt me-2 text-primary"></i>Controle de Comandas
+        </h5>
+
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <!-- Barra de Pesquisa Instantânea -->
+            <div class="input-group input-group-sm" style="width: 250px;">
+                <span class="input-group-text bg-light border-end-0">
+                    <i class="bi bi-search text-muted"></i>
+                </span>
+                <input type="text"
+                       class="form-control border-start-0 ps-0"
+                       placeholder="Buscar por Nº, Nome ou Mesa..."
+                       @bind="termoPesquisa"
+                       @bind:event="oninput" />
+                @if (!string.IsNullOrEmpty(termoPesquisa))
+                {
+                    <button class="btn btn-outline-secondary" @onclick="() => termoPesquisa = string.Empty">
+                        <i class="bi bi-x"></i>
+                    </button>
+                }
+            </div>
+
+            <!-- Filtros de Status -->
+            <div class="btn-group btn-group-sm">
+                <button class="btn @(filtroStatus == "Todas" ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick='() => filtroStatus = "Todas"'>
+                    Todas
+                </button>
+                <button class="btn @(filtroStatus == "Aberta" ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick='() => filtroStatus = "Aberta"'>
+                    Abertas
+                </button>
+                <button class="btn @(filtroStatus == "Fechada" ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick='() => filtroStatus = "Fechada"'>
+                    Fechadas
+                </button>
+            </div>
         </div>
     </div>
+
     <div class="card-body p-0">
         <DataGrid TItem="Comanda" 
-                  Items="Comandas" 
+                  Items="ComandasFiltradas" 
                   IsLoading="IsLoading" 
                   EnableRowClick="true"
                   OnRowClick="HandleRowClick"
                   UseServerPagination="false">
             <HeaderTemplate>
                 <th>ID</th>
+                <th>Identificação / Cliente</th>
                 <th>Mesa</th>
-                <th>Cliente</th>
                 <th>Abertura</th>
-                <th class="text-end">Total</th>
+                <th class="text-end">Total Acumulado</th>
                 <th>Status</th>
-                <th class="text-end">Ações</th>
+                <th class="text-end">Ações Rápidas</th>
             </HeaderTemplate>
             <RowTemplate Context="c">
-                <td>#@c.Id</td>
-                <td>@(string.IsNullOrEmpty(c.MesaId) ? "S/ Mesa" : "Mesa " + c.MesaId)</td>
-                <td>@(c.NomeCliente ?? "Consumidor")</td>
+                <td class="fw-bold text-primary">#@c.Id</td>
+                <td>
+                    <span class="fw-semibold text-dark">@(string.IsNullOrWhiteSpace(c.NomeCliente) ? "Consumidor" : c.NomeCliente)</span>
+                </td>
+                <td>
+                    @if (string.IsNullOrEmpty(c.MesaId))
+                    {
+                        <span class="badge bg-light text-muted border">Balcão / S/ Mesa</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">Mesa @c.MesaId</span>
+                    }
+                </td>
                 <td>@c.DataAbertura.ToString("HH:mm")</td>
                 <td class="text-end fw-bold text-success">R$ @c.Total.ToString("F2")</td>
                 <td>
-                    <span class="badge @(c.Status == "Aberta" ? "bg-primary" : "bg-secondary")">@c.Status</span>
+                    <span class="badge @(c.Status == "Aberta" ? "bg-primary" : (c.Status == "AguardandoPagamento" ? "bg-warning text-dark" : "bg-secondary"))">
+                        @c.Status
+                    </span>
                 </td>
                 <td class="text-end" @onclick:stopPropagation="true">
-                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => OnEdit.InvokeAsync(c)"><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" @onclick="() => OnDelete.InvokeAsync(c)"><i class="bi bi-trash"></i></button>
+                    <button class="btn btn-sm btn-outline-success me-1" @onclick="() => IrParaFechamento(c.Id)" title="Fechar / Pagar">
+                        <i class="bi bi-cash-coin"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => OnEdit.InvokeAsync(c)" title="Editar / Pedidos">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => OnDelete.InvokeAsync(c)" title="Excluir">
+                        <i class="bi bi-trash"></i>
+                    </button>
                 </td>
             </RowTemplate>
         </DataGrid>
@@ -50,6 +106,36 @@
     [Parameter] public EventCallback<Comanda> OnEdit { get; set; }
     [Parameter] public EventCallback<Comanda> OnDelete { get; set; }
 
+    private string termoPesquisa = "";
+    private string filtroStatus = "Aberta";
+
+    private IEnumerable<Comanda> ComandasFiltradas
+    {
+        get
+        {
+            if (Comandas == null) return Enumerable.Empty<Comanda>();
+
+            var query = Comandas;
+
+            if (filtroStatus != "Todas")
+            {
+                query = query.Where(c => string.Equals(c.Status, filtroStatus, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(termoPesquisa))
+            {
+                string t = termoPesquisa.Trim().ToLowerInvariant();
+                query = query.Where(c =>
+                    c.Id.ToString().Contains(t) ||
+                    (c.NomeCliente != null && c.NomeCliente.ToLowerInvariant().Contains(t)) ||
+                    (c.MesaId != null && c.MesaId.ToLowerInvariant().Contains(t))
+                );
+            }
+
+            return query.OrderByDescending(c => c.DataAbertura);
+        }
+    }
+
     private async Task HandleRowClick(Comanda comanda)
     {
         if (OnEdit.HasDelegate)
@@ -57,4 +143,9 @@
             await OnEdit.InvokeAsync(comanda);
         }
     }
-}
+
+    private void IrParaFechamento(int comandaId)
+    {
+        Navigation.NavigateTo($"/fechamento/{comandaId}");
+    }
+}

@@ -1,0 +1,272 @@
+@using JT_Food.Shared.BusinessLogic
+@using JT_Food.Shared.Domain.Entities
+@using JT_Food.Shared.Domain.Enums
+@using JT_Food.Shared.Services.Interfaces
+@inject IMesaLayoutService MesaLayoutService
+@inject LayoutSalaoLogic LayoutLogic
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+<div class="construtor-layout-mesas">
+    <!-- Barra de Ferramentas do Construtor -->
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body p-3">
+            <div class="row g-2 align-items-center">
+                <!-- Seletor de Ambientes -->
+                <div class="col-12 col-md-3">
+                    <label class="form-label small fw-bold text-muted mb-1">Ambiente Ativo:</label>
+                    <select class="form-select form-select-sm" @bind="ambienteAtivoId" @bind:after="CarregarElementosAsync">
+                        @foreach (var amb in ambientes)
+                        {
+                            <option value="@amb.Id">@amb.Nome</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Paleta de Inserção Rápida de Elementos -->
+                <div class="col-12 col-md-7 d-flex flex-wrap gap-1 align-items-end">
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => AdicionarElemento(FormatoElementoSalao.MesaQuadrada, 4)">
+                        <i class="bi bi-square me-1"></i> + Mesa 4L
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => AdicionarElemento(FormatoElementoSalao.MesaRedonda, 6)">
+                        <i class="bi bi-circle me-1"></i> + Redonda 6L
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => AdicionarElemento(FormatoElementoSalao.MesaRetangular, 8)">
+                        <i class="bi bi-square-fill me-1"></i> + Retangular 8L
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => AdicionarElemento(FormatoElementoSalao.BalcaoBar, 6)">
+                        <i class="bi bi-cup-straw me-1"></i> + Balcão Bar
+                    </button>
+                    <button class="btn btn-sm btn-outline-info" @onclick="() => AdicionarElemento(FormatoElementoSalao.PalcoCouvert, 0)">
+                        <i class="bi bi-music-note-beamed me-1"></i> + Palco
+                    </button>
+                    <button class="btn btn-sm btn-outline-dark" @onclick="() => AdicionarElemento(FormatoElementoSalao.Caixa, 0)">
+                        <i class="bi bi-cash-stack me-1"></i> + Caixa
+                    </button>
+                </div>
+
+                <!-- Botão de Salvar Tudo -->
+                <div class="col-12 col-md-2 text-md-end">
+                    <button class="btn btn-sm btn-success w-100" @onclick="SalvarLayoutAsync">
+                        <i class="bi bi-save me-1"></i> Salvar Layout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(feedbackMsg))
+    {
+        <div class="alert @feedbackClass alert-dismissible fade show mb-2 py-2" role="alert">
+            <small>@feedbackMsg</small>
+            <button type="button" class="btn-close btn-close-sm" @onclick="() => feedbackMsg = null"></button>
+        </div>
+    }
+
+    <!-- Layout Grid: Editor Visual + Painel de Propriedades -->
+    <div class="row g-3">
+        <!-- Canvas de Desenho Drag-and-Drop -->
+        <div class="col-12 col-lg-9">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-2 bg-light">
+                    <div id="editorCanvasContainer"
+                         class="position-relative rounded shadow-inner"
+                         style="height: 600px; background-color: #f8fafc; background-image: radial-gradient(#94a3b8 1px, transparent 1px); background-size: 20px 20px; border: 2px dashed #94a3b8; overflow: hidden;">
+
+                        @foreach (var elem in elementosAmbiente)
+                        {
+                            bool selecionado = elementoSelecionado?.Id == elem.Id;
+                            string formatoEstilo = elem.Formato == FormatoElementoSalao.MesaRedonda ? "border-radius: 50%;" : "border-radius: 6px;";
+
+                            <div id="@($"elem_{elem.Id}")"
+                                 class="elemento-editor position-absolute user-select-none d-flex flex-column justify-content-center align-items-center text-center @(selecionado ? "selecionado shadow-lg" : "shadow-sm")"
+                                 style="left: @elem.PosX.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%;
+                                        top: @elem.PosY.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%;
+                                        width: @elem.Largura.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%;
+                                        height: @elem.Altura.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%;
+                                        transform: rotate(@(elem.Rotacao)deg);
+                                        background: @(selecionado ? "#4338ca" : "#3b82f6");
+                                        color: white;
+                                        border: 2px solid @(selecionado ? "#fbbf24" : "#ffffff");
+                                        cursor: move;
+                                        @formatoEstilo"
+                                 @onclick="() => SelecionarElemento(elem)">
+                                
+                                <span class="fw-bold small text-truncate px-1">@elem.Identificacao</span>
+                                @if (elem.Capacidade > 0)
+                                {
+                                    <small style="font-size: 0.65rem;">@elem.Capacidade p.</small>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Painel Lateral de Edição do Elemento Selecionado -->
+        <div class="col-12 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-sliders me-1 text-primary"></i>Propriedades</h6>
+                </div>
+                <div class="card-body">
+                    @if (elementoSelecionado == null)
+                    {
+                        <div class="text-center py-5 text-muted">
+                            <i class="bi bi-cursor fs-1 opacity-25"></i>
+                            <p class="small mt-2">Clique em um elemento do salão para editar suas propriedades.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Identificação:</label>
+                            <input type="text" class="form-control form-control-sm" @bind="elementoSelecionado.Identificacao" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Capacidade (Lugares):</label>
+                            <input type="number" class="form-control form-control-sm" @bind="elementoSelecionado.Capacidade" min="0" max="50" />
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-bold text-muted">Posição X (%):</label>
+                                <input type="number" class="form-control form-control-sm" @bind="elementoSelecionado.PosX" step="1" min="0" max="95" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-bold text-muted">Posição Y (%):</label>
+                                <input type="number" class="form-control form-control-sm" @bind="elementoSelecionado.PosY" step="1" min="0" max="95" />
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-bold text-muted">Largura (%):</label>
+                                <input type="number" class="form-control form-control-sm" @bind="elementoSelecionado.Largura" step="1" min="2" max="50" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-bold text-muted">Altura (%):</label>
+                                <input type="number" class="form-control form-control-sm" @bind="elementoSelecionado.Altura" step="1" min="2" max="50" />
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 mb-3">
+                            <button class="btn btn-sm btn-outline-secondary w-50" @onclick="() => LayoutLogic.RotacionarElemento(elementoSelecionado)">
+                                <i class="bi bi-arrow-clockwise me-1"></i> Girar 90°
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger w-50" @onclick="ExcluirElementoSelecionado">
+                                <i class="bi bi-trash me-1"></i> Excluir
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .elemento-editor.selecionado {
+        box-shadow: 0 0 0 3px #fbbf24!important;
+        z-index: 20;
+    }
+</style>
+
+@code {
+    private List<AmbienteSalao> ambientes = new();
+    private List<ElementoSalao> elementosAmbiente = new();
+    private int ambienteAtivoId = 1;
+    private ElementoSalao? elementoSelecionado;
+    private string? feedbackMsg;
+    private string feedbackClass = "alert-success";
+    private DotNetObjectReference<ConstrutorLayoutMesas>? dotNetRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        ambientes = await MesaLayoutService.ObterAmbientesAsync();
+        if (ambientes.Any())
+        {
+            ambienteAtivoId = ambientes.First().Id;
+        }
+        await CarregarElementosAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dotNetRef = DotNetObjectReference.Create(this);
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("JTSalaoLayout.iniciarEditor", dotNetRef, "editorCanvasContainer");
+            }
+            catch { }
+        }
+    }
+
+    private async Task CarregarElementosAsync()
+    {
+        elementosAmbiente = await MesaLayoutService.ObterElementosPorAmbienteAsync(ambienteAtivoId);
+        elementoSelecionado = null;
+        StateHasChanged();
+    }
+
+    private void SelecionarElemento(ElementoSalao elem)
+    {
+        elementoSelecionado = elem;
+    }
+
+    private void AdicionarElemento(FormatoElementoSalao formato, int capacidade)
+    {
+        int proximoNumero = elementosAmbiente.Count(e => e.Capacidade > 0) + 1;
+        string identificacao = formato switch
+        {
+            FormatoElementoSalao.BalcaoBar => "Balcão Bar",
+            FormatoElementoSalao.PalcoCouvert => "Palco Couvert",
+            FormatoElementoSalao.Caixa => "Caixa",
+            FormatoElementoSalao.Divisoria => "Divisória",
+            _ => $"Mesa {proximoNumero:00}"
+        };
+
+        var novo = LayoutLogic.CriarNovoElemento(ambienteAtivoId, formato, identificacao, 30, 30);
+        novo.Capacidade = capacidade;
+        novo.Id = elementosAmbiente.Any() ? elementosAmbiente.Max(e => e.Id) + 1 : 1;
+
+        elementosAmbiente.Add(novo);
+        elementoSelecionado = novo;
+    }
+
+    private void ExcluirElementoSelecionado()
+    {
+        if (elementoSelecionado != null)
+        {
+            elementosAmbiente.Remove(elementoSelecionado);
+            elementoSelecionado = null;
+        }
+    }
+
+    [JSInvokable]
+    public void OnElementoArrastado(int elementoId, double leftPercent, double topPercent)
+    {
+        var elem = elementosAmbiente.FirstOrDefault(e => e.Id == elementoId);
+        if (elem != null)
+        {
+            LayoutLogic.AjustarPosicaoComSnap(elem, leftPercent, topPercent, 1.0);
+            StateHasChanged();
+        }
+    }
+
+    private async Task SalvarLayoutAsync()
+    {
+        await MesaLayoutService.SalvarElementosEmLoteAsync(elementosAmbiente);
+        feedbackClass = "alert-success";
+        feedbackMsg = "Layout do salão salvo com sucesso!";
+    }
+
+    public void Dispose()
+    {
+        dotNetRef?.Dispose();
+    }
+}

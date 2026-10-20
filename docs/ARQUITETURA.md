@@ -198,3 +198,65 @@ orquestrador.Executar("JT_Food_Auto", configCliente);
 
 - **Módulos Sincronizados:** `Gestao`, `Restaurante` e `Food`.
 - **Tolerância a Falhas:** O orquestrador é envolvido em bloco `try/catch`. Caso o servidor de banco passe por manutenção temporária ou o usuário não possua privilégios de DDL, a aplicação registra o aviso nos logs e continua a inicialização sem interromper o serviço web.
+
+---
+
+## 6. Modelo de Domínio e Entidades (`JT_Food.Shared/Domain`)
+
+A camada de domínio foi estruturada para suportar as necessidades operacionais de atendimento, salão interativo, categorização do cardápio e regras de promoção:
+
+```mermaid
+erDiagram
+    AmbienteSalao ||--o{ ElementoSalao : contem
+    Mesa ||--o{ Comanda : vincula
+    Comanda ||--o{ ItemPedido : possui
+    CategoriaMenu ||--o{ ProdutoCardapio : categoriza
+    RegraPromocao ||--o{ ProdutoCardapio : aplica
+    ImpressoraRede ||--o{ CategoriaMenu : direciona
+```
+
+### 6.1. Entidades Principais
+* **`AmbienteSalao`:** Setorização física do restaurante (*Salão Principal*, *Varanda*, *Deck*, *Piso Superior*).
+* **`ElementoSalao`:** Entidades visuais posicionadas em percentuais de tela `(X%, Y%)`, rotação e tamanho, englobando mesas (quadradas, redondas, retangulares), palcos de couvert, balcões de bar, caixas e divisórias.
+* **`Mesa`:** Estado em tempo real (`Livre`, `Ocupada`, `AguardandoPagamento`, `AlertaInatividade`), capacidade, coordenadas de layout e lista de comandas associadas.
+* **`Comanda`:** Identificação flexível por número do cartão físico (ex.: `Comanda #105`) e/ou nome do cliente (ex.: `João Silva`), controle de couvert artístico, taxa de serviço e itens de consumo.
+* **`ProdutoCardapio` & `RegraPromocao`:** Preço de venda, margem, impressora térmica de destino, fichas de insumo e regras automáticas de Happy Hour por dia/horário ou combos promocionais.
+* **`ImpressoraRede`:** Roteamento térmico com IP, Porta TCP (padrão `9100`), setor de destino (*Bar*, *Cozinha*, *Chapa*, *Caixa*) e colunas (58mm/80mm).
+* **`UsuarioOperador`:** Autenticação rápida com PIN numérico de 4 dígitos e perfis de acesso (`Gerente`, `Garcom`, `Caixa`).
+
+---
+
+## 7. Serviços Operacionais e Regras de Negócio
+
+| Contrato Interface | Implementação | Finalidade |
+| :--- | :--- | :--- |
+| `IComandaService` | `ComandaOperacionalService` | Abertura ágil por número/nome, busca em tempo real, pedidos diretos e sub-comandas de mesa. |
+| `IMesaLayoutService` | `MesaLayoutService` | Persistência do mapa do salão em coordenadas percentuais e suporte a drag-and-drop. |
+| `ICardapioService` | `CardapioService` | Gestão de produtos, categorias de preparo e motor de regras promocionais. |
+| `IImpressaoRedeService` | `EscPosPrintService` | Formatação e disparo térmico direto via ESC/POS em sockets TCP (Porta 9100). |
+| `IAuthPerfilService` | `AuthPerfilService` | Controle de autenticação e RBAC com PIN rápido e adaptação de layout. |
+| `IIAAnalyticsService` | `GeminiRelatorioService` | Análise executiva via Google Gemini com fallback inteligente para motor analítico local. |
+
+---
+
+## 8. Impressão Térmica ESC/POS em Rede Local
+
+O envio de pedidos para impressoras de rede é tratado de ponta a ponta:
+1. **Roteamento Setorial:** Quando o pedido é submetido em `LancamentoRapido.razor` ou `ModalComanda.razor`, o lote é automaticamente segregado por impressora de destino (Bebidas $\rightarrow$ Bar; Pratos e Porções $\rightarrow$ Cozinha; Lanches $\rightarrow$ Chapa).
+2. **Protocolo ESC/POS:** A classe `EscPosPrintService` compõe os bytes com comandos nativos de inicialização (`ESC @`), negrito (`ESC E 1`), alinhamentos (`ESC a`), impressão tabular em colunas e corte parcial de bobina (`GS V 66 0`).
+3. **Disparo TCP/IP Socket:** O envio é executado via `TcpClient` para o IP e porta da impressora com timeout de conexão e tratamento de falhas. Em navegadores WebAssembly, o serviço aplica guardas de compatibilidade sem interromper a execução do fluxo operacional.
+
+---
+
+## 9. Inteligência Artificial e Diagnóstico Operacional
+
+O subsistema de IA (`GeminiRelatorioService` e `RelatorioIALogic`) coleta métricas operacionais do restaurante:
+* Faturamento bruto/líquido, ticket médio por mesa e comanda.
+* Ocupação do salão e tempos de espera no KDS.
+* Eficácia das promoções vigentes e giro de insumos no estoque.
+
+Esses dados são consolidados e submetidos à API Google Gemini (ou processados pelo motor analítico local quando sem conexão externa), devolvendo:
+1. **Diagnóstico Executivo:** Pontos fortes, alertas e oportunidades do dia.
+2. **Recomendações Acionáveis:** Sugestões de novos combos para itens parados e horários de Happy Hour ideais para aumentar a taxa de ocupação.
+3. **Alertas de Cozinha e Insumos:** Gargalos de produção e previsão de compras preventivas.
+

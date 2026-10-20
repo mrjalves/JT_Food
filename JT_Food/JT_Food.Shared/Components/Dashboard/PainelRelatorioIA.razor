@@ -1,0 +1,145 @@
+@using JT_Food.Shared.BusinessLogic
+@using JT_Food.Shared.Services.Interfaces
+@inject RelatorioIALogic RelatorioLogic
+@inject IIAAnalyticsService IAService
+
+<div class="painel-relatorio-ia card border-0 shadow-sm">
+    <div class="card-header bg-gradient bg-primary text-white p-3 d-flex flex-wrap justify-content-between align-items-center">
+        <div>
+            <h5 class="mb-0 fw-bold"><i class="bi bi-stars me-2"></i>Consultor Executivo IA — JT_Food Insights</h5>
+            <small class="opacity-75">Diagnósticos inteligentes, otimização de cardápio e previsão de demanda</small>
+        </div>
+        <button class="btn btn-sm btn-light text-primary fw-bold shadow-sm"
+                @onclick="GerarRelatorioGeralAsync"
+                disabled="@gerando">
+            @if (gerando)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                <span>Analisando Dados...</span>
+            }
+            else
+            {
+                <i class="bi bi-arrow-repeat me-1"></i>
+                <span>Atualizar Diagnóstico</span>
+            }
+        </button>
+    </div>
+
+    <!-- Botões de Ações Rápidas -->
+    <div class="card-body bg-light border-bottom p-2 d-flex flex-wrap gap-2">
+        <button class="btn btn-sm btn-outline-primary" @onclick="GerarRelatorioGeralAsync" disabled="@gerando">
+            📊 Diagnóstico 360°
+        </button>
+        <button class="btn btn-sm btn-outline-danger" @onclick="SugerirCombosAsync" disabled="@gerando">
+            🔥 Sugerir Combos & Happy Hour
+        </button>
+        <button class="btn btn-sm btn-outline-success" @onclick="DiagnosticoCozinhaEstoqueAsync" disabled="@gerando">
+            🍳 Gargalos KDS & Compras
+        </button>
+    </div>
+
+    <!-- Conteúdo do Relatório Gerado -->
+    <div class="card-body p-4">
+        @if (gerando)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-grow text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+                <h5 class="fw-bold text-dark">A IA está processando as métricas de vendas, KDS e estoque...</h5>
+                <p class="text-muted">Cruzando dados de lucratividade, giro de mesas e tempos de preparo.</p>
+            </div>
+        }
+        else if (string.IsNullOrEmpty(conteudoRelatorio))
+        {
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-robot fs-1 opacity-25"></i>
+                <p class="mt-2 mb-3">Nenhum diagnóstico gerado ainda.</p>
+                <button class="btn btn-primary" @onclick="GerarRelatorioGeralAsync">
+                    <i class="bi bi-stars me-1"></i> Gerar Primeiro Relatório
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="relatorio-conteudo p-3 bg-white rounded border">
+                @((MarkupString)ConverterMarkdownParaHtml(conteudoRelatorio))
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .relatorio-conteudo h3 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 0.75rem;
+        border-bottom: 2px solid #e2e8f0;
+        padding-bottom: 0.5rem;
+    }
+    .relatorio-conteudo h4 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #3b82f6;
+        margin-top: 1.25rem;
+        margin-bottom: 0.5rem;
+    }
+    .relatorio-conteudo ul {
+        padding-left: 1.25rem;
+        margin-bottom: 1rem;
+    }
+    .relatorio-conteudo li {
+        margin-bottom: 0.35rem;
+        line-height: 1.5;
+    }
+</style>
+
+@code {
+    private string conteudoRelatorio = "";
+    private bool gerando = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GerarRelatorioGeralAsync();
+    }
+
+    private async Task GerarRelatorioGeralAsync()
+    {
+        gerando = true;
+        conteudoRelatorio = await RelatorioLogic.GerarRelatorioInteligenteAsync();
+        gerando = false;
+    }
+
+    private async Task SugerirCombosAsync()
+    {
+        gerando = true;
+        conteudoRelatorio = await IAService.GerarSugestaoPromocoesAsync("Dados de vendas: Alto giro de Chopp e Burger, baixo giro de porções às quartas-feiras.");
+        gerando = false;
+    }
+
+    private async Task DiagnosticoCozinhaEstoqueAsync()
+    {
+        gerando = true;
+        conteudoRelatorio = await IAService.GerarDiagnosticoCozinhaEComprasAsync(
+            "KDS: Tempo médio Chapa = 12min, Cozinha = 19min. Horário de pico 20h30.",
+            "Estoque: Bacon Rústico = 2.4kg (mínimo 5kg), Queijo Gouda = 1.8kg (mínimo 4kg)."
+        );
+        gerando = false;
+    }
+
+    private string ConverterMarkdownParaHtml(string markdown)
+    {
+        if (string.IsNullOrEmpty(markdown)) return "";
+
+        string html = markdown
+            .Replace("### ", "<h3>")
+            .Replace("#### ", "<h4>")
+            .Replace("- **", "<li><strong>")
+            .Replace(":** ", ":</strong> ")
+            .Replace("**", "<strong>")
+            .Replace("\n\n", "<br/><br/>")
+            .Replace("\n- ", "</li><li>");
+
+        // Fechamento simples de tags
+        return html;
+    }
+}

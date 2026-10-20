@@ -1,7 +1,10 @@
+@using JT_Food.Shared.Components.Garcom
+
 <Router AppAssembly="@typeof(JT_Food.Shared._Imports).Assembly" AdditionalAssemblies="new[] { typeof(JT_UserInterface.Shared.Layout.MainLayout).Assembly }">
     <Found Context="routeData">
         <RouteView RouteData="routeData" DefaultLayout="typeof(JT_UserInterface.Shared.Layout.MainLayout)" />
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        <BarraNavegacaoGarcom />
     </Found>
     <NotFound>
         <PageTitle>Página não encontrada</PageTitle>

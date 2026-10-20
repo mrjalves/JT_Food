@@ -1,47 +1,290 @@
 @page "/"
 @page "/home"
-@using JT_UserInterface.Shared.Components
+@using JT_Classes.Restaurante
+@using JT_Servicos.Restaurante
+@using JT_Food.Shared.BusinessLogic
+@using JT_Food.Shared.Components.Dashboard
+@using JT_Food.Shared.Domain.Entities
+@using JT_Food.Shared.Domain.Enums
+@using JT_Food.Shared.Services.Interfaces
+@inject MesaService MesaService
+@inject ComandaService ComandaService
+@inject ItemComandaService ItemComandaService
+@inject ICardapioService CardapioService
+@inject IAuthPerfilService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
 
-<PageTitle>Home - JT Food</PageTitle>
+<PageTitle>Dashboard Executivo - JT Food</PageTitle>
 
-<div class="container-fluid py-4">
-    <div class="row mb-4">
-        <div class="col">
-            <h1 class="h3 text-primary">Painel de Controle - JT Food</h1>
-            <p class="text-muted">Bem-vindo ao sistema de gestão de restaurante e pedidos.</p>
+<div class="container-fluid py-4 dashboard-home">
+    <!-- Cabeçalho com Perfil e Boas-Vindas -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800 fw-bold">
+                <i class="bi bi-speedometer2 text-primary me-2"></i>Dashboard Executivo JT_Food
+            </h1>
+            <p class="text-muted small mb-0">Visão operacional em tempo real, métricas financeiras e inteligência analítica.</p>
+        </div>
+
+        <!-- Seletor de Perfil Rápido (Login / Troca de Perfil) -->
+        <div class="d-flex align-items-center gap-2 bg-white p-2 rounded shadow-sm border">
+            <span class="small text-muted">Operador:</span>
+            <span class="badge @(AuthService.IsGerente() ? "bg-primary" : "bg-success") px-2 py-1">
+                <i class="bi @(AuthService.IsGerente() ? "bi-person-badge-fill" : "bi-person-walking") me-1"></i>
+                @usuarioAtual.Nome (@usuarioAtual.Perfil)
+            </span>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="AbrirModalPin" title="Alternar Usuário / PIN">
+                <i class="bi bi-key-fill"></i> PIN
+            </button>
         </div>
     </div>
-    <div class="row">
-        <div class="col-md-3">
-            <div class="card bg-primary text-white mb-3">
-                <div class="card-body">
-                    <h5 class="card-title">Comandas Abertas</h5>
-                    <p class="card-text fs-2">0</p>
+
+    <!-- 1. KPIs de Topo -->
+    <div class="row g-3 mb-4">
+        <!-- Faturamento Líquido -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100 kpi-card bg-gradient-primary text-white p-3">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <small class="text-white-50 text-uppercase fw-bold">Faturamento Líquido</small>
+                        <h3 class="fw-bold mt-1 mb-0">R$ @faturamentoLiquido.ToString("F2")</h3>
+                        <small class="text-white-50">Bruto: R$ @faturamentoBruto.ToString("F2")</small>
+                    </div>
+                    <div class="kpi-icon bg-white bg-opacity-20 rounded-circle p-2">
+                        <i class="bi bi-cash-coin fs-3"></i>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-success text-white mb-3">
-                <div class="card-body">
-                    <h5 class="card-title">Mesas Ocupadas</h5>
-                    <p class="card-text fs-2">0</p>
+
+        <!-- Ticket Médio -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100 kpi-card bg-gradient-success text-white p-3">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <small class="text-white-50 text-uppercase fw-bold">Ticket Médio</small>
+                        <h3 class="fw-bold mt-1 mb-0">R$ @ticketMedio.ToString("F2")</h3>
+                        <small class="text-white-50">@totalComandasFechadas comanda(s) encerrada(s)</small>
+                    </div>
+                    <div class="kpi-icon bg-white bg-opacity-20 rounded-circle p-2">
+                        <i class="bi bi-receipt fs-3"></i>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-info text-white mb-3">
-                <div class="card-body">
-                    <h5 class="card-title">Itens no Menu</h5>
-                    <p class="card-text fs-2">0</p>
+
+        <!-- Couvert & Taxas -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100 kpi-card bg-gradient-info text-white p-3">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <small class="text-white-50 text-uppercase fw-bold">Couvert & Taxas</small>
+                        <h3 class="fw-bold mt-1 mb-0">R$ @totalCouvertETaxas.ToString("F2")</h3>
+                        <small class="text-white-50">Música ao Vivo & Serviços</small>
+                    </div>
+                    <div class="kpi-icon bg-white bg-opacity-20 rounded-circle p-2">
+                        <i class="bi bi-music-note-beamed fs-3"></i>
+                    </div>
                 </div>
             </div>
+        </div>
+
+        <!-- Ocupação do Salão -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100 kpi-card bg-gradient-warning text-dark p-3">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <small class="text-dark-50 text-uppercase fw-bold">Ocupação Salão</small>
+                        <h3 class="fw-bold mt-1 mb-0">@taxaOcupacaoPercentual%</h3>
+                        <small class="text-muted">@mesasOcupadas / @totalMesas mesas ocupadas</small>
+                    </div>
+                    <div class="kpi-icon bg-dark bg-opacity-10 rounded-circle p-2">
+                        <i class="bi bi-grid-3x3-gap-fill fs-3"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Acessos Rápidos Operacionais -->
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-4">
+            <div class="card border-0 shadow-sm h-100 quick-card p-3" @onclick='() => Navigation.NavigateTo("/mesas")' style="cursor: pointer;">
+                <div class="d-flex align-items-center">
+                    <div class="p-3 bg-primary bg-opacity-10 text-primary rounded-circle me-3">
+                        <i class="bi bi-geo-alt-fill fs-3"></i>
+                    </div>
+                    <div>
+                        <h5 class="fw-bold text-dark mb-1">Mapa de Mesas</h5>
+                        <p class="text-muted small mb-0">Ver salão em tempo real e comandas abertas.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-4">
+            <div class="card border-0 shadow-sm h-100 quick-card p-3" @onclick='() => Navigation.NavigateTo("/comandas")' style="cursor: pointer;">
+                <div class="d-flex align-items-center">
+                    <div class="p-3 bg-success bg-opacity-10 text-success rounded-circle me-3">
+                        <i class="bi bi-card-checklist fs-3"></i>
+                    </div>
+                    <div>
+                        <h5 class="fw-bold text-dark mb-1">Comandas Ativas</h5>
+                        <p class="text-muted small mb-0">Pesquisar por número do cartão ou nome.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-4">
+            <div class="card border-0 shadow-sm h-100 quick-card p-3" @onclick='() => Navigation.NavigateTo("/kds")' style="cursor: pointer;">
+                <div class="d-flex align-items-center">
+                    <div class="p-3 bg-danger bg-opacity-10 text-danger rounded-circle me-3">
+                        <i class="bi bi-display fs-3"></i>
+                    </div>
+                    <div>
+                        <h5 class="fw-bold text-dark mb-1">KDS — Cozinha</h5>
+                        <p class="text-muted small mb-0">Fila de pedidos por setor (Cozinha/Bar/Chapa).</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Painel de Relatório com IA -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <PainelRelatorioIA />
         </div>
     </div>
 </div>
 
+<!-- Modal de Login por PIN -->
+@if (modalPinAberto)
+{
+    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 360px;">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-dark text-white text-center">
+                    <h5 class="modal-title fs-6"><i class="bi bi-lock-fill me-2"></i>Acesso Rápido por PIN</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => modalPinAberto = false"></button>
+                </div>
+                <div class="modal-body text-center p-4">
+                    <p class="text-muted small mb-3">Digite o PIN de 4 dígitos do operador:</p>
+                    <div class="d-flex justify-content-center mb-3">
+                        <input type="password" maxlength="4" class="form-control text-center fw-bold fs-3"
+                               style="letter-spacing: 12px; width: 160px;"
+                               @bind="pinDigitado" />
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(pinErroMsg))
+                    {
+                        <div class="alert alert-danger py-1 px-2 small mb-3">@pinErroMsg</div>
+                    }
+
+                    <div class="small text-muted mb-3">
+                        Dica para testes: <strong>1234</strong> (Gerente) | <strong>2222</strong> (Garçom) | <strong>3333</strong> (Caixa)
+                    </div>
+
+                    <button class="btn btn-primary w-100 py-2 fw-bold" @onclick="ConfirmarPinAsync">
+                        Entrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .bg-gradient-primary {
+        background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+    }
+    .bg-gradient-success {
+        background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+    }
+    .bg-gradient-info {
+        background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%);
+    }
+    .bg-gradient-warning {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+    .quick-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .quick-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1)!important;
+    }
+</style>
+
 @code {
-    protected override void OnInitialized()
+    private double faturamentoBruto = 0;
+    private double faturamentoLiquido = 0;
+    private double ticketMedio = 0;
+    private int totalComandasFechadas = 0;
+    private double totalCouvertETaxas = 0;
+    private int totalMesas = 0;
+    private int mesasOcupadas = 0;
+    private int taxaOcupacaoPercentual = 0;
+
+    private UsuarioOperador usuarioAtual = new();
+    private bool modalPinAberto = false;
+    private string pinDigitado = "";
+    private string? pinErroMsg;
+
+    protected override async Task OnInitializedAsync()
     {
-        // Load stats here later
+        usuarioAtual = await AuthService.ObterUsuarioLogadoAsync();
+        AuthService.OnSessaoAlterada += AtualizarSessao;
+        await CarregarMetricasAsync();
+    }
+
+    private void AtualizarSessao()
+    {
+        InvokeAsync(async () =>
+        {
+            usuarioAtual = await AuthService.ObterUsuarioLogadoAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task CarregarMetricasAsync()
+    {
+        var mesas = await MesaService.GetAll() ?? new();
+        totalMesas = mesas.Count;
+        mesasOcupadas = mesas.Count(m => m.Status != StatusMesaConsts.Livre);
+        taxaOcupacaoPercentual = totalMesas > 0 ? (int)Math.Round((double)mesasOcupadas / totalMesas * 100) : 0;
+
+        var comandas = await ComandaService.GetAll() ?? new();
+        var fechadas = comandas.Where(c => c.Status == "Fechada").ToList();
+        totalComandasFechadas = fechadas.Count;
+        faturamentoLiquido = fechadas.Sum(c => c.Total);
+        faturamentoBruto = fechadas.Sum(c => c.Total + c.Desconto);
+        ticketMedio = totalComandasFechadas > 0 ? faturamentoLiquido / totalComandasFechadas : 0;
+        totalCouvertETaxas = fechadas.Sum(c => c.TaxaServico);
+    }
+
+    private void AbrirModalPin()
+    {
+        pinDigitado = "";
+        pinErroMsg = null;
+        modalPinAberto = true;
+    }
+
+    private async Task ConfirmarPinAsync()
+    {
+        pinErroMsg = null;
+        var res = await AuthService.LoginPorPinAsync(pinDigitado);
+        if (res.Sucesso)
+        {
+            modalPinAberto = false;
+            usuarioAtual = res.Usuario!;
+            StateHasChanged();
+        }
+        else
+        {
+            pinErroMsg = res.Mensagem;
+        }
     }
 }

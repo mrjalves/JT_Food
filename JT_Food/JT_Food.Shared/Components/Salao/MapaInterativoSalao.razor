@@ -1,0 +1,261 @@
+@using JT_Food.Shared.Domain.Entities
+@using JT_Food.Shared.Domain.Enums
+@using JT_Food.Shared.Services.Interfaces
+@inject IMesaLayoutService MesaLayoutService
+
+<div class="mapa-interativo-salao">
+    <!-- Abas de Ambientes e Legenda de Cores -->
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body p-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <!-- Abas de Ambientes -->
+            <ul class="nav nav-pills">
+                @foreach (var amb in ambientes)
+                {
+                    <li class="nav-item">
+                        <button class="nav-link @(amb.Id == ambienteAtivoId ? "active fw-bold" : "text-dark")"
+                                @onclick="() => SelecionarAmbiente(amb.Id)">
+                            <i class="bi bi-door-open me-1"></i>@amb.Nome
+                        </button>
+                    </li>
+                }
+            </ul>
+
+            <!-- Legenda Operacional em Tempo Real -->
+            <div class="d-flex flex-wrap gap-3 align-items-center">
+                <span class="badge bg-success py-2 px-3 fs-7">
+                    <span class="rounded-circle d-inline-block bg-white me-1" style="width:8px;height:8px;"></span>
+                    Livre (@TotalLivres)
+                </span>
+                <span class="badge bg-primary py-2 px-3 fs-7">
+                    <span class="rounded-circle d-inline-block bg-white me-1" style="width:8px;height:8px;"></span>
+                    Ocupada (@TotalOcupadas)
+                </span>
+                <span class="badge bg-warning text-dark py-2 px-3 fs-7">
+                    <span class="rounded-circle d-inline-block bg-dark me-1" style="width:8px;height:8px;"></span>
+                    Inatividade (@TotalInativas)
+                </span>
+                <span class="badge bg-danger py-2 px-3 fs-7">
+                    <span class="rounded-circle d-inline-block bg-white me-1" style="width:8px;height:8px;"></span>
+                    Conta Solicitada (@TotalAguardando)
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Canvas Interativo da Planta Baixa -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-2 bg-light">
+            <div class="salao-canvas position-relative rounded shadow-inner"
+                 style="height: 620px; background-color: #f1f5f9; background-image: radial-gradient(#cbd5e1 1px, transparent 1px); background-size: 24px 24px; border: 2px dashed #cbd5e1; overflow: hidden;">
+                
+                @if (carregando)
+                {
+                    <div class="d-flex justify-content-center align-items-center h-100">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <span class="ms-2 text-muted">Carregando mapa do salão...</span>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var elem in elementosAmbiente)
+                    {
+                        string corStatusClass = ObterCorElemento(elem);
+                        string estiloFormato = ObterEstiloFormato(elem.Formato);
+
+                        <div class="elemento-salao position-absolute user-select-none @corStatusClass @estiloFormato"
+                             style="left: @elem.PosX.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%;
+                                    top: @elem.PosY.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%;
+                                    width: @elem.Largura.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%;
+                                    height: @elem.Altura.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%;
+                                    transform: rotate(@(elem.Rotacao)deg);
+                                    cursor: pointer;
+                                    transition: transform 0.2s, box-shadow 0.2s;"
+                             @onclick="() => ClicarElemento(elem)"
+                             title="@elem.Identificacao - Capacidade: @elem.Capacidade pessoas">
+                            
+                            <div class="d-flex flex-column justify-content-center align-items-center h-100 p-1 text-center">
+                                @if (elem.Formato == FormatoElementoSalao.PalcoCouvert)
+                                {
+                                    <i class="bi bi-music-note-beamed fs-4 mb-1"></i>
+                                    <span class="fw-bold small">@elem.Identificacao</span>
+                                }
+                                else if (elem.Formato == FormatoElementoSalao.Caixa)
+                                {
+                                    <i class="bi bi-cash-stack fs-4 mb-1"></i>
+                                    <span class="fw-bold small">@elem.Identificacao</span>
+                                }
+                                else if (elem.Formato == FormatoElementoSalao.BalcaoBar)
+                                {
+                                    <i class="bi bi-cup-straw fs-4 mb-1"></i>
+                                    <span class="fw-bold small">@elem.Identificacao</span>
+                                }
+                                else if (elem.Formato == FormatoElementoSalao.Divisoria)
+                                {
+                                    <div class="w-100 h-100 bg-secondary opacity-50 rounded"></div>
+                                }
+                                else
+                                {
+                                    <!-- Mesa Normal (Quadrada, Redonda, Retangular) -->
+                                    <div class="fw-bold fs-6 text-truncate w-100">
+                                        @elem.Identificacao
+                                    </div>
+                                    
+                                    @if (elem.Status == StatusMesaConsts.Ocupada || elem.Status == StatusMesaConsts.AlertaInatividade)
+                                    {
+                                        <div class="mt-1">
+                                            <span class="badge bg-light text-dark fw-bold border" style="font-size: 0.72rem;">
+                                                @(elem.TotalComandasAtivas > 0 ? $"{elem.TotalComandasAtivas} cmd" : "Conta Geral")
+                                            </span>
+                                            @if (elem.SubtotalAcumulado > 0)
+                                            {
+                                                <div class="fw-bold text-white small mt-1" style="font-size: 0.75rem;">
+                                                    R$ @elem.SubtotalAcumulado.ToString("F0")
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                    else if (elem.Status == StatusMesaConsts.AguardandoPagamento)
+                                    {
+                                        <div class="mt-1">
+                                            <span class="badge bg-warning text-dark fw-bold" style="font-size: 0.72rem;">
+                                                FECHANDO
+                                            </span>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <small class="opacity-75" style="font-size: 0.7rem;">
+                                            <i class="bi bi-people-fill me-1"></i>@elem.Capacidade p.
+                                        </small>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .elemento-salao {
+        border-radius: 8px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+        color: white;
+    }
+    .elemento-salao:hover {
+        transform: scale(1.04)!important;
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2)!important;
+        z-index: 10;
+    }
+    .formato-redondo {
+        border-radius: 50%!important;
+    }
+    .status-livre {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        border: 2px solid #34d399;
+    }
+    .status-ocupada {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        border: 2px solid #60a5fa;
+    }
+    .status-inatividade {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        border: 2px solid #fcd34d;
+        animation: pulse-alerta 2s infinite;
+    }
+    .status-aguardando {
+        background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+        border: 2px solid #f87171;
+    }
+    .status-especial {
+        background: linear-gradient(135deg, #475569 0%, #334155 100%);
+        border: 2px solid #94a3b8;
+    }
+    @@keyframes pulse-alerta {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.02); }
+        100% { transform: scale(1); }
+    }
+</style>
+
+@code {
+    [Parameter] public EventCallback<ElementoSalao> OnElementoSelecionado { get; set; }
+
+    private List<AmbienteSalao> ambientes = new();
+    private List<ElementoSalao> elementosAmbiente = new();
+    private int ambienteAtivoId = 1;
+    private bool carregando = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarAmbientesAsync();
+    }
+
+    public async Task CarregarAmbientesAsync()
+    {
+        carregando = true;
+        ambientes = await MesaLayoutService.ObterAmbientesAsync();
+        if (ambientes.Any() && !ambientes.Any(a => a.Id == ambienteAtivoId))
+        {
+            ambienteAtivoId = ambientes.First().Id;
+        }
+        await CarregarElementosDoAmbienteAsync();
+        carregando = false;
+    }
+
+    private async Task SelecionarAmbiente(int ambienteId)
+    {
+        ambienteAtivoId = ambienteId;
+        await CarregarElementosDoAmbienteAsync();
+    }
+
+    private async Task CarregarElementosDoAmbienteAsync()
+    {
+        elementosAmbiente = await MesaLayoutService.ObterElementosPorAmbienteAsync(ambienteAtivoId);
+    }
+
+    private int TotalLivres => elementosAmbiente.Count(e => e.Status == StatusMesaConsts.Livre && e.Capacidade > 0);
+    private int TotalOcupadas => elementosAmbiente.Count(e => e.Status == StatusMesaConsts.Ocupada && !e.IsAlertaInativo());
+    private int TotalInativas => elementosAmbiente.Count(e => e.IsAlertaInativo() || e.Status == StatusMesaConsts.AlertaInatividade);
+    private int TotalAguardando => elementosAmbiente.Count(e => e.Status == StatusMesaConsts.AguardandoPagamento);
+
+    private string ObterCorElemento(ElementoSalao elem)
+    {
+        if (elem.Formato == FormatoElementoSalao.PalcoCouvert ||
+            elem.Formato == FormatoElementoSalao.Caixa ||
+            elem.Formato == FormatoElementoSalao.Divisoria)
+        {
+            return "status-especial";
+        }
+
+        if (elem.Status == StatusMesaConsts.AguardandoPagamento)
+            return "status-aguardando";
+
+        if (elem.IsAlertaInativo() || elem.Status == StatusMesaConsts.AlertaInatividade)
+            return "status-inatividade";
+
+        if (elem.Status == StatusMesaConsts.Ocupada)
+            return "status-ocupada";
+
+        return "status-livre";
+    }
+
+    private string ObterEstiloFormato(FormatoElementoSalao formato)
+    {
+        return formato switch
+        {
+            FormatoElementoSalao.MesaRedonda => "formato-redondo",
+            _ => ""
+        };
+    }
+
+    private async Task ClicarElemento(ElementoSalao elem)
+    {
+        if (OnElementoSelecionado.HasDelegate)
+        {
+            await OnElementoSelecionado.InvokeAsync(elem);
+        }
+    }
+}

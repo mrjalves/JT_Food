@@ -1,4 +1,8 @@
-﻿using JT_Classes.Restaurante;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using JT_Classes.Restaurante;
 using JT_Servicos.Restaurante;
 
 namespace JT_Food.Shared.BusinessLogic
@@ -18,7 +22,7 @@ namespace JT_Food.Shared.BusinessLogic
             _producaoLogic = producaoLogic;
         }
 
-        public async Task<List<MItemComanda>> ObterItensAtivosKDSAsync()
+        public async Task<List<MItemComanda>> ObterItensAtivosKDSAsync(string setorFiltro = "Todos")
         {
             var todos = new List<MItemComanda>();
 
@@ -28,7 +32,28 @@ namespace JT_Food.Shared.BusinessLogic
             if (pendentes != null) todos.AddRange(pendentes);
             if (emPreparo != null) todos.AddRange(emPreparo);
 
-            return todos.OrderBy(x => x.Id).ToList();
+            var query = todos.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(setorFiltro) && setorFiltro != "Todos")
+            {
+                query = query.Where(item => IdentificarSetorItem(item.NomeProduto).Equals(setorFiltro, StringComparison.OrdinalIgnoreCase));
+            }
+
+            return query.OrderBy(x => x.Id).ToList();
+        }
+
+        public static string IdentificarSetorItem(string? nomeProduto)
+        {
+            if (string.IsNullOrWhiteSpace(nomeProduto)) return "Cozinha";
+            string nome = nomeProduto.ToLowerInvariant();
+
+            if (nome.Contains("chopp") || nome.Contains("suco") || nome.Contains("refrigerante") || nome.Contains("cerveja") || nome.Contains("água") || nome.Contains("drink"))
+                return "Bar";
+
+            if (nome.Contains("burger") || nome.Contains("hambúrguer") || nome.Contains("smash") || nome.Contains("misto") || nome.Contains("lanche"))
+                return "Chapa";
+
+            return "Cozinha";
         }
 
         public async Task<(bool Sucesso, string Mensagem, string? NovoStatus)> AvancarStatusItemAsync(int itemId)

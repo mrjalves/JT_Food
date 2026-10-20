@@ -1,0 +1,177 @@
+@using JT_Classes.Restaurante
+@using JT_Food.Shared.Domain.Entities
+@using JT_Food.Shared.Domain.Enums
+@using JT_Food.Shared.Services.Interfaces
+@inject IComandaService ComandaService
+@inject NavigationManager Navigation
+
+<div class="gestor-comandas-mesa card border-0 shadow-sm">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
+        <div>
+            <h5 class="mb-0 fw-bold"><i class="bi bi-diagram-3-fill me-2"></i>Comandas da @MesaIdentificacao</h5>
+            <small class="opacity-75">@(comandasDaMesa.Count) comanda(s) aberta(s) nesta mesa</small>
+        </div>
+        <button class="btn btn-sm btn-light text-primary fw-bold" @onclick="() => abrindoNovaComanda = true">
+            <i class="bi bi-plus-circle me-1"></i> Nova Comanda
+        </button>
+    </div>
+
+    <!-- Formulário Rápido de Nova Comanda na Mesa -->
+    @if (abrindoNovaComanda)
+    {
+        <div class="card-body bg-light border-bottom p-3">
+            <h6 class="fw-bold text-dark mb-2">Adicionar Comanda na @MesaIdentificacao:</h6>
+            <div class="row g-2 align-items-center">
+                <div class="col-12 col-md-4">
+                    <input type="text" class="form-control form-control-sm" placeholder="Nº Cartão (ex: 105)" @bind="novoNumeroCartao" />
+                </div>
+                <div class="col-12 col-md-5">
+                    <input type="text" class="form-control form-control-sm" placeholder="Nome do Cliente (ex: Sofia)" @bind="novoNomeCliente" />
+                </div>
+                <div class="col-12 col-md-3 d-flex gap-1">
+                    <button class="btn btn-sm btn-success w-100" @onclick="ConfirmarAberturaComandaAsync">
+                        <i class="bi bi-check-lg me-1"></i> Abrir
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => abrindoNovaComanda = false">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Lista de Comandas da Mesa -->
+    <div class="card-body p-0">
+        @if (carregando)
+        {
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+                <span class="text-muted ms-2">Buscando comandas...</span>
+            </div>
+        }
+        else if (!comandasDaMesa.Any())
+        {
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-receipt fs-1 opacity-25"></i>
+                <p class="mt-2 mb-3">Nenhuma comanda vinculada a esta mesa.</p>
+                <button class="btn btn-primary btn-sm" @onclick="() => abrindoNovaComanda = true">
+                    <i class="bi bi-plus-lg me-1"></i> Abrir Primeira Comanda
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="list-group list-group-flush">
+                @foreach (var c in comandasDaMesa)
+                {
+                    <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3">
+                        <div class="d-flex align-items-center">
+                            <div class="rounded-circle bg-primary bg-opacity-10 text-primary p-2 me-3 fs-5">
+                                <i class="bi bi-person-fill"></i>
+                            </div>
+                            <div>
+                                <div class="fw-bold fs-6">
+                                    @(string.IsNullOrWhiteSpace(c.NomeCliente) ? $"Comanda #{c.Id}" : c.NomeCliente)
+                                </div>
+                                <small class="text-muted">
+                                    Aberta às @c.DataAbertura.ToString("HH:mm") | Status: <span class="badge bg-success">@c.Status</span>
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="fs-5 fw-bold text-success me-2">R$ @c.Total.ToString("F2")</span>
+
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => SelecionarParaLancarPedido(c)" title="Registrar Pedido">
+                                <i class="bi bi-plus-lg me-1"></i> Pedido
+                            </button>
+                            <button class="btn btn-sm btn-outline-success" @onclick="() => IrParaFechamento(c.Id)" title="Fechar e Pagar">
+                                <i class="bi bi-cash-coin me-1"></i> Fechar
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- Total Consolidado da Mesa -->
+    <div class="card-footer bg-white border-top p-3 d-flex justify-content-between align-items-center">
+        <div>
+            <span class="text-muted d-block small">Total Acumulado da Mesa:</span>
+            <span class="fs-4 fw-bold text-dark">R$ @TotalMesa.ToString("F2")</span>
+        </div>
+        <div class="btn-group">
+            <button class="btn btn-outline-dark btn-sm" @onclick="RecarregarAsync">
+                <i class="bi bi-arrow-clockwise me-1"></i> Atualizar
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string MesaIdentificacao { get; set; } = string.Empty;
+    [Parameter] public EventCallback<JT_Classes.Restaurante.Comanda> OnSelecionarComanda { get; set; }
+
+    private List<JT_Classes.Restaurante.Comanda> comandasDaMesa = new();
+    private bool carregando = true;
+    private bool abrindoNovaComanda = false;
+    private string novoNumeroCartao = "";
+    private string novoNomeCliente = "";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await RecarregarAsync();
+    }
+
+    public async Task RecarregarAsync()
+    {
+        carregando = true;
+        if (!string.IsNullOrWhiteSpace(MesaIdentificacao))
+        {
+            comandasDaMesa = await ComandaService.ObterComandasDaMesaAsync(MesaIdentificacao);
+        }
+        carregando = false;
+        StateHasChanged();
+    }
+
+    private double TotalMesa => comandasDaMesa.Sum(c => c.Total);
+
+    private async Task ConfirmarAberturaComandaAsync()
+    {
+        if (string.IsNullOrWhiteSpace(novoNumeroCartao) && string.IsNullOrWhiteSpace(novoNomeCliente))
+        {
+            return;
+        }
+
+        var nova = await ComandaService.AbrirComandaFlexivelAsync(
+            novoNumeroCartao,
+            novoNomeCliente,
+            MesaIdentificacao
+        );
+
+        novoNumeroCartao = "";
+        novoNomeCliente = "";
+        abrindoNovaComanda = false;
+
+        await RecarregarAsync();
+
+        if (OnSelecionarComanda.HasDelegate)
+        {
+            await OnSelecionarComanda.InvokeAsync(nova);
+        }
+    }
+
+    private async Task SelecionarParaLancarPedido(JT_Classes.Restaurante.Comanda comanda)
+    {
+        if (OnSelecionarComanda.HasDelegate)
+        {
+            await OnSelecionarComanda.InvokeAsync(comanda);
+        }
+    }
+
+    private void IrParaFechamento(int comandaId)
+    {
+        Navigation.NavigateTo($"/fechamento/{comandaId}");
+    }
+}

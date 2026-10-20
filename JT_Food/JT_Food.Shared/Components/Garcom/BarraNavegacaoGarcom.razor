@@ -1,0 +1,46 @@
+@using JT_Food.Shared.Domain.Enums
+@using JT_Food.Shared.Services.Interfaces
+@inject IAuthPerfilService AuthService
+@inject NavigationManager Navigation
+
+@if (AuthService.IsGarcom())
+{
+    <div class="barra-navegacao-garcom fixed-bottom bg-white border-top shadow-lg d-flex justify-content-around align-items-center py-2 d-md-none">
+        <button class="btn btn-link text-decoration-none d-flex flex-column align-items-center p-0 @(IsActive("/mesas") ? "text-primary fw-bold" : "text-muted")"
+                @onclick='() => Navigation.NavigateTo("/mesas")'>
+            <i class="bi bi-grid-fill fs-4"></i>
+            <span style="font-size: 0.72rem;">Mesas</span>
+        </button>
+
+        <button class="btn btn-link text-decoration-none d-flex flex-column align-items-center p-0 @(IsActive("/comandas") ? "text-primary fw-bold" : "text-muted")"
+                @onclick='() => Navigation.NavigateTo("/comandas")'>
+            <i class="bi bi-card-checklist fs-4"></i>
+            <span style="font-size: 0.72rem;">Comandas</span>
+        </button>
+
+        <button class="btn btn-link text-decoration-none d-flex flex-column align-items-center p-0 @(IsActive("/kds") ? "text-primary fw-bold" : "text-muted")"
+                @onclick='() => Navigation.NavigateTo("/kds")'>
+            <i class="bi bi-display fs-4"></i>
+            <span style="font-size: 0.72rem;">KDS</span>
+        </button>
+    </div>
+}
+
+<style>
+    .barra-navegacao-garcom {
+        z-index: 1050;
+        height: 60px;
+    }
+</style>
+
+@code {
+    protected override void OnInitialized()
+    {
+        AuthService.OnSessaoAlterada += StateHasChanged;
+    }
+
+    private bool IsActive(string url)
+    {
+        return Navigation.Uri.EndsWith(url, StringComparison.OrdinalIgnoreCase);
+    }
+}
