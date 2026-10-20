@@ -39,18 +39,13 @@ namespace JT_Food.Shared.Layout
             }
             else
             {
-                // Interface do Gerente: Painel administrativo completo
+                // Interface do Gerente: Painel administrativo e operacional
                 itens.Add(new SItemMenu { Titulo = "Dashboard IA", Texto = "Home", Url = "/", Icone = "bi-house-door", MatchAll = true });
                 itens.Add(new SItemMenu { Titulo = "Mesas & Salão", Texto = "Mesas", Url = "/mesas", Icone = "bi-table" });
                 itens.Add(new SItemMenu { Titulo = "Comandas", Texto = "Comandas", Url = "/comandas", Icone = "bi-card-checklist" });
                 itens.Add(new SItemMenu { Titulo = "KDS (Cozinha)", Texto = "KDS", Url = "/kds", Icone = "bi-display" });
                 itens.Add(new SItemMenu { Titulo = "Cardápio & Promoções", Texto = "Menu", Url = "/menu", Icone = "bi-journal-text" });
-                itens.Add(new SItemMenu { Titulo = "Receitas", Texto = "Receitas", Url = "/receita", Icone = "bi-book" });
-                itens.Add(new SItemMenu { Titulo = "Estoque", Texto = "Estoque", Url = "/estoque", Icone = "bi-box-seam" });
-                itens.Add(new SItemMenu { Titulo = "Compras", Texto = "Compras", Url = "/compras", Icone = "bi-cart" });
-                itens.Add(new SItemMenu { Titulo = "Produção", Texto = "Produção", Url = "/producao", Icone = "bi-gear-wide-connected" });
                 itens.Add(new SItemMenu { Titulo = "Caixa", Texto = "Caixa", Url = "/caixa", Icone = "bi-cash-coin" });
-                itens.Add(new SItemMenu { Titulo = "Configurações", Texto = "Configurações", Url = "/configuracoes", Icone = "bi-gear" });
             }
 
             return new List<SModuloMenu>
