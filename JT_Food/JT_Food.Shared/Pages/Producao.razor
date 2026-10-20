@@ -1,4 +1,4 @@
-﻿@page "/producao"
+@page "/producao"
 @using JT_Classes.Acessos
 @using JT_Classes.Restaurante
 @using JT_Food.Shared.BusinessLogic
@@ -132,13 +132,15 @@
 
     private async Task CarregarDadosIniciaisAsync()
     {
-        produtosComReceita = await ProdutoService.Find($"UserId = '{UserState.UsuarioID}'") ?? new List<MProduto>();
+        var todos = await ProdutoService.GetAll();
+        produtosComReceita = todos?.ToList() ?? new List<MProduto>();
         await CarregarHistoricoAsync();
     }
 
     private async Task CarregarHistoricoAsync()
     {
-        historicoProducao = await ProducaoService.Find($"OperadorId = '{UserState.UsuarioID}'") ?? new List<MProducao>();
+        var todos = await ProducaoService.GetAll();
+        historicoProducao = todos?.ToList() ?? new List<MProducao>();
     }
 
     private async Task RegistrarProducaoAsync()

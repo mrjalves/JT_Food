@@ -80,7 +80,7 @@
                                                     @if (!string.IsNullOrEmpty(ObterMesaDaComanda(item.ComandaId)))
                                                     {
                                                         <div class="mt-1">
-                                                            <span class="badge bg-secondary">Mesa @ObterMesaDaComanda(item.ComandaId)</span>
+                                                            <span class="badge bg-secondary">@ObterMesaDaComanda(item.ComandaId)</span>
                                                         </div>
                                                     }
                                                 </div>
@@ -155,7 +155,7 @@
                                                     @if (!string.IsNullOrEmpty(ObterMesaDaComanda(item.ComandaId)))
                                                     {
                                                         <div class="mt-1">
-                                                            <span class="badge bg-secondary">Mesa @ObterMesaDaComanda(item.ComandaId)</span>
+                                                            <span class="badge bg-secondary">@ObterMesaDaComanda(item.ComandaId)</span>
                                                         </div>
                                                     }
                                                 </div>
@@ -254,29 +254,37 @@
         {
             var todos = await KdsLogic.ObterItensAtivosKDSAsync(setorSelecionado);
 
-            itensPendentes = todos.Where(x => x.Status == "Confirmado" || x.Status == "Pendente").ToList();
-            itensEmPreparo = todos.Where(x => x.Status == "Em Produção").ToList();
+            itensPendentes = todos.Where(x =>
+                string.Equals(x.Status, "Confirmado", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(x.Status, "Pendente", StringComparison.OrdinalIgnoreCase)).ToList();
 
-            // Otimização: Carregar mesas relacionadas às comandas ativas no KDS
-            var comandaIds = todos.Select(x => x.ComandaId).Distinct().ToList();
-            foreach (var cmdId in comandaIds)
+            itensEmPreparo = todos.Where(x =>
+                string.Equals(x.Status, "Em Produção", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(x.Status, "Em Preparo", StringComparison.OrdinalIgnoreCase)).ToList();
+
+            // Carregar mesas relacionadas às comandas ativas no KDS
+            try
             {
-                if (!string.IsNullOrEmpty(cmdId) && !mesaPorComanda.ContainsKey(cmdId))
+                var todasComandas = await ComandaService.GetAll() ?? new();
+                foreach (var cmd in todasComandas)
                 {
-                    var comanda = await ComandaService.GetById(Convert.ToInt32(cmdId));
-                    mesaPorComanda[cmdId] = comanda?.MesaId ?? "";
+                    mesaPorComanda[cmd.Id.ToString()] = cmd.MesaId ?? "";
                 }
             }
+            catch { }
 
-            // Carregar adicionais dos itens
-            foreach (var item in todos)
+            // Carregar adicionais dos itens com segurança
+            try
             {
-                var ads = await AdicionaisItemComandaService.Find($"ItemComandaId = '{item.Id}'");
-                if (ads != null && ads.Any())
+                var todosAds = await AdicionaisItemComandaService.GetAll();
+                if (todosAds != null && todosAds.Any())
                 {
-                    adicionaisPorItem[item.Id.ToString()] = ads;
+                    adicionaisPorItem = todosAds
+                        .GroupBy(a => a.ItemComandaId)
+                        .ToDictionary(g => g.Key, g => g.ToList());
                 }
             }
+            catch { }
 
             ultimaAtualizacao = DateTime.Now;
         }
@@ -305,7 +313,9 @@
     private string ObterMesaDaComanda(string? comandaId)
     {
         if (string.IsNullOrEmpty(comandaId)) return "";
-        return mesaPorComanda.GetValueOrDefault(comandaId, "");
+        string mesa = mesaPorComanda.GetValueOrDefault(comandaId, "");
+        if (string.IsNullOrWhiteSpace(mesa)) return "";
+        return mesa.StartsWith("Mesa", StringComparison.OrdinalIgnoreCase) ? mesa : $"Mesa {mesa}";
     }
 
     public void Dispose()

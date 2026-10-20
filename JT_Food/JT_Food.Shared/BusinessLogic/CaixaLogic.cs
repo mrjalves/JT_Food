@@ -35,10 +35,11 @@ namespace JT_Food.Shared.BusinessLogic
 
         public async Task<(bool Sucesso, string Mensagem, MCaixa? CaixaAtual)> ObterCaixaAbertoAsync()
         {
-            var caixas = await _caixaService.Find("Status = 'Aberto'");
-            if (caixas != null && caixas.Any())
+            var todos = await _caixaService.GetAll();
+            var caixaAberto = todos?.FirstOrDefault(c => string.Equals(c.Status, "Aberto", StringComparison.OrdinalIgnoreCase));
+            if (caixaAberto != null)
             {
-                return (true, "Caixa aberto encontrado.", caixas.FirstOrDefault());
+                return (true, "Caixa aberto encontrado.", caixaAberto);
             }
 
             return (false, "Nenhum caixa aberto neste momento.", null);
@@ -185,8 +186,11 @@ namespace JT_Food.Shared.BusinessLogic
         public async Task<(bool Quitada, double TotalPago, double SaldoPendente)> VerificarComandaQuitadaAsync(
             string comandaId, double totalComanda)
         {
-            var pagamentos = await _pagamentoComandaService.Find($"ComandaId = '{comandaId}'");
-            double totalPago = pagamentos?.Sum(p => p.Valor) ?? 0;
+            var todosPagamentos = await _pagamentoComandaService.GetAll();
+            var pagamentos = (todosPagamentos ?? Enumerable.Empty<MPagamentoComanda>())
+                .Where(p => p.ComandaId == comandaId)
+                .ToList();
+            double totalPago = pagamentos.Sum(p => p.Valor);
             double saldoPendente = totalComanda - totalPago;
 
             bool quitada = saldoPendente <= 0.01;
@@ -229,12 +233,24 @@ namespace JT_Food.Shared.BusinessLogic
             // Verificar se ainda há outras comandas abertas na mesa
             if (!string.IsNullOrWhiteSpace(comanda.MesaId))
             {
-                var outrasComandas = await _comandaService.Find($"MesaId = '{comanda.MesaId}' AND Status = 'Aberta'");
-                if (outrasComandas == null || !outrasComandas.Any())
+                var todasComandas = await _comandaService.GetAll();
+                string mesaNorm = comanda.MesaId.Replace("Mesa ", "").Trim();
+                var outrasComandas = (todasComandas ?? Enumerable.Empty<Comanda>())
+                    .Where(c => c.Id != comandaId && c.Status != "Fechada" && c.Status != "Cancelada" &&
+                        !string.IsNullOrWhiteSpace(c.MesaId) &&
+                        (c.MesaId.Equals(comanda.MesaId, StringComparison.OrdinalIgnoreCase) ||
+                         c.MesaId.Replace("Mesa ", "").Trim().Equals(mesaNorm, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+
+                if (!outrasComandas.Any())
                 {
                     // Libera a mesa no banco
-                    var mesas = await _mesaService.Find($"Identificacao = '{comanda.MesaId}'");
-                    var mesa = mesas?.FirstOrDefault();
+                    var todasMesas = await _mesaService.GetAll();
+                    var mesa = (todasMesas ?? Enumerable.Empty<Mesa>())
+                        .FirstOrDefault(m => !string.IsNullOrWhiteSpace(m.Identificacao) &&
+                            (m.Identificacao.Equals(comanda.MesaId, StringComparison.OrdinalIgnoreCase) ||
+                             m.Identificacao.Replace("Mesa ", "").Trim().Equals(mesaNorm, StringComparison.OrdinalIgnoreCase)));
+
                     if (mesa != null)
                     {
                         mesa.Status = StatusMesaConsts.Livre;

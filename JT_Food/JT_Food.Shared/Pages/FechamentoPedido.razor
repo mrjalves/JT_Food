@@ -370,16 +370,25 @@
             comanda = await ComandaService.GetById(id);
             if (comanda != null)
             {
-                itens = await ItemComandaService.Find($"ComandaId = '{comanda.Id}'") ?? new();
+                var allItens = await ItemComandaService.GetAll();
+                itens = (allItens ?? Enumerable.Empty<MItemComanda>())
+                    .Where(i => i.ComandaId == comanda.Id)
+                    .ToList();
 
-                foreach (var item in itens)
+                var allAds = await AdicionaisItemComandaService.GetAll();
+                var itemIds = itens.Select(i => i.Id).ToHashSet();
+                if (allAds != null)
                 {
-                    var ads = await AdicionaisItemComandaService.Find($"ItemComandaId = '{item.Id}'");
-                    if (ads != null && ads.Any())
-                        adicionaisPorItem[item.Id.ToString()] = ads;
+                    foreach (var group in allAds.Where(a => itemIds.Contains(a.ItemComandaId)).GroupBy(a => a.ItemComandaId.ToString()))
+                    {
+                        adicionaisPorItem[group.Key] = group.ToList();
+                    }
                 }
 
-                pagamentosRegistrados = await PagamentoComandaService.Find($"ComandaId = '{comanda.Id}'") ?? new();
+                var allPagamentos = await PagamentoComandaService.GetAll();
+                pagamentosRegistrados = (allPagamentos ?? Enumerable.Empty<MPagamentoComanda>())
+                    .Where(p => p.ComandaId == comanda.Id.ToString())
+                    .ToList();
 
                 cobrarCouvert = comanda.TaxaServico > 0;
                 desconto = comanda.Desconto;
@@ -455,7 +464,10 @@
         {
             ExibirAlerta(result.Mensagem, "alert-success");
             valorNovoPagamento = 0;
-            pagamentosRegistrados = await PagamentoComandaService.Find($"ComandaId = '{comanda.Id}'") ?? new();
+            var allPagamentos = await PagamentoComandaService.GetAll();
+            pagamentosRegistrados = (allPagamentos ?? Enumerable.Empty<MPagamentoComanda>())
+                .Where(p => p.ComandaId == comanda.Id.ToString())
+                .ToList();
             Recalcular();
         }
         else

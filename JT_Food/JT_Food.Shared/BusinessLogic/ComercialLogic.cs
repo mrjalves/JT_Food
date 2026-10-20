@@ -73,15 +73,26 @@ namespace JT_Food.Shared.BusinessLogic
             {
                 comandaDestino = await _comandaService.GetById(comandaId.Value);
             }
-            else if (!string.IsNullOrWhiteSpace(mesaIdentificacao))
+            
+            if (comandaDestino == null && !string.IsNullOrWhiteSpace(mesaIdentificacao))
             {
-                // Modo 1: Pedido direto na mesa - busca comanda aberta da mesa ou abre uma nova
-                var comandasDaMesa = await _comandaService.Find($"MesaId = '{mesaIdentificacao}' AND Status = 'Aberta'");
-                comandaDestino = comandasDaMesa?.FirstOrDefault();
+                // Modo 1: Pedido direto na mesa - busca comanda aberta existente da mesa para NUNCA duplicar
+                var todasComandas = await _comandaService.GetAll() ?? new List<ComandaDb>();
+                string mesaNorm = mesaIdentificacao.Replace("Mesa ", "").Trim();
+
+                var comandasDaMesa = todasComandas
+                    .Where(c => c.Status != "Fechada" && c.Status != "Cancelada" &&
+                                !string.IsNullOrWhiteSpace(c.MesaId) &&
+                                (c.MesaId.Equals(mesaIdentificacao, StringComparison.OrdinalIgnoreCase) ||
+                                 c.MesaId.Replace("Mesa ", "").Trim().Equals(mesaNorm, StringComparison.OrdinalIgnoreCase)))
+                    .OrderBy(c => c.Id)
+                    .ToList();
+
+                comandaDestino = comandasDaMesa.FirstOrDefault();
 
                 if (comandaDestino == null)
                 {
-                    // Cria uma comanda global para a mesa
+                    // Cria uma única comanda global para a mesa caso não haja nenhuma aberta
                     comandaDestino = new ComandaDb
                     {
                         UserId = "1",
@@ -92,15 +103,6 @@ namespace JT_Food.Shared.BusinessLogic
                         GarcomId = garcomId
                     };
                     await _comandaService.SaveAsync(comandaDestino);
-
-                    // Atualiza mesa como Ocupada
-                    var mesas = await _mesaService.Find($"Identificacao = '{mesaIdentificacao}'");
-                    var mesa = mesas?.FirstOrDefault();
-                    if (mesa != null)
-                    {
-                        mesa.Status = StatusMesaConsts.Ocupada;
-                        await _mesaService.SaveAsync(mesa);
-                    }
                 }
             }
 
@@ -111,8 +113,13 @@ namespace JT_Food.Shared.BusinessLogic
             string? mesaVinculada = !string.IsNullOrWhiteSpace(mesaIdentificacao) ? mesaIdentificacao : comandaDestino.MesaId;
             if (!string.IsNullOrWhiteSpace(mesaVinculada))
             {
-                var mesas = await _mesaService.Find($"Identificacao = '{mesaVinculada}'");
-                var mesa = mesas?.FirstOrDefault();
+                var todasMesas = await _mesaService.GetAll() ?? new List<JT_Classes.Restaurante.Mesa>();
+                string mvNorm = mesaVinculada.Replace("Mesa ", "").Trim();
+                var mesa = todasMesas.FirstOrDefault(m =>
+                    m.Identificacao != null &&
+                    (m.Identificacao.Equals(mesaVinculada, StringComparison.OrdinalIgnoreCase) ||
+                     m.Identificacao.Replace("Mesa ", "").Trim().Equals(mvNorm, StringComparison.OrdinalIgnoreCase)));
+
                 if (mesa != null && mesa.Status != StatusMesaConsts.Ocupada)
                 {
                     mesa.Status = StatusMesaConsts.Ocupada;
@@ -166,9 +173,17 @@ namespace JT_Food.Shared.BusinessLogic
             // 5. Atualizar estado no Mapa do Salão em tempo real
             if (!string.IsNullOrEmpty(pedido.MesaId))
             {
-                var todasComandasMesa = await _comandaService.Find($"MesaId = '{pedido.MesaId}' AND Status = 'Aberta'");
-                int totalComandas = todasComandasMesa?.Count ?? 1;
-                double subtotalMesa = todasComandasMesa?.Sum(c => c.Total) ?? comandaDestino.Total;
+                var todasComandas = await _comandaService.GetAll() ?? new List<ComandaDb>();
+                string pMesaNorm = pedido.MesaId.Replace("Mesa ", "").Trim();
+                var todasComandasMesa = todasComandas.Where(c =>
+                    c.Status != "Fechada" && c.Status != "Cancelada" &&
+                    !string.IsNullOrWhiteSpace(c.MesaId) &&
+                    (c.MesaId.Equals(pedido.MesaId, StringComparison.OrdinalIgnoreCase) ||
+                     c.MesaId.Replace("Mesa ", "").Trim().Equals(pMesaNorm, StringComparison.OrdinalIgnoreCase))
+                ).ToList();
+
+                int totalComandas = todasComandasMesa.Count > 0 ? todasComandasMesa.Count : 1;
+                double subtotalMesa = todasComandasMesa.Count > 0 ? todasComandasMesa.Sum(c => c.Total) : comandaDestino.Total;
 
                 await _mesaLayoutService.AtualizarStatusOperacionalAsync(
                     pedido.MesaId,
@@ -246,8 +261,11 @@ namespace JT_Food.Shared.BusinessLogic
                 var insumo = await _insumoService.GetById(id);
                 if (insumo != null)
                 {
-                    var lotes = await _loteInsumoService.Find($"InsumoId = '{insumoId}' ");
-                    if (lotes != null && lotes.Any())
+                    var todosLotes = await _loteInsumoService.GetAll();
+                    var lotes = (todosLotes ?? Enumerable.Empty<MLoteInsumo>())
+                        .Where(x => x.InsumoId == insumoId)
+                        .ToList();
+                    if (lotes.Any())
                     {
                         double custoTotal = lotes.Sum(x => x.CustoTotalLote);
                         double qtdTotal = lotes.Sum(x => x.QuantidadeDisponivel);

@@ -34,8 +34,11 @@ namespace JT_Food.Shared.BusinessLogic
             if (produto == null) return (false, "Produto não encontrado.");
             if (!produto.PossuiReceita) return (true, "Produto sem receita. Sem necessidade de baixa de insumos.");
 
-            var receitas = await _receitaService.Find($"ProdutoId = '{produtoId}'");
-            if (receitas == null || !receitas.Any()) return (false, "Nenhuma receita cadastrada para este produto.");
+            var todasReceitas = await _receitaService.GetAll();
+            var receitas = (todasReceitas ?? Enumerable.Empty<MReceita>())
+                .Where(r => r.ProdutoId == produtoId)
+                .ToList();
+            if (!receitas.Any()) return (false, "Nenhuma receita cadastrada para este produto.");
 
             double custoProducaoTotal = 0;
             var lotesAtualizados = new List<MLoteInsumo>();
@@ -48,9 +51,12 @@ namespace JT_Food.Shared.BusinessLogic
 
                 if (quantidadeFaltante > 0)
                 {
-                    var lotesInsumo = await _loteInsumoService.Find($"InsumoId = '{rec.InsumoId}'");
+                    var allLotesInsumo = await _loteInsumoService.GetAll();
+                    var lotesInsumo = (allLotesInsumo ?? Enumerable.Empty<MLoteInsumo>())
+                        .Where(l => l.InsumoId == rec.InsumoId)
+                        .ToList();
                     
-                    if (lotesInsumo == null || !lotesInsumo.Any())
+                    if (!lotesInsumo.Any())
                         return (false, $"Sem estoque para o insumo: {rec.NomeInsumo ?? rec.InsumoId}");
 
                     var lotesFiltrados = lotesInsumo
@@ -132,13 +138,19 @@ namespace JT_Food.Shared.BusinessLogic
 
         public async Task<(bool Sucesso, string Mensagem, double CustoAdicionais)> ProcessarAdicionaisItemAsync(string itemComandaId, string ResponsavelId)
         {
-            var adicionais = await _adicionaisItemComandaService.Find($"ItemComandaId = '{itemComandaId}'");
-            if (adicionais == null || !adicionais.Any())
+            var todosAds = await _adicionaisItemComandaService.GetAll();
+            var adicionais = (todosAds ?? Enumerable.Empty<MAdicionaisItemComanda>())
+                .Where(a => a.ItemComandaId.ToString() == itemComandaId)
+                .ToList();
+            if (!adicionais.Any())
                 return (true, "Nenhum adicional a processar.", 0);
 
             double custoTotalAdicionais = 0;
             var memoriasCalculo = new List<MMemoriaCalculo>();
             var lotesAtualizados = new List<MLoteInsumo>();
+
+            var todasReceitas = await _receitaService.GetAll();
+            var todosLotes = await _loteInsumoService.GetAll();
 
             foreach (var adicional in adicionais)
             {
@@ -147,17 +159,21 @@ namespace JT_Food.Shared.BusinessLogic
 
                 if (!produto.PossuiReceita) continue;
 
-                var receitas = await _receitaService.Find($"ProdutoId = '{adicional.ProdutoId}'");
-                if (receitas == null || !receitas.Any()) continue;
+                var receitas = (todasReceitas ?? Enumerable.Empty<MReceita>())
+                    .Where(r => r.ProdutoId == adicional.ProdutoId)
+                    .ToList();
+                if (!receitas.Any()) continue;
 
                 foreach (var rec in receitas)
                 {
                     double quantidadeNecessaria = rec.Quantidade * adicional.Quantidade;
                     double quantidadeFaltante = quantidadeNecessaria;
 
-                    var allLotes = await _loteInsumoService.Find($"InsumoId = '{rec.InsumoId}'");
+                    var allLotes = (todosLotes ?? Enumerable.Empty<MLoteInsumo>())
+                        .Where(l => l.InsumoId == rec.InsumoId)
+                        .ToList();
                     
-                    if (allLotes == null || !allLotes.Any())
+                    if (!allLotes.Any())
                         return (false, $"Sem estoque para o insumo do adicional: {rec.NomeInsumo ?? rec.InsumoId}", 0);
 
                     var lotesFiltrados = allLotes

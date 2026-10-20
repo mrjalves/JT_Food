@@ -271,8 +271,11 @@
         carregandoItens = true;
         try
         {
-            var itens = await ItemComandaService.Find($"ComandaId = '{Comanda.Id}'");
-            itensComanda = itens?.OrderByDescending(i => i.Id).ToList() ?? new();
+            var all = await ItemComandaService.GetAll();
+            itensComanda = (all ?? Enumerable.Empty<MItemComanda>())
+                .Where(i => i.ComandaId == Comanda.Id)
+                .OrderByDescending(i => i.Id)
+                .ToList();
         }
         catch { }
         carregandoItens = false;

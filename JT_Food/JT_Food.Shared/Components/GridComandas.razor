@@ -74,7 +74,7 @@
                     }
                     else
                     {
-                        <span class="badge bg-secondary">Mesa @c.MesaId</span>
+                        <span class="badge bg-secondary">@(c.MesaId.StartsWith("Mesa", StringComparison.OrdinalIgnoreCase) ? c.MesaId : $"Mesa {c.MesaId}")</span>
                     }
                 </td>
                 <td>@c.DataAbertura.ToString("HH:mm")</td>

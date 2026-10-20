@@ -192,9 +192,10 @@
 
         if (CaixaAberto)
         {
-            caixaAtual = result.CaixaAtual;
-            var list = await MovimentacaoCaixaService.Find($"CaixaId = '{caixaAtual?.Id}'");
-            movimentacoes = list ?? new List<MMovimentacaoCaixa>();
+            var all = await MovimentacaoCaixaService.GetAll();
+            movimentacoes = (all ?? Enumerable.Empty<MMovimentacaoCaixa>())
+                .Where(m => m.CaixaId == caixaAtual?.Id.ToString())
+                .ToList();
             // Set suggested final balance to calculated balance
             saldoInformadoFinal = caixaAtual?.SaldoFinalCalculado ?? 0;
         }

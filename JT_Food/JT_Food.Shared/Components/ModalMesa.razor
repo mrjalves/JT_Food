@@ -175,6 +175,7 @@
         abaAtiva = Mesa.Id == 0 ? "dados" : abaInicial;
         comandaParaPedido = null;
         modalRef.Open();
+        _ = GarantirComandaParaPedidoAsync();
         _ = CarregarItensConsumoAsync();
     }
 
@@ -184,10 +185,36 @@
     private async Task MudarAba(string aba)
     {
         abaAtiva = aba;
-        if (aba == "consumo")
+        if (aba == "pedido")
+        {
+            await GarantirComandaParaPedidoAsync();
+        }
+        else if (aba == "consumo")
         {
             await CarregarItensConsumoAsync();
         }
+    }
+
+    private async Task GarantirComandaParaPedidoAsync()
+    {
+        if (comandaParaPedido != null || string.IsNullOrWhiteSpace(Mesa.Identificacao)) return;
+        try
+        {
+            var comandas = await ComandaService.ObterComandasDaMesaAsync(Mesa.Identificacao);
+            var ativa = comandas.FirstOrDefault(c => c.Status != "Fechada" && c.Status != "Cancelada");
+            if (ativa != null)
+            {
+                comandaParaPedido = new JT_Food.Shared.Domain.Entities.Comanda
+                {
+                    Id = ativa.Id,
+                    NomeCliente = ativa.NomeCliente,
+                    MesaId = ativa.MesaId,
+                    Subtotal = ativa.Total
+                };
+                StateHasChanged();
+            }
+        }
+        catch { }
     }
 
     private async Task CarregarItensConsumoAsync()
@@ -197,13 +224,19 @@
         try
         {
             var comandas = await ComandaService.ObterComandasDaMesaAsync(Mesa.Identificacao);
-            var todosItens = new List<MItemComanda>();
-            foreach (var c in comandas)
+            var comandaIds = comandas.Select(c => c.Id).ToHashSet();
+            if (comandaIds.Any())
             {
-                var itens = await ItemComandaService.Find($"ComandaId = '{c.Id}'");
-                if (itens != null) todosItens.AddRange(itens);
+                var allItens = await ItemComandaService.GetAll();
+                itensMesa = (allItens ?? Enumerable.Empty<MItemComanda>())
+                    .Where(i => comandaIds.Contains(i.ComandaId))
+                    .OrderByDescending(i => i.Id)
+                    .ToList();
             }
-            itensMesa = todosItens.OrderByDescending(i => i.Id).ToList();
+            else
+            {
+                itensMesa.Clear();
+            }
         }
         catch { }
         carregandoItens = false;

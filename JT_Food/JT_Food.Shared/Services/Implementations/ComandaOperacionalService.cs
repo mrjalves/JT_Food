@@ -41,9 +41,22 @@ namespace JT_Food.Shared.Services.Implementations
 
         public async Task<List<Comanda>> FindAsync(Dictionary<string, object> filtros)
         {
-            var condicoes = filtros.Select(f => $"{f.Key} = '{f.Value}'");
-            string condicao = string.Join(" AND ", condicoes);
-            return await FindAsync(condicao);
+            var todas = await GetAllAsync();
+            var query = todas.AsEnumerable();
+            foreach (var kvp in filtros)
+            {
+                string val = kvp.Value?.ToString() ?? "";
+                if (kvp.Key.Equals("Status", StringComparison.OrdinalIgnoreCase))
+                    query = query.Where(c => string.Equals(c.Status, val, StringComparison.OrdinalIgnoreCase));
+                else if (kvp.Key.Equals("MesaId", StringComparison.OrdinalIgnoreCase))
+                {
+                    string mNorm = val.Replace("Mesa ", "").Trim();
+                    query = query.Where(c => !string.IsNullOrEmpty(c.MesaId) &&
+                        (c.MesaId.Equals(val, StringComparison.OrdinalIgnoreCase) ||
+                         c.MesaId.Replace("Mesa ", "").Trim().Equals(mNorm, StringComparison.OrdinalIgnoreCase)));
+                }
+            }
+            return query.ToList();
         }
 
         public async Task<Comanda?> GetByIdAsync(int id)
@@ -92,8 +105,12 @@ namespace JT_Food.Shared.Services.Implementations
         {
             if (string.IsNullOrWhiteSpace(mesaId)) return new List<Comanda>();
             var todas = await GetAllAsync();
+            string mNorm = mesaId.Replace("Mesa ", "").Trim();
             return todas
-                .Where(c => c.MesaId == mesaId && c.Status != "Fechada" && c.Status != "Cancelada")
+                .Where(c => c.Status != "Fechada" && c.Status != "Cancelada" &&
+                            !string.IsNullOrWhiteSpace(c.MesaId) &&
+                            (c.MesaId.Equals(mesaId, StringComparison.OrdinalIgnoreCase) ||
+                             c.MesaId.Replace("Mesa ", "").Trim().Equals(mNorm, StringComparison.OrdinalIgnoreCase)))
                 .OrderBy(c => c.Id)
                 .ToList();
         }
@@ -106,16 +123,59 @@ namespace JT_Food.Shared.Services.Implementations
             bool ativarCouvert = false,
             double valorCouvert = 0)
         {
+            var todas = await GetAllAsync();
+
+            // 1. REGRA ANTI-DUPLICAÇÃO: Se já existe comanda aberta com este número de cartão, REUTILIZAR
+            if (!string.IsNullOrWhiteSpace(numeroCartao))
+            {
+                string cartaoLimpo = numeroCartao.Trim();
+                var abertaComCartao = todas.FirstOrDefault(c =>
+                    c.Status != "Fechada" && c.Status != "Cancelada" &&
+                    (c.NomeCliente != null && (
+                        c.NomeCliente.Equals($"Cartão #{cartaoLimpo}", StringComparison.OrdinalIgnoreCase) ||
+                        c.NomeCliente.Contains($"[Cartão {cartaoLimpo}]", StringComparison.OrdinalIgnoreCase) ||
+                        c.NomeCliente.Equals(cartaoLimpo, StringComparison.OrdinalIgnoreCase)
+                    ))
+                );
+
+                if (abertaComCartao != null)
+                {
+                    // Cartão já aberto no salão! Atualiza mesa se fornecida e retorna a comanda existente (NUNCA DUPLICA!)
+                    if (!string.IsNullOrWhiteSpace(mesaId) && abertaComCartao.MesaId != mesaId)
+                    {
+                        abertaComCartao.MesaId = mesaId;
+                        await _comandaService.SaveAsync(abertaComCartao);
+                    }
+                    return abertaComCartao;
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(mesaId) && string.IsNullOrWhiteSpace(nomeCliente))
+            {
+                // Se não tem cartão e não tem cliente específico, verifica se já existe uma Conta Geral para esta mesa
+                string mNorm = mesaId.Replace("Mesa ", "").Trim();
+                var contaGeralMesa = todas.FirstOrDefault(c =>
+                    c.Status != "Fechada" && c.Status != "Cancelada" &&
+                    !string.IsNullOrWhiteSpace(c.MesaId) &&
+                    (c.MesaId.Equals(mesaId, StringComparison.OrdinalIgnoreCase) ||
+                     c.MesaId.Replace("Mesa ", "").Trim().Equals(mNorm, StringComparison.OrdinalIgnoreCase)) &&
+                    (c.NomeCliente == null || c.NomeCliente.StartsWith("Conta Geral")));
+
+                if (contaGeralMesa != null)
+                {
+                    return contaGeralMesa;
+                }
+            }
+
             // Formatar nome / cartão
             string nomeFormatado = "";
             if (!string.IsNullOrWhiteSpace(numeroCartao) && !string.IsNullOrWhiteSpace(nomeCliente))
-                nomeFormatado = $"[Cartão {numeroCartao}] {nomeCliente}";
+                nomeFormatado = $"[Cartão {numeroCartao.Trim()}] {nomeCliente.Trim()}";
             else if (!string.IsNullOrWhiteSpace(numeroCartao))
-                nomeFormatado = $"Cartão #{numeroCartao}";
+                nomeFormatado = $"Cartão #{numeroCartao.Trim()}";
             else if (!string.IsNullOrWhiteSpace(nomeCliente))
-                nomeFormatado = nomeCliente;
+                nomeFormatado = nomeCliente.Trim();
             else
-                nomeFormatado = "Consumidor";
+                nomeFormatado = $"Conta Geral {mesaId}";
 
             double taxaCouvertCalculada = ativarCouvert ? (valorCouvert * Math.Max(1, quantidadePessoas)) : 0.0;
 
@@ -136,8 +196,13 @@ namespace JT_Food.Shared.Services.Implementations
             // Se associada a mesa, ocupar mesa
             if (!string.IsNullOrWhiteSpace(mesaId))
             {
-                var mesas = await _mesaService.Find($"Identificacao = '{mesaId}'");
-                var mesa = mesas?.FirstOrDefault();
+                var todasMesas = await _mesaService.GetAll() ?? new List<Mesa>();
+                string mNorm = mesaId.Replace("Mesa ", "").Trim();
+                var mesa = todasMesas.FirstOrDefault(m =>
+                    m.Identificacao != null &&
+                    (m.Identificacao.Equals(mesaId, StringComparison.OrdinalIgnoreCase) ||
+                     m.Identificacao.Replace("Mesa ", "").Trim().Equals(mNorm, StringComparison.OrdinalIgnoreCase)));
+
                 if (mesa != null && mesa.Status == StatusMesaConsts.Livre)
                 {
                     mesa.Status = StatusMesaConsts.Ocupada;
@@ -160,14 +225,19 @@ namespace JT_Food.Shared.Services.Implementations
 
             if (ok)
             {
+                var todasMesas = await _mesaService.GetAll() ?? new List<Mesa>();
+
                 // Se a mesa antiga não tiver mais comandas abertas, liberar a mesa
                 if (!string.IsNullOrWhiteSpace(mesaAntiga))
                 {
                     var restantes = await ObterComandasDaMesaAsync(mesaAntiga);
                     if (!restantes.Any())
                     {
-                        var mesasAntigas = await _mesaService.Find($"Identificacao = '{mesaAntiga}'");
-                        var mA = mesasAntigas?.FirstOrDefault();
+                        string maNorm = mesaAntiga.Replace("Mesa ", "").Trim();
+                        var mA = todasMesas.FirstOrDefault(m =>
+                            m.Identificacao != null &&
+                            (m.Identificacao.Equals(mesaAntiga, StringComparison.OrdinalIgnoreCase) ||
+                             m.Identificacao.Replace("Mesa ", "").Trim().Equals(maNorm, StringComparison.OrdinalIgnoreCase)));
                         if (mA != null)
                         {
                             mA.Status = StatusMesaConsts.Livre;
@@ -179,8 +249,11 @@ namespace JT_Food.Shared.Services.Implementations
                 // Ocupar nova mesa
                 if (!string.IsNullOrWhiteSpace(novaMesaId))
                 {
-                    var novasMesas = await _mesaService.Find($"Identificacao = '{novaMesaId}'");
-                    var mN = novasMesas?.FirstOrDefault();
+                    string mnNorm = novaMesaId.Replace("Mesa ", "").Trim();
+                    var mN = todasMesas.FirstOrDefault(m =>
+                        m.Identificacao != null &&
+                        (m.Identificacao.Equals(novaMesaId, StringComparison.OrdinalIgnoreCase) ||
+                         m.Identificacao.Replace("Mesa ", "").Trim().Equals(mnNorm, StringComparison.OrdinalIgnoreCase)));
                     if (mN != null)
                     {
                         mN.Status = StatusMesaConsts.Ocupada;

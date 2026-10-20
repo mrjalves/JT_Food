@@ -24,17 +24,25 @@ namespace JT_Food.Shared.BusinessLogic
 
         public async Task<List<MItemComanda>> ObterItensAtivosKDSAsync(string setorFiltro = "Todos")
         {
-            var todos = new List<MItemComanda>();
+            List<MItemComanda> todosItens;
+            try
+            {
+                todosItens = await _itemComandaService.GetAll() ?? new List<MItemComanda>();
+            }
+            catch
+            {
+                todosItens = new List<MItemComanda>();
+            }
 
-            var pendentes = await _itemComandaService.Find("Status = 'Confirmado'");
-            var emPreparo = await _itemComandaService.Find("Status = 'Em Produção'");
+            var query = todosItens.Where(item =>
+                !string.IsNullOrWhiteSpace(item.Status) &&
+                (item.Status.Equals("Confirmado", StringComparison.OrdinalIgnoreCase) ||
+                 item.Status.Equals("Pendente", StringComparison.OrdinalIgnoreCase) ||
+                 item.Status.Equals("Em Produção", StringComparison.OrdinalIgnoreCase) ||
+                 item.Status.Equals("Em Preparo", StringComparison.OrdinalIgnoreCase))
+            );
 
-            if (pendentes != null) todos.AddRange(pendentes);
-            if (emPreparo != null) todos.AddRange(emPreparo);
-
-            var query = todos.AsEnumerable();
-
-            if (!string.IsNullOrWhiteSpace(setorFiltro) && setorFiltro != "Todos")
+            if (!string.IsNullOrWhiteSpace(setorFiltro) && !setorFiltro.Equals("Todos", StringComparison.OrdinalIgnoreCase))
             {
                 query = query.Where(item => IdentificarSetorItem(item.NomeProduto).Equals(setorFiltro, StringComparison.OrdinalIgnoreCase));
             }
@@ -47,10 +55,10 @@ namespace JT_Food.Shared.BusinessLogic
             if (string.IsNullOrWhiteSpace(nomeProduto)) return "Cozinha";
             string nome = nomeProduto.ToLowerInvariant();
 
-            if (nome.Contains("chopp") || nome.Contains("suco") || nome.Contains("refrigerante") || nome.Contains("cerveja") || nome.Contains("água") || nome.Contains("drink"))
+            if (nome.Contains("chopp") || nome.Contains("suco") || nome.Contains("refrigerante") || nome.Contains("cerveja") || nome.Contains("água") || nome.Contains("drink") || nome.Contains("bebida") || nome.Contains("gin") || nome.Contains("vodka") || nome.Contains("caipirinha"))
                 return "Bar";
 
-            if (nome.Contains("burger") || nome.Contains("hambúrguer") || nome.Contains("smash") || nome.Contains("misto") || nome.Contains("lanche"))
+            if (nome.Contains("burger") || nome.Contains("hambúrguer") || nome.Contains("smash") || nome.Contains("misto") || nome.Contains("lanche") || nome.Contains("bacon"))
                 return "Chapa";
 
             return "Cozinha";
