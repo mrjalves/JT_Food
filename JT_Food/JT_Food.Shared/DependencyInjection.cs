@@ -30,8 +30,10 @@ namespace JT_Food.Shared
             services.AddScoped<JT_Servicos.Restaurante.ItemComandaService>();
             services.AddScoped<JT_Servicos.Restaurante.AdicionaisItemComandaService>();
             services.AddScoped<JT_Servicos.Restaurante.PagamentoComandaService>();
-            services.AddScoped<JT_Servicos.Restaurante.CaixaService>();
-            services.AddScoped<JT_Servicos.Restaurante.MovimentacaoCaixaService>();
+            services.AddScoped<FoodCaixaService>();
+            services.AddScoped<JT_Servicos.Restaurante.CaixaService>(sp => sp.GetRequiredService<FoodCaixaService>());
+            services.AddScoped<FoodMovimentacaoCaixaService>();
+            services.AddScoped<JT_Servicos.Restaurante.MovimentacaoCaixaService>(sp => sp.GetRequiredService<FoodMovimentacaoCaixaService>());
             
             // Serviços de Estoque/Producao
             services.AddScoped<JT_Servicos.Restaurante.InsumoService>();
