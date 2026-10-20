@@ -45,6 +45,15 @@ namespace JT_Food.Shared.BusinessLogic
             return (false, "Nenhum caixa aberto neste momento.", null);
         }
 
+        public async Task<List<MCaixa>> ObterHistoricoCaixasAsync(int quantidade = 10)
+        {
+            var todos = await _caixaService.GetAll();
+            return (todos ?? Enumerable.Empty<MCaixa>())
+                .OrderByDescending(c => c.DataAbertura)
+                .Take(quantidade)
+                .ToList();
+        }
+
         public async Task<(bool Sucesso, string Mensagem)> AbrirCaixaAsync(string operadorId, double saldoInicial, string? observacao)
         {
             var situacaoAtual = await ObterCaixaAbertoAsync();
