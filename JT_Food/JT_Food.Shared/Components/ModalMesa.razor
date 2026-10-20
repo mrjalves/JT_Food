@@ -224,7 +224,7 @@
         try
         {
             var comandas = await ComandaService.ObterComandasDaMesaAsync(Mesa.Identificacao);
-            var comandaIds = comandas.Select(c => c.Id).ToHashSet();
+            var comandaIds = comandas.Select(c => c.Id.ToString()).ToHashSet();
             if (comandaIds.Any())
             {
                 var allItens = await ItemComandaService.GetAll();

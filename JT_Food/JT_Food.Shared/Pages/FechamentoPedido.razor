@@ -372,14 +372,14 @@
             {
                 var allItens = await ItemComandaService.GetAll();
                 itens = (allItens ?? Enumerable.Empty<MItemComanda>())
-                    .Where(i => i.ComandaId == comanda.Id)
+                    .Where(i => i.ComandaId == comanda.Id.ToString())
                     .ToList();
 
                 var allAds = await AdicionaisItemComandaService.GetAll();
-                var itemIds = itens.Select(i => i.Id).ToHashSet();
+                var itemIds = itens.Select(i => i.Id.ToString()).ToHashSet();
                 if (allAds != null)
                 {
-                    foreach (var group in allAds.Where(a => itemIds.Contains(a.ItemComandaId)).GroupBy(a => a.ItemComandaId.ToString()))
+                    foreach (var group in allAds.Where(a => itemIds.Contains(a.ItemComandaId)).GroupBy(a => a.ItemComandaId))
                     {
                         adicionaisPorItem[group.Key] = group.ToList();
                     }

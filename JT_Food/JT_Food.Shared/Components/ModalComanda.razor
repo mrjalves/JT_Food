@@ -273,7 +273,7 @@
         {
             var all = await ItemComandaService.GetAll();
             itensComanda = (all ?? Enumerable.Empty<MItemComanda>())
-                .Where(i => i.ComandaId == Comanda.Id)
+                .Where(i => i.ComandaId == Comanda.Id.ToString())
                 .OrderByDescending(i => i.Id)
                 .ToList();
         }
