@@ -128,13 +128,33 @@
                     alterou = true;
                 }
 
-                if (!string.IsNullOrWhiteSpace(geminiApiKey))
+                var cachedModelsJson = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "jt_gemini_models_cache");
+                if (!string.IsNullOrWhiteSpace(cachedModelsJson))
+                {
+                    try
+                    {
+                        var cached = System.Text.Json.JsonSerializer.Deserialize<List<GeminiModelInfo>>(cachedModelsJson);
+                        if (cached != null && cached.Count > 0)
+                        {
+                            modelosDisponiveis = cached;
+                            alterou = true;
+                        }
+                    }
+                    catch { }
+                }
+
+                if (modelosDisponiveis.Count == 0 && !string.IsNullOrWhiteSpace(geminiApiKey))
                 {
                     var res = await IAService.IdentificarModelosDisponiveisAsync(geminiApiKey);
                     if (res.Sucesso && res.Modelos.Count > 0)
                     {
                         modelosDisponiveis = res.Modelos;
                         alterou = true;
+                        try
+                        {
+                            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "jt_gemini_models_cache", System.Text.Json.JsonSerializer.Serialize(modelosDisponiveis));
+                        }
+                        catch { }
                     }
                 }
 
@@ -269,7 +289,17 @@
                     {
                         <div class="alert @statusIaClasse alert-dismissible fade show d-flex align-items-center mb-3" role="alert">
                             <i class="bi @(statusIaClasse.Contains("success") ? "bi-check-circle-fill" : statusIaClasse.Contains("danger") ? "bi-exclamation-triangle-fill" : "bi-info-circle-fill") me-2 fs-5"></i>
-                            <div class="flex-grow-1 small">@statusIaMensagem</div>
+                            <div class="flex-grow-1 small">
+                                @statusIaMensagem
+                                @if (statusIaClasse.Contains("danger") && (statusIaMensagem.Contains("AI Studio") || statusIaMensagem.Contains("inválida")))
+                                {
+                                    <span class="d-block mt-1">
+                                        <a href="https://aistudio.google.com/app/apikey" target="_blank" class="fw-bold text-decoration-underline text-danger">
+                                            <i class="bi bi-box-arrow-up-right me-1"></i>Acessar Google AI Studio para gerar uma nova API Key válida
+                                        </a>
+                                    </span>
+                                }
+                            </div>
                             <button type="button" class="btn-close" @onclick="() => statusIaMensagem = null"></button>
                         </div>
                     }
@@ -286,9 +316,9 @@
                                 <i class="bi @(mostrarApiKey ? "bi-eye-slash" : "bi-eye")"></i>
                             </button>
                             <button class="btn btn-primary fw-semibold px-3" 
-                                    type="button" 
-                                    @onclick="IdentificarModelosAsync" 
-                                    disabled="@(identificandoModelos || string.IsNullOrWhiteSpace(geminiApiKey))">
+                                     type="button" 
+                                     @onclick="IdentificarModelosAsync" 
+                                     disabled="@(identificandoModelos || string.IsNullOrWhiteSpace(geminiApiKey))">
                                 @if (identificandoModelos)
                                 {
                                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>
@@ -332,6 +362,7 @@
                                 <option value="gemini-1.5-flash">Gemini 1.5 Flash (Ultra Rápido e Otimizado)</option>
                                 <option value="gemini-1.5-pro">Gemini 1.5 Pro (Raciocínio Profundo e Diagnósticos Avançados)</option>
                                 <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                             }
                         </select>
                         @if (!string.IsNullOrEmpty(ObterDescricaoModeloSelecionado()))
@@ -425,6 +456,11 @@
                 }
                 statusIaMensagem = res.Mensagem;
                 statusIaClasse = "alert-success";
+                try
+                {
+                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "jt_gemini_models_cache", System.Text.Json.JsonSerializer.Serialize(modelosDisponiveis));
+                }
+                catch { }
             }
             else
             {
@@ -459,6 +495,10 @@
         {
             await JSRuntime.InvokeVoidAsync("localStorage.setItem", "jt_gemini_api_key", geminiApiKey ?? "");
             await JSRuntime.InvokeVoidAsync("localStorage.setItem", "jt_gemini_model", modeloIa ?? "gemini-1.5-flash");
+            if (modelosDisponiveis.Count > 0)
+            {
+                await JSRuntime.InvokeVoidAsync("localStorage.setItem", "jt_gemini_models_cache", System.Text.Json.JsonSerializer.Serialize(modelosDisponiveis));
+            }
         }
         catch
         {

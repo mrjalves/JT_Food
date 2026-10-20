@@ -27,6 +27,9 @@ builder.Services.AddScoped<JT_Classes.Acessos.ISecureStorageService, JT_Food.Sha
 
 builder.Services.AddJTUserInterface();
 
+builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("GeminiCleanClient");
+
 builder.Services.AddScoped(sp =>
 {
     var factory = sp.GetRequiredService<IHttpClientFactory>();

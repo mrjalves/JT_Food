@@ -25,22 +25,22 @@
 
                 <!-- Paleta de Inserção Rápida de Elementos -->
                 <div class="col-12 col-md-6 d-flex flex-wrap gap-1 align-items-end">
-                    <button class="btn btn-sm btn-outline-primary" @onclick="() => AdicionarElemento(FormatoElementoSalao.MesaQuadrada, 4)">
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => AdicionarElemento(FormatoElementoSalao.MesaQuadrada, 4)" title="Adicionar Mesa Quadrada 4 Lugares">
                         <i class="bi bi-square me-1"></i> + Mesa 4L
                     </button>
-                    <button class="btn btn-sm btn-outline-primary" @onclick="() => AdicionarElemento(FormatoElementoSalao.MesaRedonda, 6)">
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => AdicionarElemento(FormatoElementoSalao.MesaRedonda, 6)" title="Adicionar Mesa Redonda 6 Lugares">
                         <i class="bi bi-circle me-1"></i> + Redonda 6L
                     </button>
-                    <button class="btn btn-sm btn-outline-primary" @onclick="() => AdicionarElemento(FormatoElementoSalao.MesaRetangular, 8)">
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => AdicionarElemento(FormatoElementoSalao.MesaRetangular, 8)" title="Adicionar Mesa Retangular 8 Lugares">
                         <i class="bi bi-square-fill me-1"></i> + Retangular 8L
                     </button>
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => AdicionarElemento(FormatoElementoSalao.BalcaoBar, 6)">
+                    <button class="btn btn-sm btn-outline-success" @onclick="() => AdicionarElemento(FormatoElementoSalao.BalcaoBar, 8)" title="Adicionar Balcão de Bar / Chopp">
                         <i class="bi bi-cup-straw me-1"></i> + Balcão Bar
                     </button>
-                    <button class="btn btn-sm btn-outline-info" @onclick="() => AdicionarElemento(FormatoElementoSalao.PalcoCouvert, 0)">
+                    <button class="btn btn-sm btn-outline-info" @onclick="() => AdicionarElemento(FormatoElementoSalao.PalcoCouvert, 0)" title="Adicionar Palco de Couvert / Música">
                         <i class="bi bi-music-note-beamed me-1"></i> + Palco
                     </button>
-                    <button class="btn btn-sm btn-outline-dark" @onclick="() => AdicionarElemento(FormatoElementoSalao.Caixa, 0)">
+                    <button class="btn btn-sm btn-outline-warning text-dark" @onclick="() => AdicionarElemento(FormatoElementoSalao.Caixa, 0)" title="Adicionar Ponto de Caixa / Recepção">
                         <i class="bi bi-cash-stack me-1"></i> + Caixa
                     </button>
                 </div>
@@ -74,31 +74,96 @@
                 <div class="card-body p-2 bg-light">
                     <div id="editorCanvasContainer"
                          class="position-relative rounded shadow-inner"
-                         style="height: 600px; background-color: #f8fafc; background-image: radial-gradient(#94a3b8 1px, transparent 1px); background-size: 20px 20px; border: 2px dashed #94a3b8; overflow: hidden;">
+                         style="height: 600px; background-color: #f8fafc; background-image: radial-gradient(#94a3b8 1px, transparent 1px); background-size: 20px 20px; border: 2px dashed #94a3b8; overflow: hidden;"
+                         @onclick="DeselecionarCanvas">
 
                         @foreach (var elem in elementosAmbiente)
                         {
                             bool selecionado = elementoSelecionado?.Id == elem.Id;
-                            string formatoEstilo = elem.Formato == FormatoElementoSalao.MesaRedonda ? "border-radius: 50%;" : "border-radius: 6px;";
+                            string formatoEstilo = ObterFormatoEstilo(elem.Formato);
+                            string corFundo = ObterCorElemento(elem.Formato);
 
                             <div id="@($"elem_{elem.Id}")"
-                                 class="elemento-editor position-absolute user-select-none d-flex flex-column justify-content-center align-items-center text-center @(selecionado ? "selecionado shadow-lg" : "shadow-sm")"
+                                 data-elem-id="@elem.Id"
+                                 class="elemento-editor position-absolute user-select-none @(selecionado ? "selecionado" : "")"
                                  style="left: @elem.PosX.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%;
                                         top: @elem.PosY.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%;
                                         width: @elem.Largura.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%;
                                         height: @elem.Altura.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%;
-                                        transform: rotate(@(elem.Rotacao)deg);
-                                        background: @(selecionado ? "#4338ca" : "#3b82f6");
-                                        color: white;
-                                        border: 2px solid @(selecionado ? "#fbbf24" : "#ffffff");
-                                        cursor: move;
-                                        @formatoEstilo"
+                                        z-index: @(selecionado ? 30 : 10);
+                                        cursor: move;"
+                                 @onclick:stopPropagation="true"
                                  @onclick="() => SelecionarElemento(elem)">
-                                
-                                <span class="fw-bold small text-truncate px-1">@elem.Identificacao</span>
-                                @if (elem.Capacidade > 0)
+
+                                <!-- Corpo Visual da Mesa/Elemento (com rotação aplicada) -->
+                                <div class="elemento-corpo w-100 h-100 d-flex flex-column justify-content-center align-items-center text-center shadow-sm"
+                                     style="transform: rotate(@(elem.Rotacao)deg);
+                                            transform-origin: center center;
+                                            background: @(selecionado ? "#4338ca" : corFundo);
+                                            color: white;
+                                            border: 2px solid @(selecionado ? "#fbbf24" : "rgba(255,255,255,0.9)");
+                                            @formatoEstilo
+                                            transition: transform 0.15s ease, background 0.15s ease;">
+                                    <span class="fw-bold small text-truncate px-1" style="font-size: 0.8rem;">@elem.Identificacao</span>
+                                    @if (elem.Capacidade > 0)
+                                    {
+                                        <small class="opacity-75" style="font-size: 0.65rem;">@elem.Capacidade p.</small>
+                                    }
+                                </div>
+
+                                @if (selecionado)
                                 {
-                                    <small style="font-size: 0.65rem;">@elem.Capacidade p.</small>
+                                    <!-- Haste e Alça Visual de Rotação Rápida (Estilo CAD / Canva) -->
+                                    <div class="position-absolute" style="top: -14px; left: 50%; width: 2px; height: 14px; background: #fbbf24; transform: translateX(-50%); pointer-events: none;"></div>
+                                    <div class="alca-rotacao position-absolute bg-warning text-dark rounded-circle shadow d-flex align-items-center justify-content-center elem-action-btn"
+                                         style="top: -26px; left: 50%; width: 24px; height: 24px; transform: translateX(-50%); cursor: pointer; z-index: 45;"
+                                         title="Girar 90° (Clique para girar)"
+                                         @onclick:stopPropagation="true"
+                                         @onclick="() => RotacionarElemento(elem)">
+                                        <i class="bi bi-arrow-clockwise fw-bold" style="font-size: 0.85rem;"></i>
+                                    </div>
+
+                                    <!-- Barra de Ações Rápidas Flutuante no Próprio Elemento -->
+                                    <div class="barra-acoes-elemento position-absolute d-flex gap-1 bg-dark text-white rounded-pill px-2 py-1 shadow-lg"
+                                         style="top: -62px; left: 50%; transform: translateX(-50%); z-index: 50; white-space: nowrap;"
+                                         @onclick:stopPropagation="true">
+                                        <button type="button" class="btn btn-sm btn-outline-warning text-white rounded-circle elem-action-btn p-0 d-flex align-items-center justify-content-center"
+                                                style="width: 26px; height: 26px;"
+                                                title="Girar 90°"
+                                                @onclick="() => RotacionarElemento(elem)">
+                                            <i class="bi bi-arrow-clockwise" style="font-size: 0.8rem;"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-info text-white rounded-circle elem-action-btn p-0 d-flex align-items-center justify-content-center"
+                                                style="width: 26px; height: 26px;"
+                                                title="Girar 45°"
+                                                @onclick="() => RotacionarElemento45(elem)">
+                                            <i class="bi bi-arrow-repeat" style="font-size: 0.8rem;"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-light text-white rounded-circle elem-action-btn p-0 d-flex align-items-center justify-content-center"
+                                                style="width: 26px; height: 26px;"
+                                                title="Duplicar"
+                                                @onclick="() => DuplicarElemento(elem)">
+                                            <i class="bi bi-copy" style="font-size: 0.75rem;"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-light text-white rounded-circle elem-action-btn p-0 d-flex align-items-center justify-content-center"
+                                                style="width: 26px; height: 26px;"
+                                                title="Aumentar Tamanho (+)"
+                                                @onclick="() => AjustarEscala(elem, 1.15)">
+                                            <i class="bi bi-plus-lg" style="font-size: 0.75rem;"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-light text-white rounded-circle elem-action-btn p-0 d-flex align-items-center justify-content-center"
+                                                style="width: 26px; height: 26px;"
+                                                title="Diminuir Tamanho (-)"
+                                                @onclick="() => AjustarEscala(elem, 0.85)">
+                                            <i class="bi bi-dash-lg" style="font-size: 0.75rem;"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-danger text-white rounded-circle elem-action-btn p-0 d-flex align-items-center justify-content-center"
+                                                style="width: 26px; height: 26px;"
+                                                title="Excluir Elemento"
+                                                @onclick="() => ExcluirElemento(elem)">
+                                            <i class="bi bi-trash" style="font-size: 0.75rem;"></i>
+                                        </button>
+                                    </div>
                                 }
                             </div>
                         }
@@ -110,57 +175,120 @@
         <!-- Painel Lateral de Edição do Elemento Selecionado -->
         <div class="col-12 col-lg-3">
             <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white py-3">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                     <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-sliders me-1 text-primary"></i>Propriedades</h6>
+                    @if (elementoSelecionado != null)
+                    {
+                        <span class="badge bg-primary">ID #@elementoSelecionado.Id</span>
+                    }
                 </div>
                 <div class="card-body">
                     @if (elementoSelecionado == null)
                     {
                         <div class="text-center py-5 text-muted">
                             <i class="bi bi-cursor fs-1 opacity-25"></i>
-                            <p class="small mt-2">Clique em um elemento do salão para editar suas propriedades.</p>
+                            <p class="small mt-2">Clique em um elemento do salão para mover, girar e editar suas propriedades.</p>
                         </div>
                     }
                     else
                     {
+                        <!-- Formato / Tipo do Elemento -->
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Tipo / Formato:</label>
+                            <select class="form-select form-select-sm"
+                                    value="@elementoSelecionado.Formato"
+                                    @onchange="(e) => AlterarFormato(elementoSelecionado, Enum.Parse<FormatoElementoSalao>(e.Value?.ToString() ?? nameof(FormatoElementoSalao.MesaQuadrada)))">
+                                <option value="@FormatoElementoSalao.MesaQuadrada">Mesa Quadrada (4L)</option>
+                                <option value="@FormatoElementoSalao.MesaRedonda">Mesa Redonda (6L)</option>
+                                <option value="@FormatoElementoSalao.MesaRetangular">Mesa Retangular (8L)</option>
+                                <option value="@FormatoElementoSalao.BalcaoBar">Balcão de Bar</option>
+                                <option value="@FormatoElementoSalao.PalcoCouvert">Palco Acústico / Couvert</option>
+                                <option value="@FormatoElementoSalao.Caixa">Caixa / Recepção</option>
+                                <option value="@FormatoElementoSalao.Divisoria">Divisória / Parede</option>
+                            </select>
+                        </div>
+
+                        <!-- Identificação -->
                         <div class="mb-3">
                             <label class="form-label small fw-bold text-muted">Identificação:</label>
                             <input type="text" class="form-control form-control-sm" @bind="elementoSelecionado.Identificacao" />
                         </div>
 
+                        <!-- Capacidade -->
                         <div class="mb-3">
                             <label class="form-label small fw-bold text-muted">Capacidade (Lugares):</label>
-                            <input type="number" class="form-control form-control-sm" @bind="elementoSelecionado.Capacidade" min="0" max="50" />
+                            <input type="number" class="form-control form-control-sm" @bind="elementoSelecionado.Capacidade" min="0" max="100" />
                         </div>
 
-                        <div class="row g-2 mb-3">
-                            <div class="col-6">
-                                <label class="form-label small fw-bold text-muted">Posição X (%):</label>
-                                <input type="number" class="form-control form-control-sm" @bind="elementoSelecionado.PosX" step="1" min="0" max="95" />
+                        <!-- Controle de Rotação Completo -->
+                        <div class="mb-3 p-2 bg-light rounded border">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small fw-bold text-muted mb-0">Rotação:</label>
+                                <span class="badge bg-secondary">@(elementoSelecionado.Rotacao)°</span>
                             </div>
-                            <div class="col-6">
-                                <label class="form-label small fw-bold text-muted">Posição Y (%):</label>
-                                <input type="number" class="form-control form-control-sm" @bind="elementoSelecionado.PosY" step="1" min="0" max="95" />
+                            <input type="range" class="form-range" min="0" max="359" step="5"
+                                   @bind="elementoSelecionado.Rotacao" />
+
+                            <div class="btn-group btn-group-sm w-100 mt-1" role="group">
+                                <button type="button" class="btn btn-outline-secondary" @onclick="() => DefinirRotacao(elementoSelecionado, 0)">0°</button>
+                                <button type="button" class="btn btn-outline-secondary" @onclick="() => DefinirRotacao(elementoSelecionado, 90)">90°</button>
+                                <button type="button" class="btn btn-outline-secondary" @onclick="() => DefinirRotacao(elementoSelecionado, 180)">180°</button>
+                                <button type="button" class="btn btn-outline-secondary" @onclick="() => DefinirRotacao(elementoSelecionado, 270)">270°</button>
+                                <button type="button" class="btn btn-primary" title="Girar +45°" @onclick="() => RotacionarElemento45(elementoSelecionado)">+45°</button>
                             </div>
                         </div>
 
+                        <!-- Posição X e Y com Ajuste Fino -->
+                        <div class="mb-3 p-2 bg-light rounded border">
+                            <label class="form-label small fw-bold text-muted mb-1">Posicionamento no Salão (%):</label>
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <small class="text-muted">Pos X:</small>
+                                    <input type="number" class="form-control form-control-sm" @bind="elementoSelecionado.PosX" step="0.5" min="0" max="95" />
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted">Pos Y:</small>
+                                    <input type="number" class="form-control form-control-sm" @bind="elementoSelecionado.PosY" step="0.5" min="0" max="95" />
+                                </div>
+                            </div>
+                            <!-- D-Pad Nudge Buttons -->
+                            <div class="d-flex justify-content-center gap-1">
+                                <button type="button" class="btn btn-xs btn-outline-secondary px-2" title="Mover para Esquerda" @onclick="() => MoverElemento(elementoSelecionado, -1, 0)">
+                                    <i class="bi bi-arrow-left"></i>
+                                </button>
+                                <div class="d-flex flex-column gap-1">
+                                    <button type="button" class="btn btn-xs btn-outline-secondary px-2" title="Mover para Cima" @onclick="() => MoverElemento(elementoSelecionado, 0, -1)">
+                                        <i class="bi bi-arrow-up"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-xs btn-outline-secondary px-2" title="Mover para Baixo" @onclick="() => MoverElemento(elementoSelecionado, 0, 1)">
+                                        <i class="bi bi-arrow-down"></i>
+                                    </button>
+                                </div>
+                                <button type="button" class="btn btn-xs btn-outline-secondary px-2" title="Mover para Direita" @onclick="() => MoverElemento(elementoSelecionado, 1, 0)">
+                                    <i class="bi bi-arrow-right"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Dimensões Largura e Altura -->
                         <div class="row g-2 mb-3">
                             <div class="col-6">
                                 <label class="form-label small fw-bold text-muted">Largura (%):</label>
-                                <input type="number" class="form-control form-control-sm" @bind="elementoSelecionado.Largura" step="1" min="2" max="50" />
+                                <input type="number" class="form-control form-control-sm" @bind="elementoSelecionado.Largura" step="1" min="2" max="60" />
                             </div>
                             <div class="col-6">
                                 <label class="form-label small fw-bold text-muted">Altura (%):</label>
-                                <input type="number" class="form-control form-control-sm" @bind="elementoSelecionado.Altura" step="1" min="2" max="50" />
+                                <input type="number" class="form-control form-control-sm" @bind="elementoSelecionado.Altura" step="1" min="2" max="60" />
                             </div>
                         </div>
 
-                        <div class="d-flex gap-2 mb-3">
-                            <button class="btn btn-sm btn-outline-secondary w-50" @onclick="() => LayoutLogic.RotacionarElemento(elementoSelecionado)">
-                                <i class="bi bi-arrow-clockwise me-1"></i> Girar 90°
+                        <!-- Ações Rápidas do Painel -->
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => DuplicarElemento(elementoSelecionado)">
+                                <i class="bi bi-copy me-1"></i> Duplicar Elemento
                             </button>
-                            <button class="btn btn-sm btn-outline-danger w-50" @onclick="ExcluirElementoSelecionado">
-                                <i class="bi bi-trash me-1"></i> Excluir
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => ExcluirElemento(elementoSelecionado)">
+                                <i class="bi bi-trash me-1"></i> Excluir Elemento
                             </button>
                         </div>
                     }
@@ -171,9 +299,28 @@
 </div>
 
 <style>
-    .elemento-editor.selecionado {
+    .elemento-editor {
+        touch-action: none;
+    }
+
+    .elemento-editor.arrastando {
+        opacity: 0.92;
+        filter: drop-shadow(0 10px 15px rgba(0,0,0,0.3));
+        z-index: 99!important;
+    }
+
+    .elemento-editor.selecionado .elemento-corpo {
         box-shadow: 0 0 0 3px #fbbf24!important;
-        z-index: 20;
+    }
+
+    .barra-acoes-elemento button:hover {
+        transform: scale(1.15);
+        transition: transform 0.1s ease;
+    }
+
+    .alca-rotacao:hover {
+        transform: translateX(-50%) scale(1.2)!important;
+        transition: transform 0.15s ease;
     }
 </style>
 
@@ -198,15 +345,16 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (firstRender || dotNetRef == null)
         {
             dotNetRef = DotNetObjectReference.Create(this);
-            try
-            {
-                await JSRuntime.InvokeVoidAsync("JTSalaoLayout.iniciarEditor", dotNetRef, "editorCanvasContainer");
-            }
-            catch { }
         }
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("JTSalaoLayout.iniciarEditor", dotNetRef, "editorCanvasContainer");
+        }
+        catch { }
     }
 
     private async Task CarregarElementosAsync()
@@ -221,6 +369,115 @@
         elementoSelecionado = elem;
     }
 
+    private void DeselecionarCanvas()
+    {
+        // Se clicar no fundo vazio do canvas, desmarca seleção
+        elementoSelecionado = null;
+    }
+
+    [JSInvokable]
+    public void OnElementoSelecionadoJS(int elementoId)
+    {
+        var elem = elementosAmbiente.FirstOrDefault(e => e.Id == elementoId);
+        if (elem != null && elementoSelecionado?.Id != elem.Id)
+        {
+            elementoSelecionado = elem;
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public void OnElementoArrastado(int elementoId, double leftPercent, double topPercent)
+    {
+        var elem = elementosAmbiente.FirstOrDefault(e => e.Id == elementoId);
+        if (elem != null)
+        {
+            LayoutLogic.AjustarPosicaoComSnap(elem, leftPercent, topPercent, 0.5);
+            StateHasChanged();
+        }
+    }
+
+    private void RotacionarElemento(ElementoSalao elem)
+    {
+        LayoutLogic.RotacionarElemento(elem);
+        StateHasChanged();
+    }
+
+    private void RotacionarElemento45(ElementoSalao elem)
+    {
+        elem.Rotacao = (elem.Rotacao + 45) % 360;
+        StateHasChanged();
+    }
+
+    private void DefinirRotacao(ElementoSalao elem, int angulo)
+    {
+        elem.Rotacao = ((angulo % 360) + 360) % 360;
+        StateHasChanged();
+    }
+
+    private void MoverElemento(ElementoSalao elem, double deltaX, double deltaY)
+    {
+        elem.PosX = Math.Clamp(Math.Round(elem.PosX + deltaX, 1), 0, 100 - elem.Largura);
+        elem.PosY = Math.Clamp(Math.Round(elem.PosY + deltaY, 1), 0, 100 - elem.Altura);
+        StateHasChanged();
+    }
+
+    private void AjustarEscala(ElementoSalao elem, double fator)
+    {
+        elem.Largura = Math.Clamp(Math.Round(elem.Largura * fator, 1), 3, 60);
+        elem.Altura = Math.Clamp(Math.Round(elem.Altura * fator, 1), 3, 60);
+        StateHasChanged();
+    }
+
+    private void AlterarFormato(ElementoSalao elem, FormatoElementoSalao novoFormato)
+    {
+        elem.Formato = novoFormato;
+        var (larg, alt, cap) = LayoutLogic.ObterDimensoesPadrao(novoFormato);
+        elem.Largura = larg;
+        elem.Altura = alt;
+        if (elem.Capacidade == 0 || novoFormato == FormatoElementoSalao.PalcoCouvert || novoFormato == FormatoElementoSalao.Caixa || novoFormato == FormatoElementoSalao.Divisoria)
+        {
+            elem.Capacidade = cap;
+        }
+        StateHasChanged();
+    }
+
+    private void DuplicarElemento(ElementoSalao elem)
+    {
+        int proximoId = elementosAmbiente.Any() ? elementosAmbiente.Max(e => e.Id) + 1 : 1;
+        var clone = new ElementoSalao
+        {
+            Id = proximoId,
+            AmbienteId = elem.AmbienteId,
+            Identificacao = GerarNomeDuplicado(elem.Identificacao),
+            Formato = elem.Formato,
+            PosX = Math.Clamp(elem.PosX + 3, 0, 90),
+            PosY = Math.Clamp(elem.PosY + 3, 0, 90),
+            Largura = elem.Largura,
+            Altura = elem.Altura,
+            Rotacao = elem.Rotacao,
+            Capacidade = elem.Capacidade,
+            Status = StatusMesaConsts.Livre
+        };
+        elementosAmbiente.Add(clone);
+        elementoSelecionado = clone;
+        StateHasChanged();
+    }
+
+    private string GerarNomeDuplicado(string nomeAtual)
+    {
+        if (string.IsNullOrWhiteSpace(nomeAtual)) return "Mesa Nova";
+        var match = System.Text.RegularExpressions.Regex.Match(nomeAtual, @"^(.*?)(\d+)$");
+        if (match.Success)
+        {
+            string prefix = match.Groups[1].Value;
+            int num = int.Parse(match.Groups[2].Value) + 1;
+            int len = match.Groups[2].Value.Length;
+            return $"{prefix}{num.ToString().PadLeft(len, '0')}";
+        }
+        return $"{nomeAtual} (Cópia)";
+    }
+
     private void AdicionarElemento(FormatoElementoSalao formato, int capacidade)
     {
         int proximoNumero = elementosAmbiente.Count(e => e.Capacidade > 0) + 1;
@@ -228,7 +485,7 @@
         {
             FormatoElementoSalao.BalcaoBar => "Balcão Bar",
             FormatoElementoSalao.PalcoCouvert => "Palco Couvert",
-            FormatoElementoSalao.Caixa => "Caixa",
+            FormatoElementoSalao.Caixa => "Caixa / Recepção",
             FormatoElementoSalao.Divisoria => "Divisória",
             _ => $"Mesa {proximoNumero:00}"
         };
@@ -241,24 +498,42 @@
         elementoSelecionado = novo;
     }
 
-    private void ExcluirElementoSelecionado()
+    private void ExcluirElemento(ElementoSalao elem)
     {
-        if (elementoSelecionado != null)
+        elementosAmbiente.Remove(elem);
+        if (elementoSelecionado?.Id == elem.Id)
         {
-            elementosAmbiente.Remove(elementoSelecionado);
             elementoSelecionado = null;
         }
+        StateHasChanged();
     }
 
-    [JSInvokable]
-    public void OnElementoArrastado(int elementoId, double leftPercent, double topPercent)
+    private string ObterCorElemento(FormatoElementoSalao formato)
     {
-        var elem = elementosAmbiente.FirstOrDefault(e => e.Id == elementoId);
-        if (elem != null)
+        return formato switch
         {
-            LayoutLogic.AjustarPosicaoComSnap(elem, leftPercent, topPercent, 1.0);
-            StateHasChanged();
-        }
+            FormatoElementoSalao.MesaQuadrada => "#2563eb",
+            FormatoElementoSalao.MesaRedonda => "#1d4ed8",
+            FormatoElementoSalao.MesaRetangular => "#1e40af",
+            FormatoElementoSalao.BalcaoBar => "#059669",
+            FormatoElementoSalao.PalcoCouvert => "#7c3aed",
+            FormatoElementoSalao.Caixa => "#d97706",
+            FormatoElementoSalao.Divisoria => "#475569",
+            _ => "#3b82f6"
+        };
+    }
+
+    private string ObterFormatoEstilo(FormatoElementoSalao formato)
+    {
+        return formato switch
+        {
+            FormatoElementoSalao.MesaRedonda => "border-radius: 50%;",
+            FormatoElementoSalao.BalcaoBar => "border-radius: 12px;",
+            FormatoElementoSalao.PalcoCouvert => "border-radius: 10px;",
+            FormatoElementoSalao.Caixa => "border-radius: 8px;",
+            FormatoElementoSalao.Divisoria => "border-radius: 2px;",
+            _ => "border-radius: 8px;"
+        };
     }
 
     [Parameter] public EventCallback OnCancelar { get; set; }

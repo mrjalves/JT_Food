@@ -281,13 +281,21 @@
         try
         {
             var all = await ItemComandaService.GetAll();
+            string cid = Comanda.Id.ToString();
             itensComanda = (all ?? Enumerable.Empty<MItemComanda>())
-                .Where(i => i.ComandaId == Comanda.Id.ToString())
+                .Where(i => !string.IsNullOrWhiteSpace(i.ComandaId) &&
+                            (i.ComandaId == cid || i.ComandaId.Trim().TrimStart('#') == cid))
                 .OrderByDescending(i => i.Id)
                 .ToList();
         }
-        catch { }
-        carregandoItens = false;
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ModalComanda CarregarItensAsync Error]: {ex.Message}");
+        }
+        finally
+        {
+            carregandoItens = false;
+        }
         StateHasChanged();
     }
 

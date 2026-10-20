@@ -230,7 +230,8 @@
             {
                 var allItens = await ItemComandaService.GetAll();
                 itensMesa = (allItens ?? Enumerable.Empty<MItemComanda>())
-                    .Where(i => comandaIds.Contains(i.ComandaId))
+                    .Where(i => !string.IsNullOrWhiteSpace(i.ComandaId) &&
+                                (comandaIds.Contains(i.ComandaId) || comandaIds.Contains(i.ComandaId.Trim().TrimStart('#'))))
                     .OrderByDescending(i => i.Id)
                     .ToList();
             }
@@ -239,8 +240,14 @@
                 itensMesa.Clear();
             }
         }
-        catch { }
-        carregandoItens = false;
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ModalMesa CarregarItensConsumoAsync Error]: {ex.Message}");
+        }
+        finally
+        {
+            carregandoItens = false;
+        }
         StateHasChanged();
     }
 

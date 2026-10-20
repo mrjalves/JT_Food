@@ -27,8 +27,10 @@ namespace JT_Food.Shared
             services.AddScoped<JT_Servicos.Restaurante.ComandaService>();
             services.AddScoped<JT_Servicos.Restaurante.ProdutoRestauranteService>();
             services.AddScoped<JT_Servicos.Restaurante.CompraRestauranteService>();
-            services.AddScoped<JT_Servicos.Restaurante.ItemComandaService>();
-            services.AddScoped<JT_Servicos.Restaurante.AdicionaisItemComandaService>();
+            services.AddScoped<FoodItemComandaService>();
+            services.AddScoped<JT_Servicos.Restaurante.ItemComandaService>(sp => sp.GetRequiredService<FoodItemComandaService>());
+            services.AddScoped<FoodAdicionaisItemComandaService>();
+            services.AddScoped<JT_Servicos.Restaurante.AdicionaisItemComandaService>(sp => sp.GetRequiredService<FoodAdicionaisItemComandaService>());
             services.AddScoped<JT_Servicos.Restaurante.PagamentoComandaService>();
             services.AddScoped<FoodCaixaService>();
             services.AddScoped<JT_Servicos.Restaurante.CaixaService>(sp => sp.GetRequiredService<FoodCaixaService>());

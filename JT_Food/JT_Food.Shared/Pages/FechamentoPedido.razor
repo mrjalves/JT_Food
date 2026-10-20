@@ -371,8 +371,10 @@
             if (comanda != null)
             {
                 var allItens = await ItemComandaService.GetAll();
+                string cid = comanda.Id.ToString();
                 itens = (allItens ?? Enumerable.Empty<MItemComanda>())
-                    .Where(i => i.ComandaId == comanda.Id.ToString())
+                    .Where(i => !string.IsNullOrWhiteSpace(i.ComandaId) &&
+                                (i.ComandaId == cid || i.ComandaId.Trim().TrimStart('#') == cid))
                     .ToList();
 
                 var allAds = await AdicionaisItemComandaService.GetAll();

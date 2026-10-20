@@ -313,7 +313,10 @@
     private string ObterMesaDaComanda(string? comandaId)
     {
         if (string.IsNullOrEmpty(comandaId)) return "";
-        string mesa = mesaPorComanda.GetValueOrDefault(comandaId, "");
+        string limpo = comandaId.Trim().TrimStart('#');
+        string mesa = mesaPorComanda.GetValueOrDefault(comandaId, "") ?? "";
+        if (string.IsNullOrWhiteSpace(mesa))
+            mesa = mesaPorComanda.GetValueOrDefault(limpo, "") ?? "";
         if (string.IsNullOrWhiteSpace(mesa)) return "";
         return mesa.StartsWith("Mesa", StringComparison.OrdinalIgnoreCase) ? mesa : $"Mesa {mesa}";
     }

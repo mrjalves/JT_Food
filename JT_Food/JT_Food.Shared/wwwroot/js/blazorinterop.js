@@ -105,70 +105,130 @@ window.JTHotkeys.disableNewHotkeys = function () {
 // ==========================================
 window.JTSalaoLayout = (function () {
     let dotNetRef = null;
-    let draggingEl = null;
     let canvasEl = null;
-    let elemId = 0;
+    let activeElemId = null;
+    let draggingEl = null;
+    let isDragging = false;
+    let startX = 0, startY = 0;
+    let startLeft = 0, startTop = 0;
+    let hasMoved = false;
 
-    function onPointerMove(e) {
-        if (!draggingEl || !canvasEl) return;
-        e.preventDefault();
+    function handlePointerDown(e) {
+        // Ignora clique em botões de ação ou alças de rotação para não disparar drag
+        if (e.target.closest('.elem-action-btn') || e.target.closest('.alca-rotacao') || e.target.closest('button')) {
+            return;
+        }
 
-        const rect = canvasEl.getBoundingClientRect();
-        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+        const targetElem = e.target.closest('.elemento-editor');
+        if (!targetElem || !canvasEl) return;
 
-        if (!clientX || !clientY) return;
+        const idStr = targetElem.getAttribute('data-elem-id');
+        if (!idStr) return;
 
-        let x = ((clientX - rect.left) / rect.width) * 100;
-        let y = ((clientY - rect.top) / rect.height) * 100;
+        const id = parseInt(idStr, 10);
+        activeElemId = id;
+        draggingEl = targetElem;
+        isDragging = true;
+        hasMoved = false;
 
-        x = Math.max(0, Math.min(92, x));
-        y = Math.max(0, Math.min(92, y));
+        startX = e.clientX;
+        startY = e.clientY;
 
-        draggingEl.style.left = x.toFixed(2) + '%';
-        draggingEl.style.top = y.toFixed(2) + '%';
+        startLeft = parseFloat(targetElem.style.left) || 0;
+        startTop = parseFloat(targetElem.style.top) || 0;
+
+        try {
+            targetElem.setPointerCapture(e.pointerId);
+        } catch (_) {}
+
+        // Notifica Blazor sobre a seleção imediatamente
+        if (dotNetRef) {
+            try {
+                dotNetRef.invokeMethodAsync('OnElementoSelecionadoJS', id);
+            } catch (_) {}
+        }
     }
 
-    function onPointerUp(e) {
-        if (!draggingEl || !canvasEl) return;
+    function handlePointerMove(e) {
+        if (!isDragging || !draggingEl || !canvasEl) return;
 
-        const leftPercent = parseFloat(draggingEl.style.left) || 0;
-        const topPercent = parseFloat(draggingEl.style.top) || 0;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
 
-        if (dotNetRef && elemId) {
+        if (!hasMoved && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+            hasMoved = true;
+            draggingEl.classList.add('arrastando');
+        }
+
+        if (!hasMoved) return;
+
+        e.preventDefault();
+
+        const canvasRect = canvasEl.getBoundingClientRect();
+        if (canvasRect.width === 0 || canvasRect.height === 0) return;
+
+        const dxPercent = (dx / canvasRect.width) * 100;
+        const dyPercent = (dy / canvasRect.height) * 100;
+
+        const elemWidth = parseFloat(draggingEl.style.width) || 10;
+        const elemHeight = parseFloat(draggingEl.style.height) || 10;
+
+        let newLeft = startLeft + dxPercent;
+        let newTop = startTop + dyPercent;
+
+        // Limites da área do salão
+        newLeft = Math.max(0, Math.min(100 - elemWidth, newLeft));
+        newTop = Math.max(0, Math.min(100 - elemHeight, newTop));
+
+        // Snap sutil para 0.5%
+        newLeft = Math.round(newLeft * 2) / 2;
+        newTop = Math.round(newTop * 2) / 2;
+
+        draggingEl.style.left = newLeft.toFixed(1) + '%';
+        draggingEl.style.top = newTop.toFixed(1) + '%';
+    }
+
+    function handlePointerUp(e) {
+        if (!isDragging || !draggingEl) return;
+
+        try {
+            draggingEl.releasePointerCapture(e.pointerId);
+        } catch (_) {}
+
+        draggingEl.classList.remove('arrastando');
+
+        if (hasMoved && dotNetRef && activeElemId) {
+            const finalLeft = parseFloat(draggingEl.style.left) || 0;
+            const finalTop = parseFloat(draggingEl.style.top) || 0;
             try {
-                dotNetRef.invokeMethodAsync('OnElementoArrastado', elemId, leftPercent, topPercent);
+                dotNetRef.invokeMethodAsync('OnElementoArrastado', activeElemId, finalLeft, finalTop);
             } catch (err) {
                 console.error('Erro ao notificar Blazor sobre drag-and-drop:', err);
             }
         }
 
-        draggingEl.classList.remove('arrastando');
+        isDragging = false;
         draggingEl = null;
-        elemId = 0;
-
-        window.removeEventListener('pointermove', onPointerMove);
-        window.removeEventListener('pointerup', onPointerUp);
-        window.removeEventListener('touchmove', onPointerMove);
-        window.removeEventListener('touchend', onPointerUp);
+        activeElemId = null;
+        hasMoved = false;
     }
 
     return {
         iniciarEditor: function (refNet, canvasContainerId) {
             dotNetRef = refNet;
             canvasEl = document.getElementById(canvasContainerId);
-        },
-
-        iniciarArrasto: function (elementoId, domElement) {
             if (!canvasEl) return;
-            elemId = elementoId;
-            draggingEl = domElement;
-            draggingEl.classList.add('arrastando');
 
-            window.addEventListener('pointermove', onPointerMove, { passive: false });
-            window.addEventListener('pointerup', onPointerUp);
-            window.addEventListener('touchmove', onPointerMove, { passive: false });
-            window.addEventListener('touchend', onPointerUp);
+            // Remove ouvintes prévios para evitar duplicação em re-renders
+            canvasEl.removeEventListener('pointerdown', handlePointerDown);
+            window.removeEventListener('pointermove', handlePointerMove);
+            window.removeEventListener('pointerup', handlePointerUp);
+            window.removeEventListener('pointercancel', handlePointerUp);
+
+            canvasEl.addEventListener('pointerdown', handlePointerDown);
+            window.addEventListener('pointermove', handlePointerMove, { passive: false });
+            window.addEventListener('pointerup', handlePointerUp);
+            window.addEventListener('pointercancel', handlePointerUp);
         }
     };
 })();

@@ -7,22 +7,49 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using JT_Food.Shared.Domain.Entities;
 using JT_Food.Shared.Services.Interfaces;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Configuration;
 
 namespace JT_Food.Shared.Services.Implementations
 {
     public class GeminiRelatorioService : IIAAnalyticsService
     {
-        private readonly HttpClient _httpClient;
+        private readonly IHttpClientFactory? _httpClientFactory;
+        private readonly NavigationManager? _navigationManager;
+        private readonly HttpClient? _fallbackHttpClient;
         private readonly IConfiguration _configuration;
+        private HttpClient? _cleanHttpClient;
 
         public static string? CustomApiKey { get; set; }
         public static string CustomModel { get; set; } = "gemini-1.5-flash";
 
-        public GeminiRelatorioService(HttpClient httpClient, IConfiguration configuration)
+        public GeminiRelatorioService(
+            IConfiguration configuration,
+            IHttpClientFactory? httpClientFactory = null,
+            NavigationManager? navigationManager = null,
+            HttpClient? httpClient = null)
         {
-            _httpClient = httpClient;
             _configuration = configuration;
+            _httpClientFactory = httpClientFactory;
+            _navigationManager = navigationManager;
+            _fallbackHttpClient = httpClient;
+        }
+
+        private HttpClient ObterHttpClientLimpo()
+        {
+            if (_cleanHttpClient == null)
+            {
+                if (_httpClientFactory != null)
+                {
+                    try
+                    {
+                        _cleanHttpClient = _httpClientFactory.CreateClient("GeminiCleanClient");
+                    }
+                    catch { }
+                }
+                _cleanHttpClient ??= new HttpClient();
+            }
+            return _cleanHttpClient;
         }
 
         private string? ObterApiKey()
@@ -35,6 +62,66 @@ namespace JT_Food.Shared.Services.Implementations
                 ?? _configuration["AI:ApiKey"];
         }
 
+        private string TratarErroGoogleApi(System.Net.HttpStatusCode statusCode, string? responseJson)
+        {
+            string msgOriginal = "";
+            string reason = "";
+
+            if (!string.IsNullOrWhiteSpace(responseJson))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(responseJson);
+                    if (doc.RootElement.TryGetProperty("error", out var errorProp))
+                    {
+                        if (errorProp.TryGetProperty("message", out var mProp))
+                            msgOriginal = mProp.GetString() ?? "";
+
+                        if (errorProp.TryGetProperty("details", out var detailsProp) && detailsProp.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var d in detailsProp.EnumerateArray())
+                            {
+                                if (d.TryGetProperty("reason", out var rProp))
+                                {
+                                    reason = rProp.GetString() ?? "";
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            if (reason.Equals("API_KEY_INVALID", StringComparison.OrdinalIgnoreCase) ||
+                msgOriginal.Contains("API key not valid", StringComparison.OrdinalIgnoreCase) ||
+                msgOriginal.Contains("API_KEY_INVALID", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Chave de API inválida no Google Gemini. Por favor, gere ou verifique sua chave no Google AI Studio (aistudio.google.com/app/apikey).";
+            }
+
+            if (reason.Equals("RESOURCE_EXHAUSTED", StringComparison.OrdinalIgnoreCase) ||
+                statusCode == System.Net.HttpStatusCode.TooManyRequests ||
+                msgOriginal.Contains("quota", StringComparison.OrdinalIgnoreCase) ||
+                msgOriginal.Contains("exhausted", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Cota de requisições temporariamente excedida no Google Gemini. O sistema usará o motor inteligente embutido até a cota normalizar.";
+            }
+
+            if (reason.Equals("PERMISSION_DENIED", StringComparison.OrdinalIgnoreCase) ||
+                statusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                return "Permissão negada pela API do Google. Certifique-se de que a API Generative Language está habilitada no seu projeto Google Cloud / AI Studio.";
+            }
+
+            if (!string.IsNullOrWhiteSpace(msgOriginal))
+            {
+                return $"Google API ({(int)statusCode}): {msgOriginal}";
+            }
+
+            return $"Erro ao comunicar com a API do Google Gemini (Status: {(int)statusCode} - {statusCode}).";
+        }
+
         public async Task<(bool Sucesso, string Mensagem, List<GeminiModelInfo> Modelos)> IdentificarModelosDisponiveisAsync(string apiKey)
         {
             if (string.IsNullOrWhiteSpace(apiKey))
@@ -42,30 +129,56 @@ namespace JT_Food.Shared.Services.Implementations
                 return (false, "Informe a Google Gemini API Key antes de identificar os modelos.", new List<GeminiModelInfo>());
             }
 
+            string key = apiKey.Trim();
+            string googleEndpoint = $"https://generativelanguage.googleapis.com/v1beta/models?key={Uri.EscapeDataString(key)}";
+
+            HttpResponseMessage? response = null;
+            string? responseJson = null;
+
+            // 1. Tentar consulta direta usando HttpClient limpo (sem cabeçalhos customizados que causam bloqueio CORS)
             try
             {
-                string endpoint = $"https://generativelanguage.googleapis.com/v1beta/models?key={apiKey.Trim()}";
-                var response = await _httpClient.GetAsync(endpoint);
-
-                if (!response.IsSuccessStatusCode)
+                var client = ObterHttpClientLimpo();
+                response = await client.GetAsync(googleEndpoint);
+                responseJson = await response.Content.ReadAsStringAsync();
+            }
+            catch (Exception exDirect)
+            {
+                // 2. Fallback: Se o navegador bloquear o domínio externo (adblocker/CORS/firewall), tentar via proxy do servidor
+                if (_navigationManager != null && !string.IsNullOrWhiteSpace(_navigationManager.BaseUri))
                 {
-                    var errContent = await response.Content.ReadAsStringAsync();
-                    string msg = $"Erro na API do Google ({response.StatusCode})";
                     try
                     {
-                        using var errDoc = JsonDocument.Parse(errContent);
-                        if (errDoc.RootElement.TryGetProperty("error", out var errorProp) &&
-                            errorProp.TryGetProperty("message", out var messageProp))
-                        {
-                            msg = messageProp.GetString() ?? msg;
-                        }
+                        string proxyUrl = $"{_navigationManager.BaseUri.TrimEnd('/')}/api/gemini/models?key={Uri.EscapeDataString(key)}";
+                        var proxyClient = ObterHttpClientLimpo();
+                        response = await proxyClient.GetAsync(proxyUrl);
+                        responseJson = await response.Content.ReadAsStringAsync();
                     }
-                    catch { }
-                    return (false, $"Falha ao consultar modelos da chave: {msg}", new List<GeminiModelInfo>());
+                    catch
+                    {
+                        return (false, $"Erro de conexão ao identificar modelos: {exDirect.Message}", new List<GeminiModelInfo>());
+                    }
                 }
+                else
+                {
+                    return (false, $"Erro de conexão ao identificar modelos: {exDirect.Message}", new List<GeminiModelInfo>());
+                }
+            }
 
-                var jsonStr = await response.Content.ReadAsStringAsync();
-                using var doc = JsonDocument.Parse(jsonStr);
+            if (response != null && !response.IsSuccessStatusCode)
+            {
+                string erroTraduzido = TratarErroGoogleApi(response.StatusCode, responseJson);
+                return (false, erroTraduzido, new List<GeminiModelInfo>());
+            }
+
+            if (string.IsNullOrWhiteSpace(responseJson))
+            {
+                return (false, "Resposta vazia recebida do serviço Gemini.", new List<GeminiModelInfo>());
+            }
+
+            try
+            {
+                using var doc = JsonDocument.Parse(responseJson);
                 var modelos = new List<GeminiModelInfo>();
 
                 if (doc.RootElement.TryGetProperty("models", out var modelsElement) && modelsElement.ValueKind == JsonValueKind.Array)
@@ -126,7 +239,7 @@ namespace JT_Food.Shared.Services.Implementations
             }
             catch (Exception ex)
             {
-                return (false, $"Erro de conexão ao identificar modelos: {ex.Message}", new List<GeminiModelInfo>());
+                return (false, $"Erro ao processar catálogo de modelos: {ex.Message}", new List<GeminiModelInfo>());
             }
         }
 
@@ -138,7 +251,7 @@ namespace JT_Food.Shared.Services.Implementations
                 try
                 {
                     string modelo = !string.IsNullOrWhiteSpace(CustomModel) ? CustomModel : "gemini-1.5-flash";
-                    string endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={apiKey}";
+                    string endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={Uri.EscapeDataString(apiKey.Trim())}";
 
                     var requestBody = new
                     {
@@ -159,20 +272,45 @@ namespace JT_Food.Shared.Services.Implementations
                         }
                     };
 
-                    var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
-                    var response = await _httpClient.PostAsync(endpoint, content);
-                    if (response.IsSuccessStatusCode)
+                    var jsonBody = JsonSerializer.Serialize(requestBody);
+                    HttpResponseMessage? response = null;
+
+                    try
+                    {
+                        var client = ObterHttpClientLimpo();
+                        using var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+                        response = await client.PostAsync(endpoint, content);
+                    }
+                    catch
+                    {
+                        // Fallback via proxy local se direto falhar
+                        if (_navigationManager != null && !string.IsNullOrWhiteSpace(_navigationManager.BaseUri))
+                        {
+                            try
+                            {
+                                string proxyUrl = $"{_navigationManager.BaseUri.TrimEnd('/')}/api/gemini/generate?key={Uri.EscapeDataString(apiKey.Trim())}&model={Uri.EscapeDataString(modelo)}";
+                                var proxyClient = ObterHttpClientLimpo();
+                                using var proxyContent = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+                                response = await proxyClient.PostAsync(proxyUrl, proxyContent);
+                            }
+                            catch { }
+                        }
+                    }
+
+                    if (response != null && response.IsSuccessStatusCode)
                     {
                         var jsonStr = await response.Content.ReadAsStringAsync();
                         using var doc = JsonDocument.Parse(jsonStr);
-                        var text = doc.RootElement
-                            .GetProperty("candidates")[0]
-                            .GetProperty("content")
-                            .GetProperty("parts")[0]
-                            .GetProperty("text")
-                            .GetString();
-
-                        if (!string.IsNullOrWhiteSpace(text)) return text;
+                        if (doc.RootElement.TryGetProperty("candidates", out var candProp) &&
+                            candProp.GetArrayLength() > 0 &&
+                            candProp[0].TryGetProperty("content", out var contentProp) &&
+                            contentProp.TryGetProperty("parts", out var partsProp) &&
+                            partsProp.GetArrayLength() > 0 &&
+                            partsProp[0].TryGetProperty("text", out var textProp))
+                        {
+                            var text = textProp.GetString();
+                            if (!string.IsNullOrWhiteSpace(text)) return text;
+                        }
                     }
                 }
                 catch

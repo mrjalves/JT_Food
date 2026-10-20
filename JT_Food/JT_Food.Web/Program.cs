@@ -38,6 +38,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 });
 
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("GeminiCleanClient");
 builder.Services.AddScoped(sp =>
 {
     var factory = sp.GetRequiredService<IHttpClientFactory>();
@@ -96,6 +97,21 @@ if (!string.IsNullOrWhiteSpace(stringConexao))
         Console.WriteLine($"[MIGRACAO][ERRO] Falha na migração automática: {ex.Message}");
         Console.WriteLine("[MIGRACAO][AVISO] A aplicação continuará normalmente. Verifique o schema manualmente se necessário.");
     }
+
+    try
+    {
+        var migrador = new JT_Infra_Data.Schemas.DbSchemaMigrator(stringConexao);
+        migrador.AplicarMigracoes(new List<Type>
+        {
+            typeof(JT_Classes.Restaurante.MItemComanda),
+            typeof(JT_Classes.Restaurante.MAdicionaisItemComanda)
+        });
+        Console.WriteLine("[MIGRACAO][ITENS] Tabelas FoodItensComanda e FoodAdicionaisItemComanda migradas/verificadas com sucesso.");
+    }
+    catch (Exception exMig)
+    {
+        Console.WriteLine($"[MIGRACAO][ITENS] Aviso ao migrar tabelas de itens: {exMig.Message}");
+    }
 }
 
 var app = builder.Build();
@@ -130,6 +146,51 @@ app.Use(async (context, next) =>
 app.UseRouting();
 app.UseAntiforgery();
 app.MapStaticAssets();
+
+app.MapGet("/api/gemini/models", async (string? key, IHttpClientFactory factory) =>
+{
+    if (string.IsNullOrWhiteSpace(key))
+    {
+        return Results.BadRequest(new { error = new { message = "Chave de API não informada.", reason = "API_KEY_INVALID" } });
+    }
+
+    try
+    {
+        var client = factory.CreateClient("GeminiCleanClient");
+        var response = await client.GetAsync($"https://generativelanguage.googleapis.com/v1beta/models?key={Uri.EscapeDataString(key.Trim())}");
+        var content = await response.Content.ReadAsStringAsync();
+        return Results.Content(content, "application/json", statusCode: (int)response.StatusCode);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapPost("/api/gemini/generate", async (string? key, string? model, HttpContext context, IHttpClientFactory factory) =>
+{
+    if (string.IsNullOrWhiteSpace(key))
+    {
+        return Results.BadRequest(new { error = new { message = "Chave de API não informada.", reason = "API_KEY_INVALID" } });
+    }
+
+    try
+    {
+        string modelo = !string.IsNullOrWhiteSpace(model) ? model : "gemini-1.5-flash";
+        var client = factory.CreateClient("GeminiCleanClient");
+        using var reader = new StreamReader(context.Request.Body);
+        var body = await reader.ReadToEndAsync();
+        using var content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
+
+        var response = await client.PostAsync($"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={Uri.EscapeDataString(key.Trim())}", content);
+        var resContent = await response.Content.ReadAsStringAsync();
+        return Results.Content(resContent, "application/json", statusCode: (int)response.StatusCode);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
