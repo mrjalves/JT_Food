@@ -49,13 +49,13 @@
     private void NovaComanda()
     {
         comandaSelecionada = new Comanda { UserId = "1", DataAbertura = DateTime.UtcNow };
-        modalComanda.Open("dados");
+        modalComanda.Open(comandaSelecionada, "dados");
     }
 
     private void EditarComanda(Comanda c)
     {
         comandaSelecionada = c;
-        modalComanda.Open("pedidos");
+        modalComanda.Open(comandaSelecionada, "pedidos");
     }
 
     private async Task ExcluirComanda(Comanda c)

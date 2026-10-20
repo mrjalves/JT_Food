@@ -102,13 +102,13 @@
     private void NovaMesa()
     {
         mesaSelecionada = new JT_Classes.Restaurante.Mesa();
-        modalMesa.Open("dados");
+        modalMesa.Open(mesaSelecionada, "dados");
     }
 
     private void EditarMesa(JT_Classes.Restaurante.Mesa mesa)
     {
         mesaSelecionada = mesa;
-        modalMesa.Open("comandas");
+        modalMesa.Open(mesaSelecionada, "comandas");
     }
 
     private async Task ExcluirMesa(JT_Classes.Restaurante.Mesa mesa)
@@ -138,7 +138,7 @@
         }
 
         mesaSelecionada = mesaCorrespondente;
-        modalMesa.Open("comandas");
+        modalMesa.Open(mesaSelecionada, "comandas");
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

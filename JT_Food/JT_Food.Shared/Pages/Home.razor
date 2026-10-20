@@ -42,17 +42,17 @@
 
     <!-- 1. KPIs de Topo -->
     <div class="row g-3 mb-4">
-        <!-- Faturamento Líquido -->
+        <!-- Faturamento Líquido / Consumo Total -->
         <div class="col-12 col-sm-6 col-xl-3">
             <div class="card border-0 shadow-sm h-100 kpi-card bg-gradient-primary text-white p-3">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
-                        <small class="text-white-50 text-uppercase fw-bold">Faturamento Líquido</small>
-                        <h3 class="fw-bold mt-1 mb-0">R$ @faturamentoLiquido.ToString("F2")</h3>
-                        <small class="text-white-50">Bruto: R$ @faturamentoBruto.ToString("F2")</small>
+                        <small class="text-white-50 text-uppercase fw-bold">Consumo & Faturamento</small>
+                        <h3 class="fw-bold mt-1 mb-0">R$ @faturamentoTotalDia.ToString("F2")</h3>
+                        <small class="text-white-50">Recebido: R$ @faturamentoLiquido.ToString("F2") | Aberto: R$ @consumoAberto.ToString("F2")</small>
                     </div>
-                    <div class="kpi-icon bg-white bg-opacity-20 rounded-circle p-2">
-                        <i class="bi bi-cash-coin fs-3"></i>
+                    <div class="kpi-icon-circle">
+                        <i class="bi bi-cash-coin"></i>
                     </div>
                 </div>
             </div>
@@ -63,12 +63,12 @@
             <div class="card border-0 shadow-sm h-100 kpi-card bg-gradient-success text-white p-3">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
-                        <small class="text-white-50 text-uppercase fw-bold">Ticket Médio</small>
+                        <small class="text-white-50 text-uppercase fw-bold">Ticket Médio Geral</small>
                         <h3 class="fw-bold mt-1 mb-0">R$ @ticketMedio.ToString("F2")</h3>
-                        <small class="text-white-50">@totalComandasFechadas comanda(s) encerrada(s)</small>
+                        <small class="text-white-50">@totalComandasFechadas fechada(s) | @comandasAbertas.Count em atendimento</small>
                     </div>
-                    <div class="kpi-icon bg-white bg-opacity-20 rounded-circle p-2">
-                        <i class="bi bi-receipt fs-3"></i>
+                    <div class="kpi-icon-circle">
+                        <i class="bi bi-receipt"></i>
                     </div>
                 </div>
             </div>
@@ -79,12 +79,12 @@
             <div class="card border-0 shadow-sm h-100 kpi-card bg-gradient-info text-white p-3">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
-                        <small class="text-white-50 text-uppercase fw-bold">Couvert & Taxas</small>
+                        <small class="text-white-50 text-uppercase fw-bold">Couvert & Serviços</small>
                         <h3 class="fw-bold mt-1 mb-0">R$ @totalCouvertETaxas.ToString("F2")</h3>
-                        <small class="text-white-50">Música ao Vivo & Serviços</small>
+                        <small class="text-white-50">Música ao Vivo & 10% Serviço</small>
                     </div>
-                    <div class="kpi-icon bg-white bg-opacity-20 rounded-circle p-2">
-                        <i class="bi bi-music-note-beamed fs-3"></i>
+                    <div class="kpi-icon-circle">
+                        <i class="bi bi-music-note-beamed"></i>
                     </div>
                 </div>
             </div>
@@ -99,8 +99,8 @@
                         <h3 class="fw-bold mt-1 mb-0">@taxaOcupacaoPercentual%</h3>
                         <small class="text-muted">@mesasOcupadas / @totalMesas mesas ocupadas</small>
                     </div>
-                    <div class="kpi-icon bg-dark bg-opacity-10 rounded-circle p-2">
-                        <i class="bi bi-grid-3x3-gap-fill fs-3"></i>
+                    <div class="kpi-icon-circle-dark">
+                        <i class="bi bi-grid-3x3-gap-fill"></i>
                     </div>
                 </div>
             </div>
@@ -152,7 +152,121 @@
         </div>
     </div>
 
-    <!-- 3. Painel de Relatório com IA -->
+    <!-- 3. Operação em Tempo Real: Pedidos Recentes & Comandas no Salão -->
+    <div class="row g-3 mb-4">
+        <!-- Últimos Pedidos Lançados -->
+        <div class="col-12 col-xl-7">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold text-dark mb-0 fs-6">
+                        <i class="bi bi-clock-history text-primary me-2"></i>Últimos Pedidos Lançados em Tempo Real
+                    </h5>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="CarregarMetricasAsync">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Atualizar
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    @if (!ultimosItensPedidos.Any())
+                    {
+                        <div class="text-center py-5 text-muted">
+                            <i class="bi bi-inbox fs-1 opacity-25"></i>
+                            <p class="mt-2 mb-0">Nenhum pedido registrado hoje ainda.</p>
+                            <small>Os pedidos lançados aparecerão aqui em tempo real.</small>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light small">
+                                    <tr>
+                                        <th>Item</th>
+                                        <th class="text-center">Qtd</th>
+                                        <th class="text-end">Valor</th>
+                                        <th class="text-center">Comanda</th>
+                                        <th class="text-center">Status KDS</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in ultimosItensPedidos.Take(8))
+                                    {
+                                        <tr>
+                                            <td class="fw-bold text-dark">
+                                                @item.NomeProduto
+                                                @if (!string.IsNullOrWhiteSpace(item.Observacao))
+                                                {
+                                                    <small class="d-block text-muted fw-normal">Obs: @item.Observacao</small>
+                                                }
+                                            </td>
+                                            <td class="text-center"><span class="badge bg-secondary">@item.Quantidade</span></td>
+                                            <td class="text-end fw-bold text-success">R$ @item.TotalItem.ToString("F2")</td>
+                                            <td class="text-center">
+                                                <span class="badge bg-light text-dark border">Comanda #@item.ComandaId</span>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge @ObterClasseStatusItem(item.Status)">@item.Status</span>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Comandas Abertas em Atendimento -->
+        <div class="col-12 col-xl-5">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold text-dark mb-0 fs-6">
+                        <i class="bi bi-people-fill text-success me-2"></i>Comandas Abertas no Salão (@comandasAbertas.Count)
+                    </h5>
+                    <button class="btn btn-sm btn-link text-primary p-0 text-decoration-none" @onclick='() => Navigation.NavigateTo("/comandas")'>
+                        Ver Todas
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    @if (!comandasAbertas.Any())
+                    {
+                        <div class="text-center py-5 text-muted">
+                            <i class="bi bi-check2-circle fs-1 text-success opacity-50"></i>
+                            <p class="mt-2 mb-0">Nenhuma comanda aberta no momento.</p>
+                            <small>Todas as mesas estão livres ou contas liquidadas.</small>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var c in comandasAbertas.Take(6))
+                            {
+                                <div class="list-group-item d-flex justify-content-between align-items-center p-3">
+                                    <div>
+                                        <div class="fw-bold text-dark">
+                                            @(string.IsNullOrWhiteSpace(c.NomeCliente) ? $"Comanda #{c.Id}" : c.NomeCliente)
+                                        </div>
+                                        <small class="text-muted">
+                                            <i class="bi bi-geo-alt me-1"></i>@(string.IsNullOrWhiteSpace(c.MesaId) ? "Balcão" : c.MesaId)
+                                            <span class="ms-2">Aberta às @c.DataAbertura.ToString("HH:mm")</span>
+                                        </small>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="fw-bold text-primary d-block fs-6">R$ @c.Total.ToString("F2")</span>
+                                        <button class="btn btn-sm btn-outline-primary py-0 px-2 mt-1" @onclick='() => Navigation.NavigateTo($"/fechamento/{c.Id}")' style="font-size: 0.75rem;">
+                                            Fechar
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Painel de Relatório com IA -->
     <div class="row mb-4">
         <div class="col-12">
             <PainelRelatorioIA />
@@ -216,17 +330,45 @@
         transform: translateY(-3px);
         box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1)!important;
     }
+    .kpi-icon-circle {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background-color: rgba(255, 255, 255, 0.22);
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        flex-shrink: 0;
+    }
+    .kpi-icon-circle-dark {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background-color: rgba(0, 0, 0, 0.12);
+        color: #1f2937;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        flex-shrink: 0;
+    }
 </style>
 
 @code {
     private double faturamentoBruto = 0;
     private double faturamentoLiquido = 0;
+    private double consumoAberto = 0;
+    private double faturamentoTotalDia = 0;
     private double ticketMedio = 0;
     private int totalComandasFechadas = 0;
     private double totalCouvertETaxas = 0;
     private int totalMesas = 0;
     private int mesasOcupadas = 0;
     private int taxaOcupacaoPercentual = 0;
+    private List<JT_Classes.Restaurante.Comanda> comandasAbertas = new();
+    private List<MItemComanda> ultimosItensPedidos = new();
 
     private UsuarioOperador usuarioAtual = new();
     private bool modalPinAberto = false;
@@ -258,11 +400,38 @@
 
         var comandas = await ComandaService.GetAll() ?? new();
         var fechadas = comandas.Where(c => c.Status == "Fechada").ToList();
+        comandasAbertas = comandas.Where(c => c.Status != "Fechada" && c.Status != "Cancelada").OrderByDescending(c => c.Id).ToList();
+
         totalComandasFechadas = fechadas.Count;
         faturamentoLiquido = fechadas.Sum(c => c.Total);
         faturamentoBruto = fechadas.Sum(c => c.Total + c.Desconto);
-        ticketMedio = totalComandasFechadas > 0 ? faturamentoLiquido / totalComandasFechadas : 0;
-        totalCouvertETaxas = fechadas.Sum(c => c.TaxaServico);
+        consumoAberto = comandasAbertas.Sum(c => c.Total);
+        faturamentoTotalDia = faturamentoLiquido + consumoAberto;
+
+        int totalAtendidas = totalComandasFechadas + comandasAbertas.Count;
+        ticketMedio = totalAtendidas > 0 ? faturamentoTotalDia / totalAtendidas : 0;
+        totalCouvertETaxas = fechadas.Sum(c => c.TaxaServico) + comandasAbertas.Sum(c => c.TaxaServico);
+
+        try
+        {
+            var itens = await ItemComandaService.GetAll();
+            ultimosItensPedidos = itens?.OrderByDescending(i => i.Id).ToList() ?? new();
+        }
+        catch { }
+    }
+
+    private string ObterClasseStatusItem(string status)
+    {
+        return status switch
+        {
+            "Confirmado" => "bg-primary",
+            "Em Produção" => "bg-warning text-dark",
+            "Pronto" => "bg-info text-dark",
+            "Saída para Entrega" => "bg-secondary",
+            "Entregue" => "bg-success",
+            "Cancelado" => "bg-danger",
+            _ => "bg-secondary"
+        };
     }
 
     private void AbrirModalPin()

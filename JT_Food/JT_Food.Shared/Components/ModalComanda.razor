@@ -7,20 +7,26 @@
 @using JT_UserInterface.Shared.Components.Core
 @inject MesaService MesaService
 @inject IComandaService ComandaService
+@inject ItemComandaService ItemComandaService
 
-<Modal @ref="modalRef" Title="@(Comanda.Id == 0 ? "Abertura de Nova Comanda" : $"Comanda #{Comanda.Id} — {Comanda.NomeCliente}")" EntidadeContexto="Comanda">
+<Modal @ref="modalRef" Title="@(Comanda.Id == 0 ? "Abertura de Nova Comanda" : $"Comanda #{Comanda.Id} — {Comanda.NomeCliente}")" Size="Modal.ModalSize.ExtraLarge" EntidadeContexto="Comanda">
     <BodyContent>
         @if (Comanda.Id > 0)
         {
             <ul class="nav nav-tabs mb-3">
                 <li class="nav-item">
-                    <button class="nav-link @(abaAtiva == "dados" ? "active fw-bold" : "")" @onclick='() => abaAtiva = "dados"'>
+                    <button class="nav-link @(abaAtiva == "dados" ? "active fw-bold" : "")" @onclick='() => MudarAba("dados")'>
                         <i class="bi bi-info-circle me-1"></i> Dados & Couvert
                     </button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link @(abaAtiva == "pedidos" ? "active fw-bold text-primary" : "")" @onclick='() => abaAtiva = "pedidos"'>
+                    <button class="nav-link @(abaAtiva == "pedidos" ? "active fw-bold text-primary" : "")" @onclick='() => MudarAba("pedidos")'>
                         <i class="bi bi-cart-plus me-1"></i> Lançar Pedidos
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link @(abaAtiva == "itens" ? "active fw-bold text-success" : "")" @onclick='() => MudarAba("itens")'>
+                        <i class="bi bi-receipt me-1"></i> Itens Pedidos (@itensComanda.Count)
                     </button>
                 </li>
             </ul>
@@ -31,6 +37,75 @@
             <LancamentoRapido MesaIdentificacao="@Comanda.MesaId"
                               ComandaAtiva="comandaParaPedido"
                               OnPedidoEnviado="HandlePedidoEnviado" />
+        }
+        else if (abaAtiva == "itens" && Comanda.Id > 0)
+        {
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                    <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-receipt text-primary me-2"></i>Itens Registrados nesta Comanda</h6>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="CarregarItensAsync">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Atualizar Itens
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    @if (carregandoItens)
+                    {
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+                            <span class="text-muted ms-2">Carregando itens...</span>
+                        </div>
+                    }
+                    else if (!itensComanda.Any())
+                    {
+                        <div class="text-center py-5 text-muted">
+                            <i class="bi bi-cart-x fs-1 opacity-25"></i>
+                            <p class="mt-2 mb-0">Nenhum item lançado ainda nesta comanda.</p>
+                            <button class="btn btn-sm btn-primary mt-3" @onclick='() => MudarAba("pedidos")'>
+                                <i class="bi bi-cart-plus me-1"></i> Adicionar Produtos
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Produto</th>
+                                        <th class="text-center">Qtd</th>
+                                        <th class="text-end">Preço Unit.</th>
+                                        <th class="text-end">Total</th>
+                                        <th class="text-center">Status KDS</th>
+                                        <th>Observações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in itensComanda)
+                                    {
+                                        <tr>
+                                            <td class="fw-bold text-dark">@item.NomeProduto</td>
+                                            <td class="text-center"><span class="badge bg-secondary">@item.Quantidade</span></td>
+                                            <td class="text-end text-muted">R$ @item.PrecoUnitario.ToString("F2")</td>
+                                            <td class="text-end fw-bold text-success">R$ @item.TotalItem.ToString("F2")</td>
+                                            <td class="text-center">
+                                                <span class="badge @ObterClasseStatusItem(item.Status)">@item.Status</span>
+                                            </td>
+                                            <td class="small text-muted">@(string.IsNullOrWhiteSpace(item.Observacao) ? "-" : item.Observacao)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot class="table-light fw-bold">
+                                    <tr>
+                                        <td colspan="3" class="text-end">Subtotal de Produtos:</td>
+                                        <td class="text-end text-success fs-6">R$ @itensComanda.Sum(i => i.TotalItem).ToString("F2")</td>
+                                        <td colspan="2"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
         }
         else
         {
@@ -127,6 +202,8 @@
     private double valorCouvertUnitario = 15.00;
 
     private JT_Food.Shared.Domain.Entities.Comanda? comandaParaPedido;
+    private List<MItemComanda> itensComanda = new();
+    private bool carregandoItens = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -134,8 +211,13 @@
         mesas = todas ?? new();
     }
 
-    public void Open(string aba = "dados")
+    public void Open(JT_Classes.Restaurante.Comanda? comanda = null, string aba = "dados")
     {
+        if (comanda != null)
+        {
+            Comanda = comanda;
+        }
+
         abaAtiva = Comanda.Id == 0 ? "dados" : aba;
 
         // Extrai dados se já formatado
@@ -146,6 +228,11 @@
             var parts = nomeCliente.Split(']');
             numeroCartao = parts[0].Replace("[Cartão ", "").Trim();
             nomeCliente = parts.Length > 1 ? parts[1].Trim() : "";
+        }
+        else if (nomeCliente.StartsWith("Cartão #"))
+        {
+            numeroCartao = nomeCliente.Replace("Cartão #", "").Trim();
+            nomeCliente = "";
         }
 
         cobrarCouvert = Comanda.TaxaServico > 0;
@@ -160,6 +247,7 @@
                 MesaId = Comanda.MesaId,
                 Subtotal = Comanda.Total
             };
+            _ = CarregarItensAsync();
         }
 
         modalRef.Open();
@@ -167,6 +255,29 @@
 
     public void Close() => modalRef.Close();
     public bool IsOpen => modalRef.IsOpen;
+
+    private async Task MudarAba(string aba)
+    {
+        abaAtiva = aba;
+        if (aba == "itens")
+        {
+            await CarregarItensAsync();
+        }
+    }
+
+    private async Task CarregarItensAsync()
+    {
+        if (Comanda.Id <= 0) return;
+        carregandoItens = true;
+        try
+        {
+            var itens = await ItemComandaService.Find($"ComandaId = '{Comanda.Id}'");
+            itensComanda = itens?.OrderByDescending(i => i.Id).ToList() ?? new();
+        }
+        catch { }
+        carregandoItens = false;
+        StateHasChanged();
+    }
 
     public async Task SalvarAsync()
     {
@@ -210,6 +321,34 @@
 
     private async Task HandlePedidoEnviado()
     {
+        if (Comanda.Id > 0)
+        {
+            var cAtualizada = await ComandaService.GetByIdAsync(Comanda.Id);
+            if (cAtualizada != null)
+            {
+                Comanda = cAtualizada;
+                if (comandaParaPedido != null)
+                {
+                    comandaParaPedido.Subtotal = cAtualizada.Total;
+                }
+            }
+            await CarregarItensAsync();
+        }
         await OnSaved.InvokeAsync();
+        StateHasChanged();
+    }
+
+    private string ObterClasseStatusItem(string status)
+    {
+        return status switch
+        {
+            "Confirmado" => "bg-primary",
+            "Em Produção" => "bg-warning text-dark",
+            "Pronto" => "bg-info text-dark",
+            "Saída para Entrega" => "bg-secondary",
+            "Entregue" => "bg-success",
+            "Cancelado" => "bg-danger",
+            _ => "bg-secondary"
+        };
     }
 }

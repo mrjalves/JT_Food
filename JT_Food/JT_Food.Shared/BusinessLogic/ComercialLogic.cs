@@ -107,6 +107,19 @@ namespace JT_Food.Shared.BusinessLogic
             if (comandaDestino == null)
                 return (false, "Nenhuma comanda ou mesa especificada para lançar o pedido.", null);
 
+            // Garante que a mesa vinculada ao pedido ou à comanda passe para status Ocupada
+            string? mesaVinculada = !string.IsNullOrWhiteSpace(mesaIdentificacao) ? mesaIdentificacao : comandaDestino.MesaId;
+            if (!string.IsNullOrWhiteSpace(mesaVinculada))
+            {
+                var mesas = await _mesaService.Find($"Identificacao = '{mesaVinculada}'");
+                var mesa = mesas?.FirstOrDefault();
+                if (mesa != null && mesa.Status != StatusMesaConsts.Ocupada)
+                {
+                    mesa.Status = StatusMesaConsts.Ocupada;
+                    await _mesaService.SaveAsync(mesa);
+                }
+            }
+
             // 2. Montar objeto de Pedido e validar promoções/regras
             var regras = await _cardapioService.ObterRegrasPromocaoAsync(apenasAtivas: true);
             var (temCombo, descontoCombo) = _promocaoLogic.CalcularDescontoCombo(itens, regras);
