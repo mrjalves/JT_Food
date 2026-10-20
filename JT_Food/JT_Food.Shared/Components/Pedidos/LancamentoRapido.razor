@@ -6,6 +6,8 @@
 @inject ICardapioService CardapioService
 @inject ComercialLogic ComercialLogic
 @inject IComandaService ComandaService
+@inject CaixaLogic CaixaLogic
+@inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
 
 <div class="lancamento-rapido card border-0 shadow-sm">
@@ -26,6 +28,22 @@
             </button>
         }
     </div>
+
+    @if (!caixaAberto)
+    {
+        <div class="alert alert-warning border-warning m-3 d-flex align-items-center justify-content-between p-3 shadow-sm rounded-3">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-exclamation-triangle-fill text-warning fs-4"></i>
+                <div>
+                    <strong class="d-block text-dark">Caixa Fechado</strong>
+                    <span class="text-muted small">Não é possível lançar novos pedidos com o caixa fechado. Abra um turno de caixa para continuar.</span>
+                </div>
+            </div>
+            <button class="btn btn-warning btn-sm text-dark fw-bold px-3 shadow-sm" @onclick='() => NavigationManager.NavigateTo("/caixa")'>
+                <i class="bi bi-cash-stack me-1"></i> Abrir Caixa
+            </button>
+        </div>
+    }
 
     <!-- 2. Barra de Categorias Rápidas -->
     <div class="bg-light p-2 border-bottom category-bar d-flex gap-2 overflow-x-auto">
@@ -163,10 +181,15 @@
             <span class="text-muted d-block" style="font-size: 0.85rem;">Itens selecionados: <strong>@TotalItensSelecionados</strong></span>
             <span class="fs-4 fw-bold text-primary">R$ @TotalGeral.ToString("F2")</span>
         </div>
-        <button class="btn btn-success btn-lg px-4 shadow-sm"
+        <button class="btn @(!caixaAberto ? "btn-secondary" : "btn-success") btn-lg px-4 shadow-sm"
                 @onclick="EnviarPedidoAsync"
-                disabled="@(TotalItensSelecionados == 0 || enviandoPedido)">
-            @if (enviandoPedido)
+                disabled="@(TotalItensSelecionados == 0 || enviandoPedido || !caixaAberto)">
+            @if (!caixaAberto)
+            {
+                <i class="bi bi-lock-fill me-2"></i>
+                <span>Caixa Fechado</span>
+            }
+            else if (enviandoPedido)
             {
                 <span class="spinner-border spinner-border-sm me-2" role="status"></span>
                 <span>Enviando...</span>
@@ -238,6 +261,7 @@
     private bool apenasPromocoes = false;
     private bool carregando = true;
     private bool enviandoPedido = false;
+    private bool caixaAberto = true;
 
     private ProdutoCardapio? produtoEmObservacao = null;
     private string textoObservacaoAtual = "";
@@ -246,6 +270,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        var statusCaixa = await CaixaLogic.ObterCaixaAbertoAsync();
+        caixaAberto = statusCaixa.Sucesso;
         await CarregarCardapioAsync();
     }
 
@@ -349,6 +375,15 @@
     private async Task EnviarPedidoAsync()
     {
         if (TotalItensSelecionados == 0) return;
+
+        var statusCaixa = await CaixaLogic.ObterCaixaAbertoAsync();
+        caixaAberto = statusCaixa.Sucesso;
+        if (!caixaAberto)
+        {
+            classeFeedback = "alert-danger";
+            mensagemFeedback = "Não é possível lançar pedidos: O caixa está fechado. Por favor, abra o caixa no menu Caixa & PDV.";
+            return;
+        }
 
         enviandoPedido = true;
         mensagemFeedback = null;

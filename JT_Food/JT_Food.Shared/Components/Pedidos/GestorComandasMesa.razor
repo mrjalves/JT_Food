@@ -1,8 +1,10 @@
 @using JT_Classes.Restaurante
+@using JT_Food.Shared.BusinessLogic
 @using JT_Food.Shared.Domain.Entities
 @using JT_Food.Shared.Domain.Enums
 @using JT_Food.Shared.Services.Interfaces
 @inject IComandaService ComandaService
+@inject CaixaLogic CaixaLogic
 @inject NavigationManager Navigation
 
 <div class="gestor-comandas-mesa card border-0 shadow-sm">
@@ -11,10 +13,38 @@
             <h5 class="mb-0 fw-bold"><i class="bi bi-diagram-3-fill me-2"></i>Comandas da @MesaIdentificacao</h5>
             <small class="opacity-75">@(comandasDaMesa.Count) comanda(s) aberta(s) nesta mesa</small>
         </div>
-        <button class="btn btn-sm btn-light text-primary fw-bold" @onclick="AbrirFormularioNovaComanda">
-            <i class="bi bi-plus-circle me-1"></i> Nova Comanda
+        <button class="btn btn-sm @(caixaAberto ? "btn-light text-primary fw-bold" : "btn-secondary text-white disabled opacity-75")"
+                @onclick="AbrirFormularioNovaComanda"
+                disabled="@(!caixaAberto)"
+                title="@(!caixaAberto ? "Abra o caixa no menu Caixa & PDV para abrir comandas" : "Nova Comanda")">
+            <i class="bi @(caixaAberto ? "bi-plus-circle" : "bi-lock-fill") me-1"></i> Nova Comanda
         </button>
     </div>
+
+    @if (!caixaAberto)
+    {
+        <div class="alert alert-warning border-warning m-3 d-flex align-items-center justify-content-between p-3 shadow-sm rounded-3">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-exclamation-triangle-fill text-warning fs-4"></i>
+                <div>
+                    <strong class="d-block text-dark">Caixa Fechado</strong>
+                    <span class="text-muted small">Não é possível abrir novas comandas para a @MesaIdentificacao com o caixa fechado.</span>
+                </div>
+            </div>
+            <button class="btn btn-warning btn-sm text-dark fw-bold px-3 shadow-sm" @onclick='() => Navigation.NavigateTo("/caixa")'>
+                <i class="bi bi-cash-stack me-1"></i> Abrir Caixa
+            </button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(erroCaixa))
+    {
+        <div class="alert alert-danger alert-dismissible fade show m-3 p-3 shadow-sm" role="alert">
+            <i class="bi bi-exclamation-octagon-fill me-2"></i>
+            @erroCaixa
+            <button type="button" class="btn-close" @onclick="() => erroCaixa = null"></button>
+        </div>
+    }
 
     <!-- Formulário Unificado de Nova Comanda Vinculada à Mesa -->
     @if (abrindoNovaComanda)
@@ -111,9 +141,18 @@
             <div class="text-center py-5 text-muted">
                 <i class="bi bi-receipt fs-1 opacity-25"></i>
                 <p class="mt-2 mb-3">Nenhuma comanda vinculada a esta mesa.</p>
-                <button class="btn btn-primary btn-sm px-3 fw-bold" @onclick="AbrirFormularioNovaComanda">
-                    <i class="bi bi-plus-lg me-1"></i> Abrir Primeira Comanda
-                </button>
+                @if (caixaAberto)
+                {
+                    <button class="btn btn-primary btn-sm px-3 fw-bold" @onclick="AbrirFormularioNovaComanda">
+                        <i class="bi bi-plus-lg me-1"></i> Abrir Primeira Comanda
+                    </button>
+                }
+                else
+                {
+                    <button class="btn btn-warning btn-sm px-3 fw-bold text-dark" @onclick='() => Navigation.NavigateTo("/caixa")'>
+                        <i class="bi bi-cash-stack me-1"></i> Abrir Caixa para Iniciar
+                    </button>
+                }
             </div>
         }
         else if (comandasDaMesa.Any())
@@ -179,6 +218,8 @@
     private bool carregando = true;
     private bool abrindoNovaComanda = false;
     private bool abrindo = false;
+    private bool caixaAberto = true;
+    private string? erroCaixa;
     private string novoNumeroCartao = "";
     private string novoNomeCliente = "";
     private bool cobrarCouvert = false;
@@ -193,6 +234,8 @@
     public async Task RecarregarAsync()
     {
         carregando = true;
+        var statusCaixa = await CaixaLogic.ObterCaixaAbertoAsync();
+        caixaAberto = statusCaixa.Sucesso;
         if (!string.IsNullOrWhiteSpace(MesaIdentificacao))
         {
             comandasDaMesa = await ComandaService.ObterComandasDaMesaAsync(MesaIdentificacao);
@@ -203,6 +246,12 @@
 
     private void AbrirFormularioNovaComanda()
     {
+        if (!caixaAberto)
+        {
+            erroCaixa = "Não é possível abrir comandas enquanto o caixa estiver fechado.";
+            return;
+        }
+        erroCaixa = null;
         abrindoNovaComanda = true;
     }
 
@@ -225,9 +274,18 @@
             return;
         }
 
+        var statusCaixa = await CaixaLogic.ObterCaixaAbertoAsync();
+        caixaAberto = statusCaixa.Sucesso;
+        if (!caixaAberto)
+        {
+            erroCaixa = "Não é possível abrir comandas: o caixa está fechado. Por favor, abra o caixa antes de criar atendimentos.";
+            return;
+        }
+
         try
         {
             abrindo = true;
+            erroCaixa = null;
             StateHasChanged();
 
             var nova = await ComandaService.AbrirComandaFlexivelAsync(
@@ -251,6 +309,14 @@
             {
                 await OnSelecionarComanda.InvokeAsync(nova);
             }
+        }
+        catch (InvalidOperationException ex)
+        {
+            erroCaixa = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            erroCaixa = $"Erro ao abrir comanda: {ex.Message}";
         }
         finally
         {

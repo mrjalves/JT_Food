@@ -12,14 +12,14 @@ namespace JT_Food.Shared.BusinessLogic
     public class RelatorioIALogic
     {
         private readonly IIAAnalyticsService _iaService;
-        private readonly ComandaService _comandaService;
+        private readonly IComandaService _comandaService;
         private readonly ItemComandaService _itemComandaService;
         private readonly CaixaService _caixaService;
         private readonly InsumoService _insumoService;
 
         public RelatorioIALogic(
             IIAAnalyticsService iaService,
-            ComandaService comandaService,
+            IComandaService comandaService,
             ItemComandaService itemComandaService,
             CaixaService caixaService,
             InsumoService insumoService)
@@ -33,10 +33,17 @@ namespace JT_Food.Shared.BusinessLogic
 
         public async Task<string> GerarRelatorioInteligenteAsync()
         {
-            var comandas = await _comandaService.GetAll() ?? new List<Comanda>();
-            var itens = await _itemComandaService.GetAll() ?? new List<MItemComanda>();
-            var caixas = await _caixaService.GetAll() ?? new List<MCaixa>();
-            var insumos = await _insumoService.GetAll() ?? new List<MInsumo>();
+            List<Comanda> comandas = new();
+            try { comandas = await _comandaService.GetAllAsync() ?? new List<Comanda>(); } catch { }
+
+            List<MItemComanda> itens = new();
+            try { itens = await _itemComandaService.GetAll() ?? new List<MItemComanda>(); } catch { }
+
+            List<MCaixa> caixas = new();
+            try { caixas = await _caixaService.GetAll() ?? new List<MCaixa>(); } catch { }
+
+            List<MInsumo> insumos = new();
+            try { insumos = await _insumoService.GetAll() ?? new List<MInsumo>(); } catch { }
 
             double faturamentoTotal = comandas.Where(c => c.Status == "Fechada").Sum(c => c.Total);
             int totalComandasFechadas = comandas.Count(c => c.Status == "Fechada");
@@ -68,7 +75,15 @@ namespace JT_Food.Shared.BusinessLogic
             };
 
             string contextoJson = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
-            return await _iaService.GerarDiagnosticoGeralAsync(contextoJson);
+            try
+            {
+                return await _iaService.GerarDiagnosticoGeralAsync(contextoJson);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[RelatorioIALogic] Falha na IA: {ex.Message}");
+                return "Diagnóstico indisponível no momento. Tente novamente em instantes.";
+            }
         }
     }
 }

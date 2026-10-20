@@ -24,6 +24,7 @@ namespace JT_Food.Shared.BusinessLogic
         private readonly PromocaoLogic _promocaoLogic;
         private readonly ICardapioService _cardapioService;
         private readonly IMesaLayoutService _mesaLayoutService;
+        private readonly CaixaLogic _caixaLogic;
 
         public ComercialLogic(
             CompraRestauranteService compraService,
@@ -36,7 +37,8 @@ namespace JT_Food.Shared.BusinessLogic
             IImpressaoRedeService impressaoService,
             PromocaoLogic promocaoLogic,
             ICardapioService cardapioService,
-            IMesaLayoutService mesaLayoutService)
+            IMesaLayoutService mesaLayoutService,
+            CaixaLogic caixaLogic)
         {
             _compraService = compraService;
             _itemCompraService = itemCompraService;
@@ -49,6 +51,7 @@ namespace JT_Food.Shared.BusinessLogic
             _promocaoLogic = promocaoLogic;
             _cardapioService = cardapioService;
             _mesaLayoutService = mesaLayoutService;
+            _caixaLogic = caixaLogic;
         }
 
         /// <summary>
@@ -65,6 +68,12 @@ namespace JT_Food.Shared.BusinessLogic
         {
             if (itens == null || !itens.Any())
                 return (false, "O pedido deve conter ao menos um item.", null);
+
+            var (caixaAberto, _, _) = await _caixaLogic.ObterCaixaAbertoAsync();
+            if (!caixaAberto)
+            {
+                return (false, "Não é possível lançar pedidos com o caixa fechado. Por favor, realize a abertura do caixa no menu Caixa & PDV antes de registrar novos pedidos.", null);
+            }
 
             // 1. Resolver comanda de destino
             ComandaDb? comandaDestino = null;

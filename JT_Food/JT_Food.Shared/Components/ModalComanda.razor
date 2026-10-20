@@ -1,4 +1,5 @@
 @using JT_Classes.Restaurante
+@using JT_Food.Shared.BusinessLogic
 @using JT_Food.Shared.Components.Pedidos
 @using JT_Food.Shared.Domain.Entities
 @using JT_Food.Shared.Domain.Enums
@@ -8,9 +9,32 @@
 @inject MesaService MesaService
 @inject IComandaService ComandaService
 @inject ItemComandaService ItemComandaService
+@inject CaixaLogic CaixaLogic
+@inject NavigationManager Navigation
 
 <Modal @ref="modalRef" Title="@(Comanda.Id == 0 ? "Abertura de Nova Comanda" : $"Comanda #{Comanda.Id} — {Comanda.NomeCliente}")" Size="Modal.ModalSize.ExtraLarge" EntidadeContexto="Comanda">
     <BodyContent>
+        @if (!caixaAberto && Comanda.Id == 0)
+        {
+            <div class="alert alert-warning border-warning d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <i class="bi bi-lock-fill text-warning me-2 fs-5"></i>
+                    <strong class="text-dark">Caixa Fechado:</strong>
+                    <span class="ms-1 small text-muted">A abertura de novas comandas e lançamentos de pedidos estão bloqueados até que o caixa seja aberto.</span>
+                </div>
+                <button type="button" class="btn btn-sm btn-warning text-dark fw-bold" @onclick='() => { Close(); Navigation.NavigateTo("/caixa"); }'>
+                    <i class="bi bi-unlock-fill me-1"></i> Abrir Caixa Agora
+                </button>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(mensagemErroModal))
+        {
+            <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>@mensagemErroModal
+                <button type="button" class="btn-close" @onclick="() => mensagemErroModal = null"></button>
+            </div>
+        }
         @if (Comanda.Id > 0)
         {
             <ul class="nav nav-tabs mb-3">
@@ -179,7 +203,7 @@
 
             <div class="d-flex justify-content-end gap-2 mt-4">
                 <button type="button" class="btn btn-secondary" @onclick="Close" disabled="@salvando">Cancelar</button>
-                <button type="button" class="btn btn-success" @onclick="SalvarAsync" disabled="@salvando">
+                <button type="button" class="btn btn-success" @onclick="SalvarAsync" disabled="@(salvando || (!caixaAberto && Comanda.Id == 0))">
                     @if (salvando)
                     {
                         <span class="spinner-border spinner-border-sm me-1" role="status"></span>
@@ -187,7 +211,7 @@
                     }
                     else
                     {
-                        <i class="fas fa-save me-1"></i>
+                        <i class="fas @(caixaAberto ? "fa-save" : "fa-lock") me-1"></i>
                         <span>Salvar Comanda</span>
                     }
                 </button>
@@ -203,6 +227,8 @@
     private Modal modalRef = default!;
     private List<JT_Classes.Restaurante.Mesa> mesas = new();
     private string abaAtiva = "dados";
+    private bool caixaAberto = true;
+    private string? mensagemErroModal;
 
     private string numeroCartao = "";
     private string nomeCliente = "";
@@ -218,10 +244,20 @@
     {
         var todas = await MesaService.GetAll();
         mesas = todas ?? new();
+        await VerificarCaixaAsync();
+    }
+
+    private async Task VerificarCaixaAsync()
+    {
+        var status = await CaixaLogic.ObterCaixaAbertoAsync();
+        caixaAberto = status.Sucesso;
+        StateHasChanged();
     }
 
     public void Open(JT_Classes.Restaurante.Comanda? comanda = null, string aba = "dados")
     {
+        mensagemErroModal = null;
+        _ = VerificarCaixaAsync();
         if (comanda != null)
         {
             Comanda = comanda;
@@ -304,7 +340,21 @@
     public async Task SalvarAsync()
     {
         if (salvando) return;
+
+        if (Comanda.Id == 0)
+        {
+            var statusCaixa = await CaixaLogic.ObterCaixaAbertoAsync();
+            if (!statusCaixa.Sucesso)
+            {
+                mensagemErroModal = "Não é possível abrir comanda com o caixa fechado. Por favor, abra o caixa antes de continuar.";
+                caixaAberto = false;
+                StateHasChanged();
+                return;
+            }
+        }
+
         salvando = true;
+        mensagemErroModal = null;
         StateHasChanged();
 
         try

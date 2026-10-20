@@ -5,8 +5,11 @@
 @using JT_Food.Shared.Components.Salao
 @using JT_Food.Shared.Domain.Entities
 @using JT_Food.Shared.Services.Interfaces
+@using JT_Food.Shared.BusinessLogic
 @inject MesaService MesaService
 @inject IAuthPerfilService AuthService
+@inject CaixaLogic CaixaLogic
+@inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 @implements IDisposable
 
@@ -51,6 +54,22 @@
         </div>
     </div>
 
+    @if (!caixaAberto)
+    {
+        <div class="alert alert-warning border-warning d-flex align-items-center justify-content-between p-3 shadow-sm rounded-3 mb-4">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-exclamation-triangle-fill text-warning fs-3"></i>
+                <div>
+                    <strong class="d-block text-dark">Atenção: Turno de Caixa Fechado</strong>
+                    <span class="text-muted small">O salão está em modo de consulta. Para abrir novas comandas e lançar pedidos nas mesas, abra um turno de caixa.</span>
+                </div>
+            </div>
+            <button class="btn btn-warning text-dark fw-bold px-3 shadow-sm" @onclick='() => Navigation.NavigateTo("/caixa")'>
+                <i class="bi bi-cash-stack me-1"></i> Abrir Caixa Agora
+            </button>
+        </div>
+    }
+
     <!-- Renderização Condicional pelo Modo Selecionado -->
     @if (modoVisualizacao == "mapa")
     {
@@ -71,6 +90,7 @@
 @code {
     private List<JT_Classes.Restaurante.Mesa>? mesas;
     private bool loading = true;
+    private bool caixaAberto = true;
     private JT_Classes.Restaurante.Mesa mesaSelecionada = new();
     private ModalMesa modalMesa = default!;
     private MapaInterativoSalao? mapaSalaoRef;
@@ -79,6 +99,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        var statusCaixa = await CaixaLogic.ObterCaixaAbertoAsync();
+        caixaAberto = statusCaixa.Sucesso;
         await CarregarMesasAsync();
     }
 
@@ -92,6 +114,8 @@
 
     private async Task RecarregarAsync()
     {
+        var statusCaixa = await CaixaLogic.ObterCaixaAbertoAsync();
+        caixaAberto = statusCaixa.Sucesso;
         await CarregarMesasAsync();
         if (mapaSalaoRef != null)
         {

@@ -1,8 +1,10 @@
-@page "/comandas"
 @using JT_Classes.Restaurante
+@using JT_Food.Shared.BusinessLogic
 @using JT_Food.Shared.Components
 @using JT_Food.Shared.Services.Interfaces
 @inject IComandaService ComandaService
+@inject CaixaLogic CaixaLogic
+@inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 @implements IDisposable
 
@@ -16,10 +18,34 @@
             </h1>
             <p class="text-muted small mb-0">Pesquise por número do cartão, cliente ou mesa e gerencie pedidos.</p>
         </div>
-        <button class="btn btn-primary shadow-sm" @onclick="NovaComanda">
-            <i class="fas fa-plus fa-sm text-white-50 me-2"></i> Nova Comanda Flexível
+        <button class="btn @(caixaAberto ? "btn-primary" : "btn-secondary") shadow-sm" @onclick="NovaComanda">
+            <i class="fas @(caixaAberto ? "fa-plus" : "fa-lock") fa-sm text-white-50 me-2"></i> Nova Comanda Flexível
         </button>
     </div>
+
+    @if (!caixaAberto && !loading)
+    {
+        <div class="alert alert-warning border-warning border-2 d-flex flex-wrap justify-content-between align-items-center shadow-sm p-3 mb-4 rounded-3" role="alert">
+            <div class="d-flex align-items-center me-3 mb-2 mb-md-0">
+                <i class="bi bi-lock-fill fs-2 text-warning me-3"></i>
+                <div>
+                    <strong class="text-dark d-block fs-6">Caixa Fechado no Momento</strong>
+                    <span class="small text-muted">A abertura de novas comandas e lançamentos de pedidos estão bloqueados até que um turno de caixa seja aberto.</span>
+                </div>
+            </div>
+            <button class="btn btn-warning fw-bold text-dark px-3 py-2 shadow-sm" @onclick='() => Navigation.NavigateTo("/caixa")'>
+                <i class="bi bi-unlock-fill me-1"></i> Abrir Caixa Agora
+            </button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(mensagemAlerta))
+    {
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm mb-3" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>@mensagemAlerta
+            <button type="button" class="btn-close" @onclick="() => mensagemAlerta = null"></button>
+        </div>
+    }
 
     <GridComandas Comandas="comandas" IsLoading="loading" OnEdit="EditarComanda" OnDelete="ExcluirComanda" />
 </div>
@@ -29,6 +55,8 @@
 @code {
     private List<Comanda>? comandas;
     private bool loading = true;
+    private bool caixaAberto = true;
+    private string? mensagemAlerta;
     private Comanda comandaSelecionada = new();
     private ModalComanda modalComanda = default!;
     private DotNetObjectReference<VerComandas>? _pageRef;
@@ -41,6 +69,8 @@
     private async Task CarregarAsync()
     {
         loading = true;
+        var statusCaixa = await CaixaLogic.ObterCaixaAbertoAsync();
+        caixaAberto = statusCaixa.Sucesso;
         comandas = await ComandaService.GetAllAsync();
         loading = false;
         StateHasChanged();
@@ -48,6 +78,11 @@
 
     private void NovaComanda()
     {
+        if (!caixaAberto)
+        {
+            mensagemAlerta = "Não é possível abrir comandas com o caixa fechado. Por favor, abra o caixa antes de continuar.";
+            return;
+        }
         comandaSelecionada = new Comanda { UserId = "1", DataAbertura = DateTime.UtcNow };
         modalComanda.Open(comandaSelecionada, "dados");
     }

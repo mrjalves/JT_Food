@@ -11,7 +11,7 @@
             <small class="text-white-50">Diagnósticos inteligentes, otimização de cardápio e previsão de demanda</small>
         </div>
         <button class="btn btn-sm btn-light text-primary fw-bold shadow-sm rounded-pill px-3"
-                @onclick="GerarRelatorioGeralAsync"
+                @onclick='() => ExecutarGeracaoAsync(abaAtiva)'
                 disabled="@gerando">
             @if (gerando)
             {
@@ -27,41 +27,55 @@
     </div>
 
     <!-- Botões de Ações Rápidas -->
-    <div class="card-body bg-light border-bottom p-2.5 d-flex flex-wrap gap-2">
-        <button class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold" @onclick="GerarRelatorioGeralAsync" disabled="@gerando">
+    <div class="card-body bg-light border-bottom p-2.5 d-flex flex-wrap gap-2 align-items-center">
+        <button class="btn btn-sm rounded-pill px-3 fw-semibold @(abaAtiva == "geral" ? "btn-primary shadow-sm text-white" : "btn-outline-primary")"
+                @onclick='() => ExecutarGeracaoAsync("geral")'
+                disabled="@gerando">
             📊 Diagnóstico 360°
         </button>
-        <button class="btn btn-sm btn-outline-danger rounded-pill px-3 fw-semibold" @onclick="SugerirCombosAsync" disabled="@gerando">
+        <button class="btn btn-sm rounded-pill px-3 fw-semibold @(abaAtiva == "combos" ? "btn-danger shadow-sm text-white" : "btn-outline-danger")"
+                @onclick='() => ExecutarGeracaoAsync("combos")'
+                disabled="@gerando">
             🔥 Sugerir Combos & Happy Hour
         </button>
-        <button class="btn btn-sm btn-outline-success rounded-pill px-3 fw-semibold" @onclick="DiagnosticoCozinhaEstoqueAsync" disabled="@gerando">
+        <button class="btn btn-sm rounded-pill px-3 fw-semibold @(abaAtiva == "kds" ? "btn-success shadow-sm text-white" : "btn-outline-success")"
+                @onclick='() => ExecutarGeracaoAsync("kds")'
+                disabled="@gerando">
             🍳 Gargalos KDS & Compras
         </button>
     </div>
 
     <!-- Conteúdo do Relatório Gerado -->
     <div class="card-body p-4">
+        @if (!string.IsNullOrEmpty(erroGeracao))
+        {
+            <div class="alert alert-info alert-dismissible fade show p-2 mb-3 small" role="alert">
+                <i class="bi bi-info-circle-fill me-1"></i> @erroGeracao
+                <button type="button" class="btn-close btn-close-sm" @onclick="() => erroGeracao = null"></button>
+            </div>
+        }
+
         @if (gerando)
         {
             <div class="text-center py-5">
                 <div class="spinner-grow text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
                 <h5 class="fw-bold text-dark">A IA está processando as métricas de vendas, KDS e estoque...</h5>
-                <p class="text-muted">Cruzando dados de lucratividade, giro de mesas e tempos de preparo.</p>
+                <p class="text-muted small">Cruzando dados de lucratividade, giro de mesas e tempos de preparo.</p>
             </div>
         }
         else if (string.IsNullOrEmpty(conteudoRelatorio))
         {
             <div class="text-center py-5 text-muted">
                 <i class="bi bi-robot fs-1 opacity-25"></i>
-                <p class="mt-2 mb-3">Nenhum diagnóstico gerado ainda.</p>
-                <button class="btn btn-primary" @onclick="GerarRelatorioGeralAsync">
+                <p class="mt-2 mb-3">Nenhum diagnóstico disponível no momento.</p>
+                <button class="btn btn-primary btn-sm rounded-pill px-3 fw-bold" @onclick='() => ExecutarGeracaoAsync("geral")'>
                     <i class="bi bi-stars me-1"></i> Gerar Primeiro Relatório
                 </button>
             </div>
         }
         else
         {
-            <div class="relatorio-conteudo p-3 bg-white rounded border">
+            <div class="relatorio-conteudo p-4 bg-white rounded border shadow-sm">
                 @((MarkupString)ConverterMarkdownParaHtml(conteudoRelatorio))
             </div>
         }
@@ -69,18 +83,22 @@
 </div>
 
 <style>
+    .relatorio-conteudo {
+        font-family: inherit;
+        line-height: 1.6;
+        color: #334155;
+    }
     .relatorio-conteudo h3 {
         font-size: 1.25rem;
         font-weight: 700;
-        color: #1e293b;
+        color: #0f172a;
+        margin-top: 0.5rem;
         margin-bottom: 0.75rem;
-        border-bottom: 2px solid #e2e8f0;
-        padding-bottom: 0.5rem;
     }
     .relatorio-conteudo h4 {
-        font-size: 1.1rem;
+        font-size: 1.05rem;
         font-weight: 600;
-        color: #3b82f6;
+        color: #2563eb;
         margin-top: 1.25rem;
         margin-bottom: 0.5rem;
     }
@@ -90,57 +108,153 @@
     }
     .relatorio-conteudo li {
         margin-bottom: 0.35rem;
-        line-height: 1.5;
+    }
+    .relatorio-conteudo strong {
+        color: #1e293b;
     }
 </style>
 
 @code {
     private string conteudoRelatorio = "";
     private bool gerando = false;
+    private string abaAtiva = "geral";
+    private string? erroGeracao;
 
     protected override async Task OnInitializedAsync()
     {
-        await GerarRelatorioGeralAsync();
+        await ExecutarGeracaoAsync("geral");
     }
 
-    private async Task GerarRelatorioGeralAsync()
+    private async Task ExecutarGeracaoAsync(string tipo)
     {
-        gerando = true;
-        conteudoRelatorio = await RelatorioLogic.GerarRelatorioInteligenteAsync();
-        gerando = false;
-    }
+        if (gerando) return;
 
-    private async Task SugerirCombosAsync()
-    {
         gerando = true;
-        conteudoRelatorio = await IAService.GerarSugestaoPromocoesAsync("Dados de vendas: Alto giro de Chopp e Burger, baixo giro de porções às quartas-feiras.");
-        gerando = false;
-    }
+        erroGeracao = null;
+        abaAtiva = tipo;
+        StateHasChanged();
 
-    private async Task DiagnosticoCozinhaEstoqueAsync()
-    {
-        gerando = true;
-        conteudoRelatorio = await IAService.GerarDiagnosticoCozinhaEComprasAsync(
-            "KDS: Tempo médio Chapa = 12min, Cozinha = 19min. Horário de pico 20h30.",
-            "Estoque: Bacon Rústico = 2.4kg (mínimo 5kg), Queijo Gouda = 1.8kg (mínimo 4kg)."
-        );
-        gerando = false;
+        try
+        {
+            if (tipo == "combos")
+            {
+                conteudoRelatorio = await IAService.GerarSugestaoPromocoesAsync(
+                    "Dados de vendas: Alto giro de Chopp e Burger, baixo giro de porções às quartas-feiras."
+                );
+            }
+            else if (tipo == "kds")
+            {
+                conteudoRelatorio = await IAService.GerarDiagnosticoCozinhaEComprasAsync(
+                    "KDS: Tempo médio Chapa = 12min, Cozinha = 19min. Horário de pico 20h30.",
+                    "Estoque: Bacon Rústico = 2.4kg (mínimo 5kg), Queijo Gouda = 1.8kg (mínimo 4kg)."
+                );
+            }
+            else
+            {
+                conteudoRelatorio = await RelatorioLogic.GerarRelatorioInteligenteAsync();
+            }
+
+            if (string.IsNullOrWhiteSpace(conteudoRelatorio))
+            {
+                conteudoRelatorio = await IAService.GerarDiagnosticoGeralAsync("Dados consolidados do restaurante");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[PainelRelatorioIA] Erro na geração: {ex.Message}");
+            erroGeracao = "Conexão com servidor de IA instável. Exibindo diagnóstico estratégico local.";
+            try
+            {
+                conteudoRelatorio = await IAService.GerarDiagnosticoGeralAsync("Fallback");
+            }
+            catch { }
+        }
+        finally
+        {
+            gerando = false;
+            StateHasChanged();
+        }
     }
 
     private string ConverterMarkdownParaHtml(string markdown)
     {
-        if (string.IsNullOrEmpty(markdown)) return "";
+        if (string.IsNullOrWhiteSpace(markdown)) return "";
 
-        string html = markdown
-            .Replace("### ", "<h3>")
-            .Replace("#### ", "<h4>")
-            .Replace("- **", "<li><strong>")
-            .Replace(":** ", ":</strong> ")
-            .Replace("**", "<strong>")
-            .Replace("\n\n", "<br/><br/>")
-            .Replace("\n- ", "</li><li>");
+        var lines = markdown.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        var sb = new System.Text.StringBuilder();
+        bool inList = false;
 
-        // Fechamento simples de tags
-        return html;
+        foreach (var rawLine in lines)
+        {
+            var line = rawLine.Trim();
+
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                if (inList)
+                {
+                    sb.AppendLine("</ul>");
+                    inList = false;
+                }
+                continue;
+            }
+
+            if (line.StartsWith("### "))
+            {
+                if (inList) { sb.AppendLine("</ul>"); inList = false; }
+                string title = FormatarTextoInline(line.Substring(4));
+                sb.AppendLine($"<h3 class=\"mt-3 mb-2 fw-bold text-dark border-bottom pb-2\"><i class=\"bi bi-chevron-right text-primary me-1 fs-6\"></i>{title}</h3>");
+            }
+            else if (line.StartsWith("#### "))
+            {
+                if (inList) { sb.AppendLine("</ul>"); inList = false; }
+                string subtitle = FormatarTextoInline(line.Substring(5));
+                sb.AppendLine($"<h4 class=\"mt-3 mb-2 fw-semibold text-primary fs-6\">{subtitle}</h4>");
+            }
+            else if (line.StartsWith("- ") || line.StartsWith("* "))
+            {
+                if (!inList)
+                {
+                    sb.AppendLine("<ul class=\"mb-3 ps-3\">");
+                    inList = true;
+                }
+                string item = FormatarTextoInline(line.Substring(2));
+                sb.AppendLine($"<li class=\"mb-1\">{item}</li>");
+            }
+            else
+            {
+                if (inList) { sb.AppendLine("</ul>"); inList = false; }
+                string p = FormatarTextoInline(line);
+                if (p.StartsWith("<em>") && p.EndsWith("</em>"))
+                {
+                    sb.AppendLine($"<p class=\"text-muted small mb-2\">{p}</p>");
+                }
+                else
+                {
+                    sb.AppendLine($"<p class=\"mb-2\">{p}</p>");
+                }
+            }
+        }
+
+        if (inList)
+        {
+            sb.AppendLine("</ul>");
+        }
+
+        return sb.ToString();
+    }
+
+    private string FormatarTextoInline(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return "";
+
+        // Negrito: **texto**
+        var rxBold = new System.Text.RegularExpressions.Regex(@"\*\*(.+?)\*\*");
+        text = rxBold.Replace(text, "<strong>$1</strong>");
+
+        // Itálico: *texto*
+        var rxItalic = new System.Text.RegularExpressions.Regex(@"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)");
+        text = rxItalic.Replace(text, "<em>$1</em>");
+
+        return text;
     }
 }

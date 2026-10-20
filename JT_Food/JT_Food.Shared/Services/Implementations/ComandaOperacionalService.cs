@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using JT_Classes.Restaurante;
+using JT_Food.Shared.BusinessLogic;
 using JT_Food.Shared.Domain.Enums;
 using JT_Food.Shared.Services.Interfaces;
 using JT_Servicos.Restaurante;
@@ -15,6 +16,7 @@ namespace JT_Food.Shared.Services.Implementations
         private readonly MesaService _mesaService;
         private readonly ItemComandaService _itemComandaService;
         private readonly IMesaLayoutService _mesaLayoutService;
+        private readonly CaixaLogic _caixaLogic;
         private static readonly System.Threading.SemaphoreSlim _aberturaLock = new(1, 1);
 
         public event Action? OnDataChanged;
@@ -23,12 +25,14 @@ namespace JT_Food.Shared.Services.Implementations
             ComandaService comandaService,
             MesaService mesaService,
             ItemComandaService itemComandaService,
-            IMesaLayoutService mesaLayoutService)
+            IMesaLayoutService mesaLayoutService,
+            CaixaLogic caixaLogic)
         {
             _comandaService = comandaService;
             _mesaService = mesaService;
             _itemComandaService = itemComandaService;
             _mesaLayoutService = mesaLayoutService;
+            _caixaLogic = caixaLogic;
         }
 
 
@@ -69,8 +73,26 @@ namespace JT_Food.Shared.Services.Implementations
             return await _comandaService.GetById(id);
         }
 
+        public async Task<(bool Aberto, string Mensagem)> VerificarCaixaAbertoAsync()
+        {
+            var (sucesso, _, caixaAtual) = await _caixaLogic.ObterCaixaAbertoAsync();
+            if (sucesso && caixaAtual != null)
+            {
+                return (true, $"Caixa #{caixaAtual.Id} aberto.");
+            }
+            return (false, "O Caixa está fechado. Abra o caixa no menu Caixa & PDV antes de realizar novos atendimentos.");
+        }
+
         public async Task<bool> SaveAsync(Comanda entity)
         {
+            if (entity.Id == 0)
+            {
+                var (aberto, msg) = await VerificarCaixaAbertoAsync();
+                if (!aberto)
+                {
+                    throw new InvalidOperationException("Não é possível abrir comandas com o caixa fechado. Por favor, realize a abertura do caixa no menu Caixa & PDV antes de iniciar os atendimentos.");
+                }
+            }
             bool ok = await _comandaService.SaveAsync(entity) > 0;
             if (ok) OnDataChanged?.Invoke();
             return ok;
@@ -128,6 +150,12 @@ namespace JT_Food.Shared.Services.Implementations
             bool ativarCouvert = false,
             double valorCouvert = 0)
         {
+            var (caixaAberto, msgCaixa) = await VerificarCaixaAbertoAsync();
+            if (!caixaAberto)
+            {
+                throw new InvalidOperationException("Não é possível abrir comandas com o caixa fechado. Por favor, realize a abertura do caixa no menu Caixa & PDV antes de iniciar os atendimentos.");
+            }
+
             await _aberturaLock.WaitAsync();
             try
             {

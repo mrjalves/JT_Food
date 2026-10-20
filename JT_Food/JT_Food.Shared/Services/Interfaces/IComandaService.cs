@@ -21,6 +21,7 @@ namespace JT_Food.Shared.Services.Interfaces
         Task<bool> TransferirMesaAsync(int comandaId, string novaMesaId);
         Task<bool> AtualizarCouvertAsync(int comandaId, bool cobrarCouvert, double valorCouvert, int pessoas = 1);
         Task<double> ObterTotalConsolidadoMesaAsync(string mesaId);
+        Task<(bool Aberto, string Mensagem)> VerificarCaixaAbertoAsync();
         
         void NotificarErro(string titulo, string mensagem);
         void NotificarSucesso(string titulo, string mensagem);
