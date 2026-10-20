@@ -1,5 +1,6 @@
 using JT_Food.Shared.BusinessLogic;
 using JT_Food.Shared.Layout;
+using JT_Food.Shared.Providers;
 using JT_Food.Shared.Services.Implementations;
 using JT_Food.Shared.Services.Interfaces;
 using JT_Servicos.Interfaces;
@@ -16,6 +17,7 @@ namespace JT_Food.Shared
         {
             services.AddScoped<IMenuProvider, MenuLateral>();
             services.AddScoped<IModuloMenuProvider, MenuLateral>();
+            services.AddScoped<ITutorialProvider, FoodTutorialProvider>();
 
             // Serviços de Configuração
             services.AddScoped<MFoodConfiguracaoService>();
@@ -60,6 +62,13 @@ namespace JT_Food.Shared
             services.AddScoped<IImpressaoRedeService, EscPosPrintService>();
             services.AddScoped<IAuthPerfilService, AuthPerfilService>();
             services.AddScoped<IIAAnalyticsService, GeminiRelatorioService>();
+
+            // Serviços de IA (Copiloto & Assistente Integrado)
+            services.AddScoped<FoodConfiguracaoIAService>();
+            services.AddScoped<JT_Servicos.IA.ConfiguracaoIAService>(sp => sp.GetRequiredService<FoodConfiguracaoIAService>());
+            services.AddScoped<JT_Servicos.IA.InstrutorIAService>();
+            services.AddScoped<FoodInstrutorIAService>();
+            services.AddScoped<JT_Servicos.IA.Interfaces.IInstrutorIAService>(sp => sp.GetRequiredService<FoodInstrutorIAService>());
 
             return services;
         }

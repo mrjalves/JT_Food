@@ -10,6 +10,7 @@
 @inject IImpressaoRedeService ImpressaoService
 @inject IIAAnalyticsService IAService
 @inject IJSRuntime JSRuntime
+@inject JT_Servicos.IA.ConfiguracaoIAService ConfiguracaoIAService
 
 @RenderizarFormularioConfiguracoes()
 
@@ -136,12 +137,34 @@
                     GeminiRelatorioService.CustomApiKey = savedKey;
                     alterou = true;
                 }
+                else
+                {
+                    var configs = await ConfiguracaoIAService.GetAll();
+                    var configAtiva = configs.FirstOrDefault();
+                    if (!string.IsNullOrWhiteSpace(configAtiva?.ApiKey))
+                    {
+                        geminiApiKey = configAtiva.ApiKey;
+                        GeminiRelatorioService.CustomApiKey = configAtiva.ApiKey;
+                        alterou = true;
+                    }
+                }
 
                 if (!string.IsNullOrWhiteSpace(savedModel))
                 {
                     modeloIa = savedModel;
                     GeminiRelatorioService.CustomModel = savedModel;
                     alterou = true;
+                }
+                else
+                {
+                    var configs = await ConfiguracaoIAService.GetAll();
+                    var configAtiva = configs.FirstOrDefault();
+                    if (!string.IsNullOrWhiteSpace(configAtiva?.Modelo))
+                    {
+                        modeloIa = configAtiva.Modelo;
+                        GeminiRelatorioService.CustomModel = configAtiva.Modelo;
+                        alterou = true;
+                    }
                 }
 
                 var cachedModelsJson = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "jt_gemini_models_cache");
@@ -519,6 +542,21 @@
         catch
         {
             // Ignora exceção em casos de localStorage desabilitado
+        }
+
+        try
+        {
+            // Sincroniza diretamente com o serviço global do Assistente IA (ChatInstrutor)
+            var configs = await ConfiguracaoIAService.GetAll();
+            var configIa = configs.FirstOrDefault() ?? new JT_Classes.IA.ConfiguracaoIA();
+            configIa.ApiKey = geminiApiKey ?? string.Empty;
+            configIa.Modelo = modeloIa ?? "gemini-1.5-flash";
+            configIa.Provedor = "Gemini";
+            await ConfiguracaoIAService.Save(configIa);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Configuracoes] Aviso ao sincronizar com Assistente IA: {ex.Message}");
         }
 
         statusIaMensagem = $"Configurações da Inteligência Artificial salvas! Modelo ativo: {modeloIa}";
