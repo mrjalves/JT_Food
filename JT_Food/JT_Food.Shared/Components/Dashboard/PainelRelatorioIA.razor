@@ -3,13 +3,14 @@
 @inject RelatorioIALogic RelatorioLogic
 @inject IIAAnalyticsService IAService
 
-<div class="painel-relatorio-ia card border-0 shadow-sm">
-    <div class="card-header bg-gradient bg-primary text-white p-3 d-flex flex-wrap justify-content-between align-items-center">
+<div class="painel-relatorio-ia card border-0 shadow-sm" style="border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0 !important;">
+    <div class="card-header text-white p-3 d-flex flex-wrap justify-content-between align-items-center"
+         style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 60%, #4338ca 100%); border-bottom: none;">
         <div>
-            <h5 class="mb-0 fw-bold"><i class="bi bi-stars me-2"></i>Consultor Executivo IA — JT_Food Insights</h5>
-            <small class="opacity-75">Diagnósticos inteligentes, otimização de cardápio e previsão de demanda</small>
+            <h5 class="mb-0 fw-bold"><i class="bi bi-stars text-warning me-2"></i>Consultor Executivo IA — JT_Food Insights</h5>
+            <small class="text-white-50">Diagnósticos inteligentes, otimização de cardápio e previsão de demanda</small>
         </div>
-        <button class="btn btn-sm btn-light text-primary fw-bold shadow-sm"
+        <button class="btn btn-sm btn-light text-primary fw-bold shadow-sm rounded-pill px-3"
                 @onclick="GerarRelatorioGeralAsync"
                 disabled="@gerando">
             @if (gerando)
@@ -26,14 +27,14 @@
     </div>
 
     <!-- Botões de Ações Rápidas -->
-    <div class="card-body bg-light border-bottom p-2 d-flex flex-wrap gap-2">
-        <button class="btn btn-sm btn-outline-primary" @onclick="GerarRelatorioGeralAsync" disabled="@gerando">
+    <div class="card-body bg-light border-bottom p-2.5 d-flex flex-wrap gap-2">
+        <button class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold" @onclick="GerarRelatorioGeralAsync" disabled="@gerando">
             📊 Diagnóstico 360°
         </button>
-        <button class="btn btn-sm btn-outline-danger" @onclick="SugerirCombosAsync" disabled="@gerando">
+        <button class="btn btn-sm btn-outline-danger rounded-pill px-3 fw-semibold" @onclick="SugerirCombosAsync" disabled="@gerando">
             🔥 Sugerir Combos & Happy Hour
         </button>
-        <button class="btn btn-sm btn-outline-success" @onclick="DiagnosticoCozinhaEstoqueAsync" disabled="@gerando">
+        <button class="btn btn-sm btn-outline-success rounded-pill px-3 fw-semibold" @onclick="DiagnosticoCozinhaEstoqueAsync" disabled="@gerando">
             🍳 Gargalos KDS & Compras
         </button>
     </div>

@@ -20,22 +20,25 @@
 <div class="container-fluid py-4 dashboard-home">
     <!-- Cabeçalho com Perfil e Boas-Vindas -->
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
-        <div>
-            <h1 class="h3 mb-0 text-gray-800 fw-bold">
-                <i class="bi bi-speedometer2 text-primary me-2"></i>Dashboard Executivo JT_Food
-            </h1>
-            <p class="text-muted small mb-0">Visão operacional em tempo real, métricas financeiras e inteligência analítica.</p>
+        <div class="d-flex align-items-center gap-3">
+            <div class="header-icon-badge">
+                <i class="bi bi-speedometer2"></i>
+            </div>
+            <div>
+                <h1 class="h4 mb-0 text-dark fw-bold">Dashboard Executivo JT_Food</h1>
+                <p class="text-muted small mb-0">Visão operacional em tempo real, métricas financeiras e inteligência analítica.</p>
+            </div>
         </div>
 
         <!-- Seletor de Perfil Rápido (Login / Troca de Perfil) -->
-        <div class="d-flex align-items-center gap-2 bg-white p-2 rounded shadow-sm border">
-            <span class="small text-muted">Operador:</span>
-            <span class="badge @(AuthService.IsGerente() ? "bg-primary" : "bg-success") px-2 py-1">
+        <div class="d-flex align-items-center gap-2 bg-white px-3 py-2 rounded-pill shadow-sm border">
+            <span class="small text-muted fw-semibold">Operador:</span>
+            <span class="badge @(AuthService.IsGerente() ? "badge-subtle-primary" : "badge-subtle-success") px-2 py-1 rounded-pill fw-semibold">
                 <i class="bi @(AuthService.IsGerente() ? "bi-person-badge-fill" : "bi-person-walking") me-1"></i>
                 @usuarioAtual.Nome (@usuarioAtual.Perfil)
             </span>
-            <button class="btn btn-sm btn-outline-secondary" @onclick="AbrirModalPin" title="Alternar Usuário / PIN">
-                <i class="bi bi-key-fill"></i> PIN
+            <button class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-0.5 ms-1" @onclick="AbrirModalPin" title="Alternar Usuário / PIN" style="font-size: 0.78rem;">
+                <i class="bi bi-key-fill text-warning me-1"></i>PIN
             </button>
         </div>
     </div>
@@ -44,14 +47,21 @@
     <div class="row g-3 mb-4">
         <!-- Faturamento Líquido / Consumo Total -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm h-100 kpi-card bg-gradient-primary text-white p-3">
+            <div class="card border-0 kpi-card-refined kpi-accent-indigo h-100 p-3 shadow-sm">
                 <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <small class="text-white-50 text-uppercase fw-bold">Consumo & Faturamento</small>
-                        <h3 class="fw-bold mt-1 mb-0">R$ @faturamentoTotalDia.ToString("F2")</h3>
-                        <small class="text-white-50">Recebido: R$ @faturamentoLiquido.ToString("F2") | Aberto: R$ @consumoAberto.ToString("F2")</small>
+                    <div class="flex-grow-1">
+                        <div class="kpi-label">Consumo & Faturamento</div>
+                        <div class="kpi-value">R$ @faturamentoTotalDia.ToString("N2")</div>
+                        <div class="kpi-sub-badges mt-2 d-flex flex-wrap gap-1">
+                            <span class="badge badge-subtle-success" title="Total faturado e liquidado no caixa">
+                                <i class="bi bi-check2-circle me-1"></i>Recebido: R$ @faturamentoLiquido.ToString("N2")
+                            </span>
+                            <span class="badge badge-subtle-primary" title="Total em consumo ativo nas mesas e comandas">
+                                <i class="bi bi-hourglass-split me-1"></i>Aberto: R$ @consumoAberto.ToString("N2")
+                            </span>
+                        </div>
                     </div>
-                    <div class="kpi-icon-circle">
+                    <div class="kpi-icon-bubble kpi-bubble-indigo ms-2">
                         <i class="bi bi-cash-coin"></i>
                     </div>
                 </div>
@@ -60,14 +70,21 @@
 
         <!-- Ticket Médio -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm h-100 kpi-card bg-gradient-success text-white p-3">
+            <div class="card border-0 kpi-card-refined kpi-accent-emerald h-100 p-3 shadow-sm">
                 <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <small class="text-white-50 text-uppercase fw-bold">Ticket Médio Geral</small>
-                        <h3 class="fw-bold mt-1 mb-0">R$ @ticketMedio.ToString("F2")</h3>
-                        <small class="text-white-50">@totalComandasFechadas fechada(s) | @comandasAbertas.Count em atendimento</small>
+                    <div class="flex-grow-1">
+                        <div class="kpi-label">Ticket Médio Geral</div>
+                        <div class="kpi-value">R$ @ticketMedio.ToString("N2")</div>
+                        <div class="kpi-sub-badges mt-2 d-flex flex-wrap gap-1">
+                            <span class="badge badge-subtle-neutral">
+                                <i class="bi bi-check-all me-1"></i>@totalComandasFechadas fechada(s)
+                            </span>
+                            <span class="badge badge-subtle-neutral">
+                                <i class="bi bi-people me-1"></i>@comandasAbertas.Count em atendimento
+                            </span>
+                        </div>
                     </div>
-                    <div class="kpi-icon-circle">
+                    <div class="kpi-icon-bubble kpi-bubble-emerald ms-2">
                         <i class="bi bi-receipt"></i>
                     </div>
                 </div>
@@ -76,14 +93,21 @@
 
         <!-- Couvert & Taxas -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm h-100 kpi-card bg-gradient-info text-white p-3">
+            <div class="card border-0 kpi-card-refined kpi-accent-sky h-100 p-3 shadow-sm">
                 <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <small class="text-white-50 text-uppercase fw-bold">Couvert & Serviços</small>
-                        <h3 class="fw-bold mt-1 mb-0">R$ @totalCouvertETaxas.ToString("F2")</h3>
-                        <small class="text-white-50">Música ao Vivo & 10% Serviço</small>
+                    <div class="flex-grow-1">
+                        <div class="kpi-label">Couvert & Serviços</div>
+                        <div class="kpi-value">R$ @totalCouvertETaxas.ToString("N2")</div>
+                        <div class="kpi-sub-badges mt-2 d-flex flex-wrap gap-1">
+                            <span class="badge badge-subtle-purple">
+                                <i class="bi bi-music-note-beamed me-1"></i>Música ao Vivo
+                            </span>
+                            <span class="badge badge-subtle-slate">
+                                <i class="bi bi-percent me-1"></i>10% Serviço
+                            </span>
+                        </div>
                     </div>
-                    <div class="kpi-icon-circle">
+                    <div class="kpi-icon-bubble kpi-bubble-sky ms-2">
                         <i class="bi bi-music-note-beamed"></i>
                     </div>
                 </div>
@@ -92,14 +116,20 @@
 
         <!-- Ocupação do Salão -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm h-100 kpi-card bg-gradient-warning text-dark p-3">
+            <div class="card border-0 kpi-card-refined kpi-accent-amber h-100 p-3 shadow-sm">
                 <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <small class="text-dark-50 text-uppercase fw-bold">Ocupação Salão</small>
-                        <h3 class="fw-bold mt-1 mb-0">@taxaOcupacaoPercentual%</h3>
-                        <small class="text-muted">@mesasOcupadas / @totalMesas mesas ocupadas</small>
+                    <div class="flex-grow-1">
+                        <div class="kpi-label">Ocupação Salão</div>
+                        <div class="d-flex align-items-baseline gap-2">
+                            <div class="kpi-value">@taxaOcupacaoPercentual%</div>
+                            <span class="small text-muted fw-semibold">(@mesasOcupadas / @totalMesas mesas)</span>
+                        </div>
+                        <div class="progress mt-2" style="height: 6px; background-color: #f1f5f9; border-radius: 999px;">
+                            <div class="progress-bar @(taxaOcupacaoPercentual > 80 ? "bg-danger" : taxaOcupacaoPercentual > 50 ? "bg-warning" : "bg-success")"
+                                 style="width: @(Math.Min(100, taxaOcupacaoPercentual))%; border-radius: 999px;"></div>
+                        </div>
                     </div>
-                    <div class="kpi-icon-circle-dark">
+                    <div class="kpi-icon-bubble kpi-bubble-amber ms-2">
                         <i class="bi bi-grid-3x3-gap-fill"></i>
                     </div>
                 </div>
@@ -110,13 +140,13 @@
     <!-- 2. Acessos Rápidos Operacionais -->
     <div class="row g-3 mb-4">
         <div class="col-12 col-md-4">
-            <div class="card border-0 shadow-sm h-100 quick-card p-3" @onclick='() => Navigation.NavigateTo("/mesas")' style="cursor: pointer;">
+            <div class="card border-0 quick-card h-100 p-3 shadow-sm" @onclick='() => Navigation.NavigateTo("/mesas")' style="cursor: pointer;">
                 <div class="d-flex align-items-center">
-                    <div class="p-3 bg-primary bg-opacity-10 text-primary rounded-circle me-3">
-                        <i class="bi bi-geo-alt-fill fs-3"></i>
+                    <div class="quick-icon-bubble quick-bubble-indigo me-3">
+                        <i class="bi bi-geo-alt-fill fs-4"></i>
                     </div>
                     <div>
-                        <h5 class="fw-bold text-dark mb-1">Mapa de Mesas</h5>
+                        <h6 class="fw-bold text-dark mb-1">Mapa de Mesas</h6>
                         <p class="text-muted small mb-0">Ver salão em tempo real e comandas abertas.</p>
                     </div>
                 </div>
@@ -124,13 +154,13 @@
         </div>
 
         <div class="col-12 col-md-4">
-            <div class="card border-0 shadow-sm h-100 quick-card p-3" @onclick='() => Navigation.NavigateTo("/comandas")' style="cursor: pointer;">
+            <div class="card border-0 quick-card h-100 p-3 shadow-sm" @onclick='() => Navigation.NavigateTo("/comandas")' style="cursor: pointer;">
                 <div class="d-flex align-items-center">
-                    <div class="p-3 bg-success bg-opacity-10 text-success rounded-circle me-3">
-                        <i class="bi bi-card-checklist fs-3"></i>
+                    <div class="quick-icon-bubble quick-bubble-emerald me-3">
+                        <i class="bi bi-card-checklist fs-4"></i>
                     </div>
                     <div>
-                        <h5 class="fw-bold text-dark mb-1">Comandas Ativas</h5>
+                        <h6 class="fw-bold text-dark mb-1">Comandas Ativas</h6>
                         <p class="text-muted small mb-0">Pesquisar por número do cartão ou nome.</p>
                     </div>
                 </div>
@@ -138,13 +168,13 @@
         </div>
 
         <div class="col-12 col-md-4">
-            <div class="card border-0 shadow-sm h-100 quick-card p-3" @onclick='() => Navigation.NavigateTo("/kds")' style="cursor: pointer;">
+            <div class="card border-0 quick-card h-100 p-3 shadow-sm" @onclick='() => Navigation.NavigateTo("/kds")' style="cursor: pointer;">
                 <div class="d-flex align-items-center">
-                    <div class="p-3 bg-danger bg-opacity-10 text-danger rounded-circle me-3">
-                        <i class="bi bi-display fs-3"></i>
+                    <div class="quick-icon-bubble quick-bubble-rose me-3">
+                        <i class="bi bi-display fs-4"></i>
                     </div>
                     <div>
-                        <h5 class="fw-bold text-dark mb-1">KDS — Cozinha</h5>
+                        <h6 class="fw-bold text-dark mb-1">KDS — Cozinha</h6>
                         <p class="text-muted small mb-0">Fila de pedidos por setor (Cozinha/Bar/Chapa).</p>
                     </div>
                 </div>
@@ -156,12 +186,12 @@
     <div class="row g-3 mb-4">
         <!-- Últimos Pedidos Lançados -->
         <div class="col-12 col-xl-7">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <div class="card border-0 shadow-sm h-100 dashboard-panel">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
                     <h5 class="fw-bold text-dark mb-0 fs-6">
                         <i class="bi bi-clock-history text-primary me-2"></i>Últimos Pedidos Lançados em Tempo Real
                     </h5>
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="CarregarMetricasAsync">
+                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-2.5" @onclick="CarregarMetricasAsync">
                         <i class="bi bi-arrow-clockwise me-1"></i> Atualizar
                     </button>
                 </div>
@@ -170,15 +200,15 @@
                     {
                         <div class="text-center py-5 text-muted">
                             <i class="bi bi-inbox fs-1 opacity-25"></i>
-                            <p class="mt-2 mb-0">Nenhum pedido registrado hoje ainda.</p>
-                            <small>Os pedidos lançados aparecerão aqui em tempo real.</small>
+                            <p class="mt-2 mb-0 fw-semibold">Nenhum pedido registrado hoje ainda.</p>
+                            <small class="text-muted">Os pedidos lançados aparecerão aqui em tempo real.</small>
                         </div>
                     }
                     else
                     {
                         <div class="table-responsive">
                             <table class="table table-hover align-middle mb-0">
-                                <thead class="table-light small">
+                                <thead class="table-header-custom">
                                     <tr>
                                         <th>Item</th>
                                         <th class="text-center">Qtd</th>
@@ -198,10 +228,10 @@
                                                     <small class="d-block text-muted fw-normal">Obs: @item.Observacao</small>
                                                 }
                                             </td>
-                                            <td class="text-center"><span class="badge bg-secondary">@item.Quantidade</span></td>
+                                            <td class="text-center"><span class="badge badge-subtle-neutral">@item.Quantidade</span></td>
                                             <td class="text-end fw-bold text-success">R$ @item.TotalItem.ToString("F2")</td>
                                             <td class="text-center">
-                                                <span class="badge bg-light text-dark border">Comanda #@item.ComandaId</span>
+                                                <span class="badge badge-subtle-neutral">Comanda #@item.ComandaId</span>
                                             </td>
                                             <td class="text-center">
                                                 <span class="badge @ObterClasseStatusItem(item.Status)">@item.Status</span>
@@ -218,13 +248,13 @@
 
         <!-- Comandas Abertas em Atendimento -->
         <div class="col-12 col-xl-5">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <div class="card border-0 shadow-sm h-100 dashboard-panel">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
                     <h5 class="fw-bold text-dark mb-0 fs-6">
                         <i class="bi bi-people-fill text-success me-2"></i>Comandas Abertas no Salão (@comandasAbertas.Count)
                     </h5>
-                    <button class="btn btn-sm btn-link text-primary p-0 text-decoration-none" @onclick='() => Navigation.NavigateTo("/comandas")'>
-                        Ver Todas
+                    <button class="btn btn-sm btn-link text-primary p-0 text-decoration-none fw-semibold" @onclick='() => Navigation.NavigateTo("/comandas")'>
+                        Ver Todas <i class="bi bi-chevron-right small"></i>
                     </button>
                 </div>
                 <div class="card-body p-0">
@@ -232,8 +262,8 @@
                     {
                         <div class="text-center py-5 text-muted">
                             <i class="bi bi-check2-circle fs-1 text-success opacity-50"></i>
-                            <p class="mt-2 mb-0">Nenhuma comanda aberta no momento.</p>
-                            <small>Todas as mesas estão livres ou contas liquidadas.</small>
+                            <p class="mt-2 mb-0 fw-semibold">Nenhuma comanda aberta no momento.</p>
+                            <small class="text-muted">Todas as mesas estão livres ou contas liquidadas.</small>
                         </div>
                     }
                     else
@@ -241,19 +271,19 @@
                         <div class="list-group list-group-flush">
                             @foreach (var c in comandasAbertas.Take(6))
                             {
-                                <div class="list-group-item d-flex justify-content-between align-items-center p-3">
+                                <div class="list-group-item d-flex justify-content-between align-items-center p-3 border-bottom">
                                     <div>
                                         <div class="fw-bold text-dark">
                                             @(string.IsNullOrWhiteSpace(c.NomeCliente) ? $"Comanda #{c.Id}" : c.NomeCliente)
                                         </div>
                                         <small class="text-muted">
                                             <i class="bi bi-geo-alt me-1"></i>@(string.IsNullOrWhiteSpace(c.MesaId) ? "Balcão" : c.MesaId)
-                                            <span class="ms-2">Aberta às @c.DataAbertura.ToString("HH:mm")</span>
+                                            <span class="ms-2"><i class="bi bi-clock me-1"></i>@c.DataAbertura.ToString("HH:mm")</span>
                                         </small>
                                     </div>
                                     <div class="text-end">
                                         <span class="fw-bold text-primary d-block fs-6">R$ @c.Total.ToString("F2")</span>
-                                        <button class="btn btn-sm btn-outline-primary py-0 px-2 mt-1" @onclick='() => Navigation.NavigateTo($"/fechamento/{c.Id}")' style="font-size: 0.75rem;">
+                                        <button class="btn btn-sm btn-outline-primary rounded-pill py-0 px-2 mt-1 fw-semibold" @onclick='() => Navigation.NavigateTo($"/fechamento/{c.Id}")' style="font-size: 0.75rem;">
                                             Fechar
                                         </button>
                                     </div>
@@ -311,48 +341,249 @@
 }
 
 <style>
-    .bg-gradient-primary {
-        background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+    /* =================================================================
+       Paleta Executiva Refinada JT_Food (SaaS POS Design System)
+       ================================================================= */
+    .dashboard-home {
+        background-color: #f8fafc;
+        min-height: 100vh;
     }
-    .bg-gradient-success {
-        background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+
+    .header-icon-badge {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background-color: #eff6ff;
+        color: #2563eb;
+        border: 1px solid #dbeafe;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.4rem;
+        flex-shrink: 0;
     }
-    .bg-gradient-info {
-        background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%);
+
+    /* Cards KPI Refinados */
+    .kpi-card-refined {
+        background: #ffffff;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 16px;
+        box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.03);
+        transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s;
+        position: relative;
+        overflow: hidden;
     }
-    .bg-gradient-warning {
-        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    .kpi-card-refined::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
     }
+    .kpi-accent-indigo::before {
+        background: linear-gradient(90deg, #4f46e5 0%, #6366f1 100%);
+    }
+    .kpi-accent-emerald::before {
+        background: linear-gradient(90deg, #059669 0%, #10b981 100%);
+    }
+    .kpi-accent-sky::before {
+        background: linear-gradient(90deg, #0284c7 0%, #38bdf8 100%);
+    }
+    .kpi-accent-amber::before {
+        background: linear-gradient(90deg, #d97706 0%, #f59e0b 100%);
+    }
+
+    .kpi-card-refined:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 24px -6px rgba(15, 23, 42, 0.08), 0 4px 6px -2px rgba(15, 23, 42, 0.04);
+        border-color: #cbd5e1 !important;
+    }
+
+    .kpi-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #64748b;
+        margin-bottom: 0.35rem;
+    }
+
+    .kpi-value {
+        font-size: 1.85rem;
+        font-weight: 800;
+        line-height: 1.15;
+        letter-spacing: -0.025em;
+        color: #0f172a;
+    }
+
+    .kpi-icon-bubble {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.4rem;
+        flex-shrink: 0;
+        transition: transform 0.2s ease;
+    }
+    .kpi-card-refined:hover .kpi-icon-bubble {
+        transform: scale(1.08);
+    }
+
+    .kpi-bubble-indigo {
+        background-color: #eef2ff;
+        color: #4f46e5;
+        border: 1px solid #e0e7ff;
+    }
+    .kpi-bubble-emerald {
+        background-color: #ecfdf5;
+        color: #059669;
+        border: 1px solid #d1fae5;
+    }
+    .kpi-bubble-sky {
+        background-color: #f0f9ff;
+        color: #0284c7;
+        border: 1px solid #e0f2fe;
+    }
+    .kpi-bubble-amber {
+        background-color: #fffbeb;
+        color: #d97706;
+        border: 1px solid #fef3c7;
+    }
+
+    /* Badges Sutis (Subtle Badges) */
+    .badge-subtle-primary {
+        background-color: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+        font-weight: 600;
+        font-size: 0.72rem;
+        padding: 0.3rem 0.55rem;
+        border-radius: 6px;
+    }
+    .badge-subtle-success {
+        background-color: #ecfdf5;
+        color: #047857;
+        border: 1px solid #a7f3d0;
+        font-weight: 600;
+        font-size: 0.72rem;
+        padding: 0.3rem 0.55rem;
+        border-radius: 6px;
+    }
+    .badge-subtle-warning {
+        background-color: #fffbeb;
+        color: #b45309;
+        border: 1px solid #fde68a;
+        font-weight: 600;
+        font-size: 0.72rem;
+        padding: 0.3rem 0.55rem;
+        border-radius: 6px;
+    }
+    .badge-subtle-info {
+        background-color: #f0f9ff;
+        color: #0369a1;
+        border: 1px solid #bae6fd;
+        font-weight: 600;
+        font-size: 0.72rem;
+        padding: 0.3rem 0.55rem;
+        border-radius: 6px;
+    }
+    .badge-subtle-danger {
+        background-color: #fff1f2;
+        color: #be123c;
+        border: 1px solid #fecdd3;
+        font-weight: 600;
+        font-size: 0.72rem;
+        padding: 0.3rem 0.55rem;
+        border-radius: 6px;
+    }
+    .badge-subtle-purple {
+        background-color: #faf5ff;
+        color: #7e22ce;
+        border: 1px solid #e9d5ff;
+        font-weight: 600;
+        font-size: 0.72rem;
+        padding: 0.3rem 0.55rem;
+        border-radius: 6px;
+    }
+    .badge-subtle-slate {
+        background-color: #f1f5f9;
+        color: #334155;
+        border: 1px solid #cbd5e1;
+        font-weight: 600;
+        font-size: 0.72rem;
+        padding: 0.3rem 0.55rem;
+        border-radius: 6px;
+    }
+    .badge-subtle-neutral {
+        background-color: #f8fafc;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        font-weight: 500;
+        font-size: 0.72rem;
+        padding: 0.3rem 0.55rem;
+        border-radius: 6px;
+    }
+
+    /* Acessos Rápidos */
     .quick-card {
-        transition: transform 0.2s, box-shadow 0.2s;
+        background: #ffffff;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 14px;
+        box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04);
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .quick-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1)!important;
+        transform: translateY(-2px);
+        box-shadow: 0 10px 18px -3px rgba(15, 23, 42, 0.08)!important;
+        border-color: #cbd5e1 !important;
     }
-    .kpi-icon-circle {
-        width: 48px;
-        height: 48px;
-        border-radius: 50%;
-        background-color: rgba(255, 255, 255, 0.22);
-        color: #ffffff;
+    .quick-icon-bubble {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.5rem;
         flex-shrink: 0;
+        transition: transform 0.2s ease;
     }
-    .kpi-icon-circle-dark {
-        width: 48px;
-        height: 48px;
-        border-radius: 50%;
-        background-color: rgba(0, 0, 0, 0.12);
-        color: #1f2937;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.5rem;
-        flex-shrink: 0;
+    .quick-card:hover .quick-icon-bubble {
+        transform: scale(1.08);
+    }
+    .quick-bubble-indigo {
+        background-color: #eef2ff;
+        color: #4f46e5;
+        border: 1px solid #e0e7ff;
+    }
+    .quick-bubble-emerald {
+        background-color: #ecfdf5;
+        color: #059669;
+        border: 1px solid #d1fae5;
+    }
+    .quick-bubble-rose {
+        background-color: #fff1f2;
+        color: #e11d48;
+        border: 1px solid #ffe4e6;
+    }
+
+    /* Painéis e Tabelas */
+    .dashboard-panel {
+        background: #ffffff;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 14px;
+        overflow: hidden;
+    }
+    .table-header-custom {
+        background-color: #f8fafc;
+        font-size: 0.72rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #64748b;
+        font-weight: 700;
+        border-bottom: 1px solid #e2e8f0;
     }
 </style>
 
@@ -424,13 +655,13 @@
     {
         return status switch
         {
-            "Confirmado" => "bg-primary",
-            "Em Produção" => "bg-warning text-dark",
-            "Pronto" => "bg-info text-dark",
-            "Saída para Entrega" => "bg-secondary",
-            "Entregue" => "bg-success",
-            "Cancelado" => "bg-danger",
-            _ => "bg-secondary"
+            "Confirmado" => "badge-subtle-primary",
+            "Em Produção" => "badge-subtle-warning",
+            "Pronto" => "badge-subtle-info",
+            "Saída para Entrega" => "badge-subtle-slate",
+            "Entregue" => "badge-subtle-success",
+            "Cancelado" => "badge-subtle-danger",
+            _ => "badge-subtle-neutral"
         };
     }
 
