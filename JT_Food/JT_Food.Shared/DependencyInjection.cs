@@ -16,7 +16,6 @@ namespace JT_Food.Shared
         {
             services.AddScoped<IMenuProvider, MenuLateral>();
             services.AddScoped<IModuloMenuProvider, MenuLateral>();
-            services.AddScoped<IConfiguracaoTabProvider, RestauranteConfigTabProvider>();
 
             // Serviços de Configuração
             services.AddScoped<MFoodConfiguracaoService>();

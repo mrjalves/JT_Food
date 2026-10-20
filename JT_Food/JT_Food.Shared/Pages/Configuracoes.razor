@@ -104,6 +104,22 @@
         impressoras = await ImpressaoService.ObterImpressorasAsync();
     }
 
+    protected override async Task CarregarTabsInjetadasAsync()
+    {
+        await base.CarregarTabsInjetadasAsync();
+        if (InjectedTabs != null && InjectedTabs.Count > 1)
+        {
+            var distinctTabs = InjectedTabs
+                .GroupBy(t => t.Titulo, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .OrderBy(t => t.Ordem)
+                .ToList();
+
+            InjectedTabs.Clear();
+            InjectedTabs.AddRange(distinctTabs);
+        }
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
