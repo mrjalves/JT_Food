@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using JT_Food.Shared.Domain.Entities;
 using JT_Food.Shared.Services.Interfaces;
 using Microsoft.Extensions.Configuration;
 
@@ -13,6 +16,9 @@ namespace JT_Food.Shared.Services.Implementations
         private readonly HttpClient _httpClient;
         private readonly IConfiguration _configuration;
 
+        public static string? CustomApiKey { get; set; }
+        public static string CustomModel { get; set; } = "gemini-1.5-flash";
+
         public GeminiRelatorioService(HttpClient httpClient, IConfiguration configuration)
         {
             _httpClient = httpClient;
@@ -21,9 +27,107 @@ namespace JT_Food.Shared.Services.Implementations
 
         private string? ObterApiKey()
         {
+            if (!string.IsNullOrWhiteSpace(CustomApiKey))
+                return CustomApiKey;
+
             return _configuration["GeminiApiKey"]
                 ?? _configuration["Config:Gemini:ApiKey"]
                 ?? _configuration["AI:ApiKey"];
+        }
+
+        public async Task<(bool Sucesso, string Mensagem, List<GeminiModelInfo> Modelos)> IdentificarModelosDisponiveisAsync(string apiKey)
+        {
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                return (false, "Informe a Google Gemini API Key antes de identificar os modelos.", new List<GeminiModelInfo>());
+            }
+
+            try
+            {
+                string endpoint = $"https://generativelanguage.googleapis.com/v1beta/models?key={apiKey.Trim()}";
+                var response = await _httpClient.GetAsync(endpoint);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errContent = await response.Content.ReadAsStringAsync();
+                    string msg = $"Erro na API do Google ({response.StatusCode})";
+                    try
+                    {
+                        using var errDoc = JsonDocument.Parse(errContent);
+                        if (errDoc.RootElement.TryGetProperty("error", out var errorProp) &&
+                            errorProp.TryGetProperty("message", out var messageProp))
+                        {
+                            msg = messageProp.GetString() ?? msg;
+                        }
+                    }
+                    catch { }
+                    return (false, $"Falha ao consultar modelos da chave: {msg}", new List<GeminiModelInfo>());
+                }
+
+                var jsonStr = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(jsonStr);
+                var modelos = new List<GeminiModelInfo>();
+
+                if (doc.RootElement.TryGetProperty("models", out var modelsElement) && modelsElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var m in modelsElement.EnumerateArray())
+                    {
+                        string rawName = m.TryGetProperty("name", out var nameProp) ? (nameProp.GetString() ?? "") : "";
+                        string displayName = m.TryGetProperty("displayName", out var dispProp) ? (dispProp.GetString() ?? "") : "";
+                        string description = m.TryGetProperty("description", out var descProp) ? (descProp.GetString() ?? "") : "";
+
+                        bool suportaGeracao = false;
+                        if (m.TryGetProperty("supportedGenerationMethods", out var methodsProp) && methodsProp.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var method in methodsProp.EnumerateArray())
+                            {
+                                if (string.Equals(method.GetString(), "generateContent", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    suportaGeracao = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        // Filtra modelos suportados para geração de texto (ex: gemini-1.5-flash, gemini-1.5-pro, gemini-2.0-flash, etc.)
+                        if (suportaGeracao || rawName.Contains("gemini", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string idLimpo = rawName.StartsWith("models/") ? rawName.Substring("models/".Length) : rawName;
+
+                            // Ignora modelos puramente de embedding ou imagem se houver
+                            if (idLimpo.Contains("embedding", StringComparison.OrdinalIgnoreCase) ||
+                                idLimpo.Contains("aqa", StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue;
+                            }
+
+                            modelos.Add(new GeminiModelInfo
+                            {
+                                Id = idLimpo,
+                                DisplayName = string.IsNullOrWhiteSpace(displayName) ? idLimpo : displayName,
+                                Description = description
+                            });
+                        }
+                    }
+                }
+
+                var ordenados = modelos
+                    .OrderByDescending(m => m.Id.Contains("flash"))
+                    .ThenByDescending(m => m.Id.Contains("1.5") || m.Id.Contains("2.0") || m.Id.Contains("2.5"))
+                    .ThenBy(m => m.DisplayName)
+                    .ToList();
+
+                if (ordenados.Count == 0)
+                {
+                    return (false, "Nenhum modelo de geração compatível retornado para esta chave.", ordenados);
+                }
+
+                return (true, $"{ordenados.Count} modelos compatíveis identificados com sucesso para esta chave!", ordenados);
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Erro de conexão ao identificar modelos: {ex.Message}", new List<GeminiModelInfo>());
+            }
         }
 
         public async Task<string> GerarDiagnosticoGeralAsync(string promptContexto)
@@ -33,7 +137,9 @@ namespace JT_Food.Shared.Services.Implementations
             {
                 try
                 {
-                    string endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={apiKey}";
+                    string modelo = !string.IsNullOrWhiteSpace(CustomModel) ? CustomModel : "gemini-1.5-flash";
+                    string endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={apiKey}";
+
                     var requestBody = new
                     {
                         contents = new[]

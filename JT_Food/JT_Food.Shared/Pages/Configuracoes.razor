@@ -1,11 +1,15 @@
 @page "/configuracoes"
 @using JT_Classes.Restaurante
 @using JT_Food.Shared.Domain.Entities
+@using JT_Food.Shared.Services.Implementations
 @using JT_Food.Shared.Services.Interfaces
 @using JT_Servicos.Interfaces
 @using JT_UserInterface.Shared.Components.Core
+@using Microsoft.JSInterop
 @inherits JT_UserInterface.Shared.Pages.Comum.ConfiguracoesBase<MFoodConfiguracao, IMFoodConfiguracaoService>
 @inject IImpressaoRedeService ImpressaoService
+@inject IIAAnalyticsService IAService
+@inject IJSRuntime JSRuntime
 
 @RenderizarFormularioConfiguracoes()
 
@@ -83,8 +87,13 @@
     private string horaInicioCouvert = "19:00";
     private string horaFimCouvert = "23:00";
 
-    private string geminiApiKey = "";
-    private string modeloIa = "gemini-1.5-flash";
+    private string geminiApiKey = GeminiRelatorioService.CustomApiKey ?? "";
+    private string modeloIa = GeminiRelatorioService.CustomModel ?? "gemini-1.5-flash";
+    private bool identificandoModelos = false;
+    private bool mostrarApiKey = false;
+    private List<GeminiModelInfo> modelosDisponiveis = new();
+    private string? statusIaMensagem;
+    private string statusIaClasse = "alert-info";
 
     private string? mensagemAlerta;
     private string classeAlerta = "alert-success";
@@ -93,6 +102,52 @@
     {
         await base.OnInitializedAsync();
         impressoras = await ImpressaoService.ObterImpressorasAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var savedKey = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "jt_gemini_api_key");
+                var savedModel = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "jt_gemini_model");
+
+                bool alterou = false;
+                if (!string.IsNullOrWhiteSpace(savedKey))
+                {
+                    geminiApiKey = savedKey;
+                    GeminiRelatorioService.CustomApiKey = savedKey;
+                    alterou = true;
+                }
+
+                if (!string.IsNullOrWhiteSpace(savedModel))
+                {
+                    modeloIa = savedModel;
+                    GeminiRelatorioService.CustomModel = savedModel;
+                    alterou = true;
+                }
+
+                if (!string.IsNullOrWhiteSpace(geminiApiKey))
+                {
+                    var res = await IAService.IdentificarModelosDisponiveisAsync(geminiApiKey);
+                    if (res.Sucesso && res.Modelos.Count > 0)
+                    {
+                        modelosDisponiveis = res.Modelos;
+                        alterou = true;
+                    }
+                }
+
+                if (alterou)
+                {
+                    StateHasChanged();
+                }
+            }
+            catch
+            {
+                // Ignora falhas em pré-renderização sem JS
+            }
+        }
     }
 
     public override RenderFragment? TabsAdicionais => 
@@ -199,37 +254,105 @@
             </TabPage>
 
             <TabPage Title="Inteligência Artificial (Gemini)">
-                <div class="py-3" style="max-width: 700px;">
-                    <h6 class="fw-bold text-primary mb-3"><i class="bi bi-robot me-2"></i>Parametrização Google Gemini AI</h6>
+                <div class="py-3" style="max-width: 750px;">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-primary bg-opacity-10 text-primary p-2 rounded-circle me-3">
+                            <i class="bi bi-robot fs-4"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold text-dark mb-0">Parametrização Google Gemini AI</h6>
+                            <small class="text-muted">Informe sua Google Gemini API Key e identifique os modelos habilitados para sua conta.</small>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(statusIaMensagem))
+                    {
+                        <div class="alert @statusIaClasse alert-dismissible fade show d-flex align-items-center mb-3" role="alert">
+                            <i class="bi @(statusIaClasse.Contains("success") ? "bi-check-circle-fill" : statusIaClasse.Contains("danger") ? "bi-exclamation-triangle-fill" : "bi-info-circle-fill") me-2 fs-5"></i>
+                            <div class="flex-grow-1 small">@statusIaMensagem</div>
+                            <button type="button" class="btn-close" @onclick="() => statusIaMensagem = null"></button>
+                        </div>
+                    }
 
                     <div class="mb-3">
                         <label class="form-label fw-bold small text-muted">Google Gemini API Key:</label>
                         <div class="input-group">
-                            <span class="input-group-text"><i class="bi bi-key-fill text-muted"></i></span>
-                            <input type="password" class="form-control" @bind="geminiApiKey" placeholder="AIzaSy..." />
+                            <span class="input-group-text bg-light"><i class="bi bi-key-fill text-muted"></i></span>
+                            <input type="@(mostrarApiKey ? "text" : "password")" 
+                                   class="form-control font-monospace" 
+                                   @bind="geminiApiKey" 
+                                   placeholder="Cole sua API Key do Google AI Studio (ex: AIzaSy...)" />
+                            <button class="btn btn-outline-secondary" type="button" @onclick="() => mostrarApiKey = !mostrarApiKey" title="Visualizar chave">
+                                <i class="bi @(mostrarApiKey ? "bi-eye-slash" : "bi-eye")"></i>
+                            </button>
+                            <button class="btn btn-primary fw-semibold px-3" 
+                                    type="button" 
+                                    @onclick="IdentificarModelosAsync" 
+                                    disabled="@(identificandoModelos || string.IsNullOrWhiteSpace(geminiApiKey))">
+                                @if (identificandoModelos)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                    <span>Identificando...</span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-cpu me-1"></i>
+                                    <span>Identificar Modelos</span>
+                                }
+                            </button>
                         </div>
-                        <small class="text-muted">A chave é utilizada para gerar diagnósticos executivos, prever estoque e sugerir combos.</small>
+                        <div class="d-flex justify-content-between align-items-center mt-1">
+                            <small class="text-muted">A chave é utilizada para consultar a API oficial do Gemini de forma segura.</small>
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="small text-decoration-none">
+                                <i class="bi bi-box-arrow-up-right me-1"></i>Obter Chave no Google AI Studio
+                            </a>
+                        </div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold small text-muted">Modelo de Linguagem:</label>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label fw-bold small text-muted mb-0">Modelo de Linguagem:</label>
+                            @if (modelosDisponiveis.Count > 0)
+                            {
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                    <i class="bi bi-check-lg me-1"></i>@modelosDisponiveis.Count modelos identificados
+                                </span>
+                            }
+                        </div>
                         <select class="form-select" @bind="modeloIa">
-                            <option value="gemini-1.5-flash">Gemini 1.5 Flash (Ultra Rápido e Otimizado)</option>
-                            <option value="gemini-1.5-pro">Gemini 1.5 Pro (Raciocínio Profundo e Diagnósticos Avançados)</option>
+                            @if (modelosDisponiveis.Count > 0)
+                            {
+                                @foreach (var mod in modelosDisponiveis)
+                                {
+                                    <option value="@mod.Id">@mod.DisplayName (@mod.Id)</option>
+                                }
+                            }
+                            else
+                            {
+                                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Ultra Rápido e Otimizado)</option>
+                                <option value="gemini-1.5-pro">Gemini 1.5 Pro (Raciocínio Profundo e Diagnósticos Avançados)</option>
+                                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                            }
                         </select>
+                        @if (!string.IsNullOrEmpty(ObterDescricaoModeloSelecionado()))
+                        {
+                            <small class="text-muted d-block mt-1 fst-italic">
+                                <i class="bi bi-info-circle me-1"></i>@ObterDescricaoModeloSelecionado()
+                            </small>
+                        }
                     </div>
 
-                    <div class="p-3 bg-light rounded border mb-3">
+                    <div class="p-3 bg-light rounded border mb-4">
                         <div class="d-flex align-items-center">
                             <i class="bi bi-shield-check text-success fs-3 me-3"></i>
                             <div>
                                 <strong class="text-dark">Motor Analítico Híbrido Ativo</strong>
-                                <small class="d-block text-muted">Se a chave não for configurada, o sistema utiliza o motor analítico inteligente embutido sem custo adicional.</small>
+                                <small class="d-block text-muted">Se a chave não for informada ou a cota do Google esgotar, o sistema utiliza automaticamente o motor analítico inteligente embutido sem custo adicional.</small>
                             </div>
                         </div>
                     </div>
 
-                    <button type="button" class="btn btn-primary" @onclick="SalvarIaConfig">
+                    <button type="button" class="btn btn-primary px-4 fw-semibold shadow-sm" @onclick="SalvarIaConfig">
                         <i class="bi bi-save me-1"></i> Salvar Configuração de IA
                     </button>
                 </div>
@@ -276,8 +399,74 @@
         ExibirAlerta("Parâmetros de Couvert Artístico atualizados!", "alert-success");
     }
 
-    private void SalvarIaConfig()
+    private async Task IdentificarModelosAsync()
     {
+        if (string.IsNullOrWhiteSpace(geminiApiKey))
+        {
+            statusIaMensagem = "Por favor, informe a Google Gemini API Key antes de identificar os modelos.";
+            statusIaClasse = "alert-warning";
+            return;
+        }
+
+        identificandoModelos = true;
+        statusIaMensagem = "Consultando a API do Google para identificar modelos disponíveis...";
+        statusIaClasse = "alert-info";
+        StateHasChanged();
+
+        try
+        {
+            var res = await IAService.IdentificarModelosDisponiveisAsync(geminiApiKey);
+            if (res.Sucesso && res.Modelos.Count > 0)
+            {
+                modelosDisponiveis = res.Modelos;
+                if (!modelosDisponiveis.Any(m => m.Id == modeloIa))
+                {
+                    modeloIa = modelosDisponiveis.First().Id;
+                }
+                statusIaMensagem = res.Mensagem;
+                statusIaClasse = "alert-success";
+            }
+            else
+            {
+                statusIaMensagem = res.Mensagem;
+                statusIaClasse = "alert-danger";
+            }
+        }
+        catch (Exception ex)
+        {
+            statusIaMensagem = $"Erro ao identificar modelos: {ex.Message}";
+            statusIaClasse = "alert-danger";
+        }
+        finally
+        {
+            identificandoModelos = false;
+            StateHasChanged();
+        }
+    }
+
+    private string ObterDescricaoModeloSelecionado()
+    {
+        var mod = modelosDisponiveis.FirstOrDefault(m => m.Id == modeloIa);
+        return mod?.Description ?? "";
+    }
+
+    private async Task SalvarIaConfig()
+    {
+        GeminiRelatorioService.CustomApiKey = geminiApiKey;
+        GeminiRelatorioService.CustomModel = modeloIa;
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "jt_gemini_api_key", geminiApiKey ?? "");
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "jt_gemini_model", modeloIa ?? "gemini-1.5-flash");
+        }
+        catch
+        {
+            // Ignora exceção em casos de localStorage desabilitado
+        }
+
+        statusIaMensagem = $"Configurações da Inteligência Artificial salvas! Modelo ativo: {modeloIa}";
+        statusIaClasse = "alert-success";
         ExibirAlerta("Configurações da Inteligência Artificial salvas com sucesso!", "alert-success");
     }
 
@@ -287,3 +476,4 @@
         classeAlerta = classe;
     }
 }
+
