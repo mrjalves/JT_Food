@@ -178,7 +178,13 @@ namespace JT_Food.Shared.Services.Implementations
         public override async Task<int> SaveAsync(MCaixa entity)
         {
             var id = entity.Id;
-            bool isNew = id == 0;
+            bool isNew = id <= 0;
+
+            if (isNew)
+            {
+                entity.Id = System.Threading.Interlocked.Increment(ref _nextCaixaId);
+            }
+            _cacheCaixas[entity.Id] = entity;
 
             if (IsApiMode)
             {
@@ -195,29 +201,27 @@ namespace JT_Food.Shared.Services.Implementations
                                 var created = await response.Content.ReadFromJsonAsync<MCaixa>();
                                 if (created != null && created.Id > 0)
                                 {
-                                    entity.Id = created.Id;
-                                    _cacheCaixas[entity.Id] = entity;
+                                    if (created.Id != entity.Id)
+                                    {
+                                        _cacheCaixas.TryRemove(entity.Id, out _);
+                                        entity.Id = created.Id;
+                                        _cacheCaixas[entity.Id] = entity;
+                                    }
                                     return created.Id;
                                 }
                             }
                             catch { }
-
-                            if (entity.Id <= 0)
-                            {
-                                entity.Id = System.Threading.Interlocked.Increment(ref _nextCaixaId);
-                            }
-                            _cacheCaixas[entity.Id] = entity;
                             return entity.Id;
                         }
                     }
                     else
                     {
-                        var url = ObterUrlEfetiva($"{GetApiRoute()}/{id}");
+                        var url = ObterUrlEfetiva($"{GetApiRoute()}/{entity.Id}");
                         var response = await _client.PutAsJsonAsync(url, entity);
                         if (response.IsSuccessStatusCode)
                         {
                             _cacheCaixas[entity.Id] = entity;
-                            return id;
+                            return entity.Id;
                         }
                     }
                 }
@@ -240,12 +244,6 @@ namespace JT_Food.Shared.Services.Implementations
                 catch { }
             }
 
-            // Fallback resiliente em memória caso a API esteja indisponível
-            if (isNew && entity.Id <= 0)
-            {
-                entity.Id = System.Threading.Interlocked.Increment(ref _nextCaixaId);
-            }
-            _cacheCaixas[entity.Id] = entity;
             return entity.Id;
         }
 
@@ -440,7 +438,13 @@ namespace JT_Food.Shared.Services.Implementations
         public override async Task<int> SaveAsync(MMovimentacaoCaixa entity)
         {
             var id = entity.Id;
-            bool isNew = id == 0;
+            bool isNew = id <= 0;
+
+            if (isNew)
+            {
+                entity.Id = System.Threading.Interlocked.Increment(ref _nextMovId);
+            }
+            _cacheMovimentacoes[entity.Id] = entity;
 
             if (IsApiMode)
             {
@@ -457,29 +461,27 @@ namespace JT_Food.Shared.Services.Implementations
                                 var created = await response.Content.ReadFromJsonAsync<MMovimentacaoCaixa>();
                                 if (created != null && created.Id > 0)
                                 {
-                                    entity.Id = created.Id;
-                                    _cacheMovimentacoes[entity.Id] = entity;
+                                    if (created.Id != entity.Id)
+                                    {
+                                        _cacheMovimentacoes.TryRemove(entity.Id, out _);
+                                        entity.Id = created.Id;
+                                        _cacheMovimentacoes[entity.Id] = entity;
+                                    }
                                     return created.Id;
                                 }
                             }
                             catch { }
-
-                            if (entity.Id <= 0)
-                            {
-                                entity.Id = System.Threading.Interlocked.Increment(ref _nextMovId);
-                            }
-                            _cacheMovimentacoes[entity.Id] = entity;
                             return entity.Id;
                         }
                     }
                     else
                     {
-                        var url = ObterUrlEfetiva($"{GetApiRoute()}/{id}");
+                        var url = ObterUrlEfetiva($"{GetApiRoute()}/{entity.Id}");
                         var response = await _client.PutAsJsonAsync(url, entity);
                         if (response.IsSuccessStatusCode)
                         {
                             _cacheMovimentacoes[entity.Id] = entity;
-                            return id;
+                            return entity.Id;
                         }
                     }
                 }
@@ -502,12 +504,6 @@ namespace JT_Food.Shared.Services.Implementations
                 catch { }
             }
 
-            // Fallback local
-            if (isNew && entity.Id <= 0)
-            {
-                entity.Id = System.Threading.Interlocked.Increment(ref _nextMovId);
-            }
-            _cacheMovimentacoes[entity.Id] = entity;
             return entity.Id;
         }
 

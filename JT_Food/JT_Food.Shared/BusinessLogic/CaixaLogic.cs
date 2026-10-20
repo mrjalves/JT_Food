@@ -56,71 +56,113 @@ namespace JT_Food.Shared.BusinessLogic
 
         public async Task<(bool Sucesso, string Mensagem)> AbrirCaixaAsync(string operadorId, double saldoInicial, string? observacao)
         {
-            var situacaoAtual = await ObterCaixaAbertoAsync();
-            if (situacaoAtual.Sucesso)
+            try
             {
-                return (false, "Já existe um caixa aberto. Feche-o primeiro.");
+                var situacaoAtual = await ObterCaixaAbertoAsync();
+                if (situacaoAtual.Sucesso)
+                {
+                    return (false, "Já existe um caixa aberto. Feche-o primeiro.");
+                }
+
+                var novoCaixa = new MCaixa
+                {
+                    OperadorAberturaId = operadorId,
+                    SaldoInicial = saldoInicial,
+                    SaldoFinalCalculado = saldoInicial,
+                    DataAbertura = DateTime.UtcNow,
+                    Status = "Aberto",
+                    Observacao = observacao
+                };
+
+                int idSalvo = await _caixaService.SaveAsync(novoCaixa);
+                if (idSalvo > 0)
+                {
+                    novoCaixa.Id = idSalvo;
+                    try
+                    {
+                        await RegistrarMovimentacaoAsync(novoCaixa.Id.ToString(), operadorId, "Abertura", "Entrada", saldoInicial, "Dinheiro", "Abertura de Caixa");
+                    }
+                    catch (Exception exMov)
+                    {
+                        Console.WriteLine($"[CaixaLogic] Aviso ao registrar movimentação de abertura: {exMov.Message}");
+                    }
+                    return (true, "Caixa aberto com sucesso.");
+                }
+
+                return (false, "Erro ao abrir o caixa. Não foi possível registrar a abertura do turno.");
             }
-
-            var novoCaixa = new MCaixa
+            catch (Exception ex)
             {
-                OperadorAberturaId = operadorId,
-                SaldoInicial = saldoInicial,
-                SaldoFinalCalculado = saldoInicial,
-                DataAbertura = DateTime.UtcNow,
-                Status = "Aberto",
-                Observacao = observacao
-            };
-
-            bool salvou = await _caixaService.SaveAsync(novoCaixa) > 0;
-            
-            if (salvou)
-            {
-                await RegistrarMovimentacaoAsync(novoCaixa.Id.ToString(), operadorId, "Abertura", "Entrada", saldoInicial, "Dinheiro", "Abertura de Caixa");
-                return (true, "Caixa aberto com sucesso.");
+                return (false, $"Erro ao abrir o caixa: {ex.Message}");
             }
-
-            return (false, "Erro ao abrir o caixa.");
         }
 
         public async Task<(bool Sucesso, string Mensagem)> FecharCaixaAsync(string caixaId, string operadorId, double saldoInformado, string? observacao)
         {
-            var caixa = await _caixaService.GetById(Convert.ToInt32(caixaId));
-            if (caixa == null || caixa.Status != "Aberto")
+            try
             {
-                return (false, "Caixa inválido ou já fechado.");
+                var caixa = await _caixaService.GetById(Convert.ToInt32(caixaId));
+                if (caixa == null || caixa.Status != "Aberto")
+                {
+                    return (false, "Caixa inválido ou já fechado.");
+                }
+
+                caixa.DataFechamento = DateTime.UtcNow;
+                caixa.OperadorFechamentoId = operadorId;
+                caixa.SaldoFinalInformado = saldoInformado;
+                caixa.Status = "Fechado";
+                caixa.Observacao += $"\nFechamento: {observacao}";
+
+                bool salvou = await _caixaService.SaveAsync(caixa) > 0;
+                if (salvou)
+                {
+                    try
+                    {
+                        await RegistrarMovimentacaoAsync(caixa.Id.ToString(), operadorId, "Fechamento", "Saida", saldoInformado, "Dinheiro", "Fechamento de Caixa");
+                    }
+                    catch (Exception exMov)
+                    {
+                        Console.WriteLine($"[CaixaLogic] Aviso ao registrar movimentação de fechamento: {exMov.Message}");
+                    }
+                    return (true, "Caixa fechado com sucesso.");
+                }
+
+                return (false, "Erro ao fechar o caixa.");
             }
-
-            caixa.DataFechamento = DateTime.UtcNow;
-            caixa.OperadorFechamentoId = operadorId;
-            caixa.SaldoFinalInformado = saldoInformado;
-            caixa.Status = "Fechado";
-            caixa.Observacao += $"\nFechamento: {observacao}";
-
-            bool salvou = await _caixaService.SaveAsync(caixa) > 0;
-            if (salvou)
+            catch (Exception ex)
             {
-                await RegistrarMovimentacaoAsync(caixa.Id.ToString(), operadorId, "Fechamento", "Saida", saldoInformado, "Dinheiro", "Fechamento de Caixa");
-                return (true, "Caixa fechado com sucesso.");
+                return (false, $"Erro ao fechar o caixa: {ex.Message}");
             }
-
-            return (false, "Erro ao fechar o caixa.");
         }
 
         public async Task<(bool Sucesso, string Mensagem)> TrocarOperadorCaixaAsync(string caixaId, string antigoOperadorId, string novoOperadorId)
         {
-            var caixa = await _caixaService.GetById(Convert.ToInt32(caixaId));
-            if (caixa == null || caixa.Status != "Aberto")
+            try
             {
-                return (false, "Caixa inválido ou fechado.");
+                var caixa = await _caixaService.GetById(Convert.ToInt32(caixaId));
+                if (caixa == null || caixa.Status != "Aberto")
+                {
+                    return (false, "Caixa inválido ou fechado.");
+                }
+                
+                caixa.Observacao += $"\nTroca de operador. Saiu:{antigoOperadorId} Entrou:{novoOperadorId} as {DateTime.UtcNow:dd/MM/yyyy HH:mm}";
+                await _caixaService.SaveAsync(caixa);
+
+                try
+                {
+                    await RegistrarMovimentacaoAsync(caixa.Id.ToString(), novoOperadorId, "TrocaOperador", "Calculo", 0.0, "-", $"Assumiu o caixa de {antigoOperadorId}");
+                }
+                catch (Exception exMov)
+                {
+                    Console.WriteLine($"[CaixaLogic] Aviso ao registrar movimentação de troca de operador: {exMov.Message}");
+                }
+
+                return (true, "Troca de operador registrada com sucesso.");
             }
-            
-            caixa.Observacao += $"\nTroca de operador. Saiu:{antigoOperadorId} Entrou:{novoOperadorId} as {DateTime.UtcNow:dd/MM/yyyy HH:mm}";
-            await _caixaService.SaveAsync(caixa);
-
-            await RegistrarMovimentacaoAsync(caixa.Id.ToString(), novoOperadorId, "TrocaOperador", "Calculo", 0.0, "-", $"Assumiu o caixa de {antigoOperadorId}");
-
-            return (true, "Troca de operador registrada com sucesso.");
+            catch (Exception ex)
+            {
+                return (false, $"Erro na troca de operador: {ex.Message}");
+            }
         }
 
         public async Task RegistrarMovimentacaoAsync(string caixaId, string operadorId, string tipoMovimentacao, string natureza, double valor, string formaPagamento, string? descricao = null, string? comandaId = null)

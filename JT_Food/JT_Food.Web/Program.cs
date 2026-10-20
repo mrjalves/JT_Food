@@ -104,13 +104,24 @@ if (!string.IsNullOrWhiteSpace(stringConexao))
         migrador.AplicarMigracoes(new List<Type>
         {
             typeof(JT_Classes.Restaurante.MItemComanda),
-            typeof(JT_Classes.Restaurante.MAdicionaisItemComanda)
+            typeof(JT_Classes.Restaurante.MAdicionaisItemComanda),
+            typeof(JT_Classes.Restaurante.MCaixa),
+            typeof(JT_Classes.Restaurante.MMovimentacaoCaixa),
+            typeof(JT_Classes.Restaurante.MInsumo),
+            typeof(JT_Classes.Restaurante.MLoteInsumo),
+            typeof(JT_Classes.Restaurante.MReceita),
+            typeof(JT_Classes.Restaurante.MProducao),
+            typeof(JT_Classes.Restaurante.MPagamentoComanda),
+            typeof(JT_Classes.Restaurante.MMemoriaCalculo),
+            typeof(JT_Classes.Restaurante.MItemCompra),
+            typeof(JT_Classes.Restaurante.MEstoque),
+            typeof(JT_Classes.Restaurante.MFoodConfiguracao)
         });
-        Console.WriteLine("[MIGRACAO][ITENS] Tabelas FoodItensComanda e FoodAdicionaisItemComanda migradas/verificadas com sucesso.");
+        Console.WriteLine("[MIGRACAO][FOOD] Tabelas do ecossistema Food migradas/verificadas com sucesso.");
     }
     catch (Exception exMig)
     {
-        Console.WriteLine($"[MIGRACAO][ITENS] Aviso ao migrar tabelas de itens: {exMig.Message}");
+        Console.WriteLine($"[MIGRACAO][FOOD] Aviso ao migrar tabelas do Food: {exMig.Message}");
     }
 }
 

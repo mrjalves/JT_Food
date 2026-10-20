@@ -118,8 +118,8 @@ namespace JT_Food.Shared.Services.Implementations
                     Console.WriteLine($"[FoodItemComandaService GetAll API Error]: {ex.Message}");
                 }
 
-                // Fallback para banco direto se a API não retornou itens ou falhou
-                if (resultado.Count == 0 && !string.IsNullOrWhiteSpace(JT_Aplicacao.Config.Config.Instancia?.Conexao?.StringConexao))
+                // Fallback para banco direto se a API não retornou itens ou falhou (apenas quando não executando no WebAssembly do browser)
+                if (!OperatingSystem.IsBrowser() && resultado.Count == 0 && !string.IsNullOrWhiteSpace(JT_Aplicacao.Config.Config.Instancia?.Conexao?.StringConexao))
                 {
                     try
                     {
@@ -202,7 +202,7 @@ namespace JT_Food.Shared.Services.Implementations
                 }
                 catch { }
 
-                if (!string.IsNullOrWhiteSpace(JT_Aplicacao.Config.Config.Instancia?.Conexao?.StringConexao))
+                if (!OperatingSystem.IsBrowser() && !string.IsNullOrWhiteSpace(JT_Aplicacao.Config.Config.Instancia?.Conexao?.StringConexao))
                 {
                     try
                     {
@@ -275,10 +275,10 @@ namespace JT_Food.Shared.Services.Implementations
                     Console.WriteLine($"[FoodItemComandaService SaveAsync Exception]: {ex.Message}");
                 }
 
-                // Fallback para banco direto caso a API falhe
-                try
+                // Fallback para banco direto caso a API falhe (apenas quando não executando no WebAssembly do browser)
+                if (!OperatingSystem.IsBrowser() && !string.IsNullOrWhiteSpace(JT_Aplicacao.Config.Config.Instancia?.Conexao?.StringConexao))
                 {
-                    if (!string.IsNullOrWhiteSpace(JT_Aplicacao.Config.Config.Instancia?.Conexao?.StringConexao))
+                    try
                     {
                         int dbId;
                         if (isNew)
@@ -305,10 +305,10 @@ namespace JT_Food.Shared.Services.Implementations
                             return dbId;
                         }
                     }
-                }
-                catch (Exception exDb)
-                {
-                    Console.WriteLine($"[FoodItemComandaService SaveAsync DB Fallback Error]: {exDb.Message}");
+                    catch (Exception exDb)
+                    {
+                        Console.WriteLine($"[FoodItemComandaService SaveAsync DB Fallback Error]: {exDb.Message}");
+                    }
                 }
 
                 return entity.Id;
@@ -450,8 +450,8 @@ namespace JT_Food.Shared.Services.Implementations
                 }
                 catch { }
 
-                // Fallback para banco direto se a API não retornou itens ou falhou
-                if (resultado.Count == 0 && !string.IsNullOrWhiteSpace(JT_Aplicacao.Config.Config.Instancia?.Conexao?.StringConexao))
+                // Fallback para banco direto se a API não retornou itens ou falhou (apenas quando não executando no WebAssembly do browser)
+                if (!OperatingSystem.IsBrowser() && resultado.Count == 0 && !string.IsNullOrWhiteSpace(JT_Aplicacao.Config.Config.Instancia?.Conexao?.StringConexao))
                 {
                     try
                     {
@@ -549,10 +549,10 @@ namespace JT_Food.Shared.Services.Implementations
                 }
                 catch { }
 
-                // Fallback para banco direto caso a API falhe
-                try
+                // Fallback para banco direto caso a API falhe (apenas quando não executando no WebAssembly do browser)
+                if (!OperatingSystem.IsBrowser() && !string.IsNullOrWhiteSpace(JT_Aplicacao.Config.Config.Instancia?.Conexao?.StringConexao))
                 {
-                    if (!string.IsNullOrWhiteSpace(JT_Aplicacao.Config.Config.Instancia?.Conexao?.StringConexao))
+                    try
                     {
                         int dbId;
                         if (isNew)
@@ -579,8 +579,8 @@ namespace JT_Food.Shared.Services.Implementations
                             return dbId;
                         }
                     }
+                    catch { }
                 }
-                catch { }
 
                 return entity.Id;
             }
