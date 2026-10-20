@@ -178,9 +178,18 @@
             </div>
 
             <div class="d-flex justify-content-end gap-2 mt-4">
-                <button type="button" class="btn btn-secondary" @onclick="Close">Cancelar</button>
-                <button type="button" class="btn btn-success" @onclick="SalvarAsync">
-                    <i class="fas fa-save me-1"></i> Salvar Comanda
+                <button type="button" class="btn btn-secondary" @onclick="Close" disabled="@salvando">Cancelar</button>
+                <button type="button" class="btn btn-success" @onclick="SalvarAsync" disabled="@salvando">
+                    @if (salvando)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        <span>Salvando...</span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-save me-1"></i>
+                        <span>Salvar Comanda</span>
+                    }
                 </button>
             </div>
         }
@@ -282,44 +291,58 @@
         StateHasChanged();
     }
 
+    private bool salvando = false;
+
     public async Task SalvarAsync()
     {
-        if (Comanda.Id == 0)
-        {
-            await ComandaService.AbrirComandaFlexivelAsync(
-                numeroCartao,
-                nomeCliente,
-                Comanda.MesaId,
-                quantidadePessoas,
-                cobrarCouvert,
-                valorCouvertUnitario
-            );
-        }
-        else
-        {
-            // Atualizar
-            string formatado = "";
-            if (!string.IsNullOrWhiteSpace(numeroCartao) && !string.IsNullOrWhiteSpace(nomeCliente))
-                formatado = $"[Cartão {numeroCartao}] {nomeCliente}";
-            else if (!string.IsNullOrWhiteSpace(numeroCartao))
-                formatado = $"Cartão #{numeroCartao}";
-            else if (!string.IsNullOrWhiteSpace(nomeCliente))
-                formatado = nomeCliente;
-            else
-                formatado = "Consumidor";
+        if (salvando) return;
+        salvando = true;
+        StateHasChanged();
 
-            Comanda.NomeCliente = formatado;
-
-            if (cobrarCouvert)
+        try
+        {
+            if (Comanda.Id == 0)
             {
-                Comanda.TaxaServico = quantidadePessoas * valorCouvertUnitario;
+                var nova = await ComandaService.AbrirComandaFlexivelAsync(
+                    numeroCartao,
+                    nomeCliente,
+                    Comanda.MesaId,
+                    quantidadePessoas,
+                    cobrarCouvert,
+                    valorCouvertUnitario
+                );
+                Comanda = nova;
+            }
+            else
+            {
+                // Atualizar
+                string formatado = "";
+                if (!string.IsNullOrWhiteSpace(numeroCartao) && !string.IsNullOrWhiteSpace(nomeCliente))
+                    formatado = $"[Cartão {numeroCartao}] {nomeCliente}";
+                else if (!string.IsNullOrWhiteSpace(numeroCartao))
+                    formatado = $"Cartão #{numeroCartao}";
+                else if (!string.IsNullOrWhiteSpace(nomeCliente))
+                    formatado = nomeCliente;
+                else
+                    formatado = "Consumidor";
+
+                Comanda.NomeCliente = formatado;
+
+                if (cobrarCouvert)
+                {
+                    Comanda.TaxaServico = quantidadePessoas * valorCouvertUnitario;
+                }
+
+                await ComandaService.SaveAsync(Comanda);
             }
 
-            await ComandaService.SaveAsync(Comanda);
+            await OnSaved.InvokeAsync();
+            Close();
         }
-
-        await OnSaved.InvokeAsync();
-        Close();
+        finally
+        {
+            salvando = false;
+        }
     }
 
     private async Task HandlePedidoEnviado()

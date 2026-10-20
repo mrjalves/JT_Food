@@ -41,7 +41,8 @@
         @if (abaAtiva == "comandas" && Mesa.Id > 0)
         {
             <GestorComandasMesa MesaIdentificacao="@Mesa.Identificacao"
-                                OnSelecionarComanda="SelecionarComandaParaPedido" />
+                                OnSelecionarComanda="SelecionarComandaParaPedido"
+                                OnComandaCriada="HandleComandaCriada" />
         }
         else if (abaAtiva == "pedido" && Mesa.Id > 0)
         {
@@ -254,8 +255,24 @@
         }
     }
 
-    private void SelecionarComandaParaPedido(JT_Classes.Restaurante.Comanda c)
+    private async Task HandleComandaCriada()
     {
+        Mesa.Status = StatusMesaConsts.Ocupada;
+        if (Mesa.Id > 0)
+        {
+            await MesaService.SaveAsync(Mesa);
+        }
+        await OnSaved.InvokeAsync();
+        StateHasChanged();
+    }
+
+    private async Task SelecionarComandaParaPedido(JT_Classes.Restaurante.Comanda c)
+    {
+        Mesa.Status = StatusMesaConsts.Ocupada;
+        if (Mesa.Id > 0)
+        {
+            await MesaService.SaveAsync(Mesa);
+        }
         comandaParaPedido = new JT_Food.Shared.Domain.Entities.Comanda
         {
             Id = c.Id,
@@ -264,7 +281,10 @@
             Subtotal = c.Total
         };
         abaAtiva = "pedido";
+        await OnSaved.InvokeAsync();
+        StateHasChanged();
     }
+
 
     private async Task HandlePedidoEnviado()
     {

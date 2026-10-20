@@ -269,7 +269,14 @@ namespace JT_Food.Shared.Services.Implementations
 
         public Task<bool> AtualizarStatusOperacionalAsync(string identificacaoMesa, string novoStatus, int totalComandas, double subtotal)
         {
-            var elem = _elementos.FirstOrDefault(e => string.Equals(e.Identificacao, identificacaoMesa, StringComparison.OrdinalIgnoreCase));
+            if (string.IsNullOrWhiteSpace(identificacaoMesa)) return Task.FromResult(false);
+
+            string normA = identificacaoMesa.Replace("Mesa ", "").Trim();
+            var elem = _elementos.FirstOrDefault(e =>
+                string.Equals(e.Identificacao, identificacaoMesa, StringComparison.OrdinalIgnoreCase) ||
+                (e.Identificacao != null && e.Identificacao.Replace("Mesa ", "").Trim().Equals(normA, StringComparison.OrdinalIgnoreCase))
+            );
+
             if (elem != null)
             {
                 elem.Status = novoStatus;

@@ -29,10 +29,19 @@
                     <input type="text" class="form-control form-control-sm" placeholder="Nome do Cliente (ex: Sofia)" @bind="novoNomeCliente" />
                 </div>
                 <div class="col-12 col-md-3 d-flex gap-1">
-                    <button class="btn btn-sm btn-success w-100" @onclick="ConfirmarAberturaComandaAsync">
-                        <i class="bi bi-check-lg me-1"></i> Abrir
+                    <button class="btn btn-sm btn-success w-100" @onclick="ConfirmarAberturaComandaAsync" disabled="@abrindo">
+                        @if (abrindo)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <span>Abrindo...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-check-lg me-1"></i>
+                            <span>Abrir</span>
+                        }
                     </button>
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => abrindoNovaComanda = false">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => abrindoNovaComanda = false" disabled="@abrindo">
                         <i class="bi bi-x-lg"></i>
                     </button>
                 </div>
@@ -112,10 +121,12 @@
 @code {
     [Parameter] public string MesaIdentificacao { get; set; } = string.Empty;
     [Parameter] public EventCallback<JT_Classes.Restaurante.Comanda> OnSelecionarComanda { get; set; }
+    [Parameter] public EventCallback OnComandaCriada { get; set; }
 
     private List<JT_Classes.Restaurante.Comanda> comandasDaMesa = new();
     private bool carregando = true;
     private bool abrindoNovaComanda = false;
+    private bool abrindo = false;
     private string novoNumeroCartao = "";
     private string novoNomeCliente = "";
 
@@ -139,26 +150,43 @@
 
     private async Task ConfirmarAberturaComandaAsync()
     {
+        if (abrindo) return;
         if (string.IsNullOrWhiteSpace(novoNumeroCartao) && string.IsNullOrWhiteSpace(novoNomeCliente))
         {
             return;
         }
 
-        var nova = await ComandaService.AbrirComandaFlexivelAsync(
-            novoNumeroCartao,
-            novoNomeCliente,
-            MesaIdentificacao
-        );
-
-        novoNumeroCartao = "";
-        novoNomeCliente = "";
-        abrindoNovaComanda = false;
-
-        await RecarregarAsync();
-
-        if (OnSelecionarComanda.HasDelegate)
+        try
         {
-            await OnSelecionarComanda.InvokeAsync(nova);
+            abrindo = true;
+            StateHasChanged();
+
+            var nova = await ComandaService.AbrirComandaFlexivelAsync(
+                novoNumeroCartao,
+                novoNomeCliente,
+                MesaIdentificacao
+            );
+
+            novoNumeroCartao = "";
+            novoNomeCliente = "";
+            abrindoNovaComanda = false;
+
+            await RecarregarAsync();
+
+            if (OnComandaCriada.HasDelegate)
+            {
+                await OnComandaCriada.InvokeAsync();
+            }
+
+            if (OnSelecionarComanda.HasDelegate)
+            {
+                await OnSelecionarComanda.InvokeAsync(nova);
+            }
+        }
+        finally
+        {
+            abrindo = false;
+            StateHasChanged();
         }
     }
 
