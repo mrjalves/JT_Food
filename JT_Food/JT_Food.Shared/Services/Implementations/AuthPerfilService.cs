@@ -113,6 +113,40 @@ namespace JT_Food.Shared.Services.Implementations
             return (true, $"Bem-vindo, {user.Nome}!", user);
         }
 
+        public async Task SetOperadorLogadoAsync(Usuario usuario, string? senha = null)
+        {
+            if (usuario == null) return;
+
+            PerfilAcesso perfil = PerfilAcesso.Caixa;
+            var roleLower = (usuario.Role ?? string.Empty).ToLowerInvariant();
+            if (roleLower.Contains("gerente") || roleLower.Contains("supervisor") || roleLower.Contains("admin"))
+            {
+                perfil = PerfilAcesso.Gerente;
+            }
+            else if (roleLower.Contains("garcom") || roleLower.Contains("garçom") || roleLower.Contains("atendente"))
+            {
+                perfil = PerfilAcesso.Garcom;
+            }
+            else if (roleLower.Contains("cozinha") || roleLower.Contains("producao") || roleLower.Contains("produção"))
+            {
+                perfil = PerfilAcesso.Cozinha;
+            }
+
+            var op = new UsuarioOperador
+            {
+                Id = usuario.Id.ToString(),
+                Nome = !string.IsNullOrWhiteSpace(usuario.Nome) ? usuario.Nome : usuario.Login,
+                Email = !string.IsNullOrWhiteSpace(usuario.Email) ? usuario.Email : $"{usuario.Login}@jtfood.com",
+                Perfil = perfil,
+                Ativo = usuario.Ativo,
+                PinRapido = "1234"
+            };
+
+            _usuarioAtual = op;
+            await SalvarSessaoAsync(op);
+            OnSessaoAlterada?.Invoke();
+        }
+
         public async Task LogoutAsync()
         {
             // Retorna para Garçom padrão ou desloga

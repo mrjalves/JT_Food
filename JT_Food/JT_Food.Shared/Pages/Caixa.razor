@@ -7,11 +7,15 @@
 @using JT_Servicos.Restaurante
 @using JT_UserInterface.Shared.Components.Core
 @using JT_UserInterface.Shared.Services.Interfaces.Acessos
+@using JT_UserInterface.Shared.Security
 @inject CaixaLogic CaixaLogic
 @inject MovimentacaoCaixaService MovimentacaoCaixaService
 @inject IComandaService ComandaService
 @inject NavigationManager Navigation
 @inject IServiceProvider ServiceProvider
+@inject CurrentUserState CurrentUserState
+@inject IAuthPerfilService AuthPerfilService
+@inject ISecureStorageService SecureStorage
 
 <PageTitle>Controle de Caixa - JT Food</PageTitle>
 
@@ -134,9 +138,17 @@
                                                  ValorSelecionado="@operadorSelecionado"
                                                  ValorSelecionadoChanged="OnOperadorSelecionado" />
                             </div>
-                            <small class="text-muted d-block mt-1" style="font-size: 0.78rem;">
-                                Usuário autenticado para prestação de contas deste turno.
-                            </small>
+                            <div class="d-flex justify-content-between align-items-center mt-1">
+                                <small class="text-muted" style="font-size: 0.78rem;">
+                                    Usuário autenticado para prestação de contas deste turno.
+                                </small>
+                                @if (operadorSelecionado != null)
+                                {
+                                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none small text-primary fw-semibold" style="font-size: 0.76rem;" @onclick="() => SolicitarAutenticacao(operadorSelecionado)">
+                                        <i class="bi bi-key-fill me-1"></i>Autenticar
+                                    </button>
+                                }
+                            </div>
                         </div>
 
                         <div class="mb-3.5">
@@ -607,6 +619,98 @@
             </div>
         </div>
     }
+
+    <!-- Modal Executivo de Autenticação de Operador -->
+    @if (exibirModalSenha && usuarioPendenteAutenticacao != null)
+    {
+        <div class="cx-modal-backdrop" @onclick="FecharModalSenha">
+            <div class="cx-modal-dialog" @onclick:stopPropagation="true">
+                <div class="cx-modal-header">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="cx-modal-icon-badge">
+                            <i class="bi bi-shield-lock-fill"></i>
+                        </div>
+                        <div>
+                            <h5 class="modal-title fw-bold mb-0 text-white">Autenticação de Operador</h5>
+                            <span class="text-white-50 small">Informe a senha para autenticar e assumir o turno</span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" @onclick="FecharModalSenha"></button>
+                </div>
+
+                <div class="cx-modal-body p-4 bg-white">
+                    <!-- Perfil do Operador Selecionado -->
+                    <div class="d-flex align-items-center gap-3 p-3 mb-3.5 rounded-3 border bg-slate-50">
+                        <div class="cx-avatar-circle shadow-sm">
+                            <i class="bi bi-person-fill fs-4 text-primary"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center gap-2">
+                                <h6 class="fw-bold mb-0 text-dark">@usuarioPendenteAutenticacao.Nome</h6>
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace small">
+                                    @usuarioPendenteAutenticacao.Role
+                                </span>
+                            </div>
+                            <small class="text-muted d-block mt-0.5">
+                                <i class="bi bi-person-badge me-1"></i>Login: <strong>@usuarioPendenteAutenticacao.Login</strong> | ID: #@usuarioPendenteAutenticacao.Id
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Input de Senha -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark small d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-key-fill me-1 text-primary"></i>Senha de Acesso:</span>
+                            <button type="button" class="btn btn-link p-0 text-decoration-none small text-primary fw-semibold" style="font-size: 0.78rem;" @onclick="PreencherSenhaPadrao">
+                                <i class="bi bi-magic me-1"></i>Preencher padrão (123456)
+                            </button>
+                        </label>
+                        <div class="input-group">
+                            <input type="@(mostrarSenha ? "text" : "password")"
+                                   class="form-control cx-input-control @(!string.IsNullOrEmpty(erroAutenticacao) ? "is-invalid" : "")"
+                                   placeholder="Digite a senha..."
+                                   @bind="senhaDigitada"
+                                   @onkeyup="HandleSenhaKeyUp"
+                                   autofocus />
+                            <button class="btn btn-outline-secondary" type="button" @onclick="() => mostrarSenha = !mostrarSenha" title="@(mostrarSenha ? "Ocultar senha" : "Ver senha")">
+                                <i class="bi @(mostrarSenha ? "bi-eye-slash-fill" : "bi-eye-fill")"></i>
+                            </button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(erroAutenticacao))
+                        {
+                            <div class="text-danger small mt-1.5 d-flex align-items-center gap-1.5">
+                                <i class="bi bi-exclamation-circle-fill"></i>
+                                <span>@erroAutenticacao</span>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="p-2.5 rounded-3 bg-light border small text-muted">
+                        <i class="bi bi-info-circle text-primary me-1.5"></i>
+                        O usuário será criado automaticamente no sistema se necessário, e a sessão global será vinculada a ele.
+                    </div>
+                </div>
+
+                <div class="cx-modal-footer p-3 bg-white border-top d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-light border px-3 fw-semibold" @onclick="FecharModalSenha" disabled="@autenticando">
+                        Cancelar
+                    </button>
+                    <button type="button" class="btn btn-primary px-4 fw-bold shadow-sm" @onclick="ConfirmarAutenticacaoOperadorAsync" disabled="@autenticando">
+                        @if (autenticando)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <span>Autenticando...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-box-arrow-in-right me-1.5"></i>
+                            <span>Confirmar e Logar</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
 </div>
 
 <style>
@@ -1041,6 +1145,79 @@
     .cx-table tbody tr:hover td {
         background: #f8fafc;
     }
+
+    /* Modal de Autenticação de Operador */
+    .cx-modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1060;
+        padding: 16px;
+        animation: cxFadeIn 0.2s ease-out;
+    }
+
+    .cx-modal-dialog {
+        background: #ffffff;
+        border-radius: 18px;
+        max-width: 480px;
+        width: 100%;
+        box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
+        overflow: hidden;
+        animation: cxSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .cx-modal-header {
+        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #4338ca 100%);
+        padding: 18px 22px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .cx-modal-icon-badge {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.15);
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+
+    .cx-avatar-circle {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: #e0e7ff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .bg-slate-50 {
+        background-color: #f8fafc;
+    }
+
+    @@keyframes cxFadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @@keyframes cxSlideUp {
+        from { opacity: 0; transform: translateY(20px) scale(0.97); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
 </style>
 
 @code {
@@ -1073,6 +1250,14 @@
         { "Perfil", "Role" }
     };
 
+    // Estado do Modal de Autenticação de Operador
+    private bool exibirModalSenha = false;
+    private Usuario? usuarioPendenteAutenticacao;
+    private string senhaDigitada = "";
+    private string erroAutenticacao = "";
+    private bool mostrarSenha = false;
+    private bool autenticando = false;
+
     // Totais calculados
     private double TotalVendas => movimentacoes.Where(x => x.TipoMovimentacao == "Venda").Sum(x => x.Valor);
     private int TotalVendasQtd => movimentacoes.Count(x => x.TipoMovimentacao == "Venda");
@@ -1086,11 +1271,35 @@
 
     protected override async Task OnInitializedAsync()
     {
+        try
+        {
+            var usuarioService = ServiceProvider.GetService(typeof(IUsuarioService)) as IUsuarioService;
+            if (usuarioService != null)
+            {
+                _ = UsuarioMockProvider.GarantirTodosMocksCriadosAsync(usuarioService);
+
+                if (CurrentUserState != null && CurrentUserState.Autenticado && CurrentUserState.UsuarioID > 0)
+                {
+                    var user = await usuarioService.ObterUsuarioPorIdAsync(CurrentUserState.UsuarioID);
+                    if (user != null)
+                    {
+                        operadorSelecionado = user;
+                        CurrentUserId = user.Id.ToString();
+                    }
+                }
+            }
+        }
+        catch (Exception exInit)
+        {
+            Console.WriteLine($"[Caixa] Inicialização de usuário: {exInit.Message}");
+        }
+
         if (operadorSelecionado == null)
         {
             operadorSelecionado = UsuarioMockProvider.ObterPadrao();
             CurrentUserId = operadorSelecionado.Id.ToString();
         }
+
         await CarregarDadosAsync();
     }
 
@@ -1172,6 +1381,7 @@
             var usuarioService = ServiceProvider.GetService(typeof(IUsuarioService)) as IUsuarioService;
             if (usuarioService != null)
             {
+                await UsuarioMockProvider.GarantirTodosMocksCriadosAsync(usuarioService);
                 var usuariosReais = await usuarioService.ObterTodosUsuariosAsync();
                 if (usuariosReais != null && usuariosReais.Any())
                 {
@@ -1196,8 +1406,147 @@
     {
         if (usuario != null)
         {
-            operadorSelecionado = usuario;
-            CurrentUserId = usuario.Id.ToString();
+            SolicitarAutenticacao(usuario);
+        }
+    }
+
+    private void SolicitarAutenticacao(Usuario usuario)
+    {
+        usuarioPendenteAutenticacao = usuario;
+        senhaDigitada = "";
+        erroAutenticacao = "";
+        mostrarSenha = false;
+        exibirModalSenha = true;
+        StateHasChanged();
+    }
+
+    private void FecharModalSenha()
+    {
+        exibirModalSenha = false;
+        usuarioPendenteAutenticacao = null;
+        senhaDigitada = "";
+        erroAutenticacao = "";
+        StateHasChanged();
+    }
+
+    private void PreencherSenhaPadrao()
+    {
+        senhaDigitada = UsuarioMockProvider.SenhaPadrao;
+        erroAutenticacao = "";
+    }
+
+    private async Task HandleSenhaKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ConfirmarAutenticacaoOperadorAsync();
+        }
+    }
+
+    private async Task ConfirmarAutenticacaoOperadorAsync()
+    {
+        if (usuarioPendenteAutenticacao == null)
+        {
+            FecharModalSenha();
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(senhaDigitada))
+        {
+            erroAutenticacao = "Por favor, informe a senha do operador.";
+            return;
+        }
+
+        autenticando = true;
+        erroAutenticacao = "";
+        StateHasChanged();
+
+        try
+        {
+            var usuarioService = ServiceProvider.GetService(typeof(IUsuarioService)) as IUsuarioService;
+
+            // 1. Garante que o usuário existe automaticamente no banco / serviço
+            var usuarioValido = await UsuarioMockProvider.GarantirUsuarioCriadoAsync(
+                usuarioPendenteAutenticacao,
+                senhaDigitada,
+                usuarioService
+            );
+
+            // 2. Tenta autenticar via IUsuarioService (API / backend)
+            bool autenticado = false;
+            if (usuarioService != null)
+            {
+                try
+                {
+                    var logado = await usuarioService.LogarAsync(usuarioValido.Login, senhaDigitada);
+                    if (logado != null)
+                    {
+                        usuarioValido = logado;
+                        autenticado = true;
+                    }
+                }
+                catch (Exception exLog)
+                {
+                    Console.WriteLine($"[Caixa] Login via API em fallback: {exLog.Message}");
+                }
+            }
+
+            // Fallback: se a API não autenticou diretamente, valida as credenciais
+            if (!autenticado)
+            {
+                if (UsuarioMockProvider.ValidarSenha(usuarioValido, senhaDigitada))
+                {
+                    autenticado = true;
+                }
+                else
+                {
+                    erroAutenticacao = "Senha incorreta para este operador. Tente novamente ou use a senha padrão (123456).";
+                    autenticando = false;
+                    StateHasChanged();
+                    return;
+                }
+            }
+
+            // 3. Atualiza a sessão e estado global com esse usuário
+            usuarioValido.Token = string.IsNullOrWhiteSpace(usuarioValido.Token)
+                ? $"jwt_food_{usuarioValido.Id}_{Guid.NewGuid():N}"
+                : usuarioValido.Token;
+
+            if (CurrentUserState != null)
+            {
+                await CurrentUserState.SetUserAsync(usuarioValido);
+                await CurrentUserState.AtualizarPerfilAsync(usuarioValido.Nome, usuarioValido.Email, usuarioValido.PhotoUrl);
+            }
+
+            // 4. Atualiza o perfil e papel no AuthPerfilService
+            if (AuthPerfilService != null)
+            {
+                await AuthPerfilService.SetOperadorLogadoAsync(usuarioValido, senhaDigitada);
+            }
+
+            // 5. Persiste o token de acesso no armazenamento seguro
+            if (SecureStorage != null && !string.IsNullOrEmpty(usuarioValido.Token))
+            {
+                await SecureStorage.SetTokenAsync(JwtAuthorizationHandler.TokenStorageKey, usuarioValido.Token);
+            }
+
+            // 6. Atualiza o operador selecionado no Caixa
+            operadorSelecionado = usuarioValido;
+            CurrentUserId = usuarioValido.Id.ToString();
+
+            exibirModalSenha = false;
+            usuarioPendenteAutenticacao = null;
+            senhaDigitada = "";
+
+            ExibirAlerta($"Operador '{usuarioValido.Nome}' autenticado e conectado com sucesso!", "alert-success");
+        }
+        catch (Exception ex)
+        {
+            erroAutenticacao = $"Erro ao autenticar: {ex.Message}";
+        }
+        finally
+        {
+            autenticando = false;
             StateHasChanged();
         }
     }

@@ -1,35 +1,246 @@
 @using JT_Classes.Restaurante
 @using JT_Food.Shared.Services
 @using JT_UserInterface.Shared.Components.Core
+@using JT_UserInterface.Shared.Services.Comum
+@inject FiltroService FiltroService
 
 <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-        <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-cart me-2 text-primary"></i>Histórico de Compras</h5>
+    <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <h5 class="mb-0 fw-bold text-dark">
+                <i class="bi bi-cart me-2 text-primary"></i>Histórico de Compras
+            </h5>
+            <span class="badge rounded-pill bg-light text-dark border font-monospace small px-2 py-1">
+                @TotalCompras @(TotalCompras == 1 ? "registro" : "registros")
+            </span>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <!-- Filtros de Status -->
+            <div class="btn-group btn-group-sm shadow-sm" role="group">
+                <button type="button" class="btn @(filtroStatus == "Todas" ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick='() => AlterarFiltroStatus("Todas")'>
+                    Todas <span class="badge bg-light text-dark ms-1">@TotalCompras</span>
+                </button>
+                <button type="button" class="btn @(filtroStatus == "Finalizada" ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick='() => AlterarFiltroStatus("Finalizada")'>
+                    Finalizadas <span class="badge @(filtroStatus == "Finalizada" ? "bg-white text-primary" : "bg-success-subtle text-success") ms-1">@QtdFinalizadas</span>
+                </button>
+                <button type="button" class="btn @(filtroStatus == "Pendente" ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick='() => AlterarFiltroStatus("Pendente")'>
+                    Pendentes <span class="badge @(filtroStatus == "Pendente" ? "bg-white text-primary" : "bg-warning-subtle text-warning") ms-1">@QtdPendentes</span>
+                </button>
+            </div>
+
+            <!-- Seletor de Itens por Página -->
+            <div class="d-flex align-items-center gap-1.5 ms-md-2">
+                <span class="small text-muted d-none d-sm-inline">Exibir:</span>
+                <select class="form-select form-select-sm" style="width: 80px;" value="@PageSize" @onchange="AlterarPageSize">
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+        </div>
     </div>
+
     <div class="card-body p-0">
         <DataGrid TItem="MCompra" 
-                  Items="Compras" 
+                  Items="ItensPaginados" 
+                  Columns="gridColumns"
                   IsLoading="IsLoading" 
-                  UseServerPagination="false">
-            <HeaderTemplate>
-                <th>Data</th>
-                <th>Fornecedor</th>
-                <th>Valor Total</th>
-                <th>Status</th>
-            </HeaderTemplate>
-            <RowTemplate Context="compra">
-                <td>@compra.DataCompra.ToShortDateString()</td>
-                <td>@(compra.FornecedorRestaurante ?? "S/ Fornecedor")</td>
-                <td>R$ @compra.Valor.ToString("F2")</td>
-                <td>
-                    <span class="badge @(compra.Status == "Finalizada" ? "bg-success" : "bg-warning")">@compra.Status</span>
-                </td>
-            </RowTemplate>
+                  SortSelectors="SortSelectors"
+                  OnSortChanged="HandleSortChanged"
+                  PageSize="PageSize"
+                  TotalItems="TotalComprasFiltradas"
+                  CurrentPage="CurrentPage"
+                  OnPageChanged="MudarPagina"
+                  UseServerPagination="true"
+                  EnableIA="true"
+                  NomeEntidade="Compra"
+                  EnableSearch="true"
+                  OnSearchChanged="AplicarPesquisa"
+                  ShowFilterButton="true"
+                  OnFilterToggled="AlternarFiltros"
+                  EnableColumnToggle="true"
+                  EnableColumnReorder="true">
+            <EmptyTemplate>
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-cart-x fs-1 text-muted opacity-50 d-block mb-2"></i>
+                    <h6 class="fw-semibold text-dark">Nenhuma compra registrada</h6>
+                    <p class="small text-muted mb-0">Novas compras lançadas de insumos ou produtos aparecerão aqui.</p>
+                </div>
+            </EmptyTemplate>
         </DataGrid>
+    </div>
+
+    <!-- Totais e Indicadores Consolidados -->
+    <div class="card-footer totals-footer d-flex flex-wrap gap-3 justify-content-between align-items-center py-2.5 px-3">
+        <div class="d-flex flex-wrap gap-3 align-items-center small">
+            <span><strong>Total Compras:</strong> @TotalCompras</span>
+            <span class="text-primary"><strong>Valor Total:</strong> R$ @ValorTotalCompras.ToString("F2")</span>
+            <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace">@QtdFinalizadas finalizadas</span>
+            @if (QtdPendentes > 0)
+            {
+                <span class="badge bg-warning-subtle text-warning border border-warning-subtle font-monospace">@QtdPendentes pendentes</span>
+            }
+        </div>
     </div>
 </div>
 
 @code {
     [Parameter] public IEnumerable<MCompra>? Compras { get; set; }
     [Parameter] public bool IsLoading { get; set; }
-}
+    [Parameter] public int PageSize { get; set; } = 10;
+
+    private List<DataGridColumn<MCompra>> gridColumns = new();
+    private IReadOnlyDictionary<string, Func<MCompra, IComparable?>> SortSelectors = new Dictionary<string, Func<MCompra, IComparable?>>();
+
+    private string termoPesquisa = "";
+    private string filtroStatus = "Todas";
+    public int CurrentPage { get; set; } = 1;
+
+    private string? _currentSortKey;
+    private DataGrid<MCompra>.SortDirection _currentSortDirection = DataGrid<MCompra>.SortDirection.Asc;
+
+    protected override void OnInitialized()
+    {
+        InicializarSortSelectors();
+        InicializarColunas();
+    }
+
+    private void InicializarSortSelectors()
+    {
+        SortSelectors = new Dictionary<string, Func<MCompra, IComparable?>>
+        {
+            ["DataCompra"] = c => c.DataCompra,
+            ["Fornecedor"] = c => c.FornecedorRestaurante ?? string.Empty,
+            ["Valor"] = c => (IComparable?)c.Valor,
+            ["Status"] = c => c.Status ?? string.Empty
+        };
+    }
+
+    private void InicializarColunas()
+    {
+        gridColumns.Clear();
+
+        gridColumns.Add(new DataGridColumn<MCompra>("DataCompra", "Data", sortable: true, visible: true, order: 0)
+        {
+            CellTemplate = c => @<span class="small text-muted"><i class="bi bi-calendar3 me-1 text-primary"></i>@c.DataCompra.ToShortDateString()</span>
+        });
+
+        gridColumns.Add(new DataGridColumn<MCompra>("Fornecedor", "Fornecedor", sortable: true, visible: true, order: 1)
+        {
+            CellTemplate = c => @<span class="fw-semibold text-dark">@(c.FornecedorRestaurante ?? "S/ Fornecedor")</span>
+        });
+
+        gridColumns.Add(new DataGridColumn<MCompra>("Valor", "Valor Total", sortable: true, visible: true, order: 2)
+        {
+            CellTemplate = c => @<span class="fw-bold text-success">R$ @c.Valor.ToString("F2")</span>
+        });
+
+        gridColumns.Add(new DataGridColumn<MCompra>("Status", "Status", sortable: true, visible: true, order: 3)
+        {
+            CellTemplate = c => @<span class="badge @(c.Status == "Finalizada" ? "bg-success-subtle text-success border border-success-subtle" : "bg-warning-subtle text-warning border border-warning-subtle")">@c.Status</span>
+        });
+    }
+
+    private IEnumerable<MCompra> ComprasBase => Compras ?? Enumerable.Empty<MCompra>();
+
+    private IEnumerable<MCompra> ComprasFiltradas
+    {
+        get
+        {
+            var query = ComprasBase;
+
+            if (filtroStatus != "Todas")
+            {
+                query = query.Where(c => string.Equals(c.Status, filtroStatus, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(termoPesquisa))
+            {
+                string t = termoPesquisa.Trim().ToLowerInvariant();
+                query = query.Where(c =>
+                    (c.FornecedorRestaurante != null && c.FornecedorRestaurante.ToLowerInvariant().Contains(t)) ||
+                    (c.Status != null && c.Status.ToLowerInvariant().Contains(t)) ||
+                    c.Valor.ToString().Contains(t)
+                );
+            }
+
+            return query;
+        }
+    }
+
+    private int TotalComprasFiltradas => ComprasFiltradas.Count();
+
+    private IEnumerable<MCompra> ItensPaginados
+    {
+        get
+        {
+            var items = ComprasFiltradas;
+            if (!string.IsNullOrEmpty(_currentSortKey) && SortSelectors.TryGetValue(_currentSortKey, out var selector))
+            {
+                items = _currentSortDirection == DataGrid<MCompra>.SortDirection.Asc
+                    ? items.OrderBy(selector)
+                    : items.OrderByDescending(selector);
+            }
+            else
+            {
+                items = items.OrderByDescending(c => c.DataCompra);
+            }
+
+            return items.Skip((CurrentPage - 1) * PageSize).Take(PageSize);
+        }
+    }
+
+    // Totais
+    private int TotalCompras => ComprasBase.Count();
+    private int QtdFinalizadas => ComprasBase.Count(c => c.Status == "Finalizada");
+    private int QtdPendentes => ComprasBase.Count(c => c.Status == "Pendente");
+    private decimal ValorTotalCompras => ComprasBase.Sum(c => c.Valor);
+
+    private void HandleSortChanged(DataGrid<MCompra>.SortChangedEventArgs args)
+    {
+        _currentSortKey = args.Key;
+        _currentSortDirection = args.Direction;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+
+    private void MudarPagina(int novaPagina)
+    {
+        CurrentPage = novaPagina;
+        StateHasChanged();
+    }
+
+    private void AlterarFiltroStatus(string status)
+    {
+        filtroStatus = status;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+
+    private void AlterarPageSize(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int novoTamanho) && novoTamanho > 0)
+        {
+            PageSize = novoTamanho;
+            CurrentPage = 1;
+            StateHasChanged();
+        }
+    }
+
+    private void AplicarPesquisa(string termo)
+    {
+        termoPesquisa = termo;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+
+    private void AlternarFiltros()
+    {
+        FiltroService?.ToggleFiltros();
+    }
+}

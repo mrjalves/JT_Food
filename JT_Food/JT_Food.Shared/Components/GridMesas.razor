@@ -1,36 +1,102 @@
 @using JT_Classes.Restaurante
 @using JT_Food.Shared.Services
 @using JT_UserInterface.Shared.Components.Core
+@using JT_UserInterface.Shared.Services.Comum
+@inject FiltroService FiltroService
 
 <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-        <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-grid-3x3 me-2 text-primary"></i>Mapa de Mesas</h5>
+    <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <h5 class="mb-0 fw-bold text-dark">
+                <i class="bi bi-grid-3x3 me-2 text-primary"></i>Mapa de Mesas
+            </h5>
+            <span class="badge rounded-pill bg-light text-dark border font-monospace small px-2 py-1">
+                @TotalMesas @(TotalMesas == 1 ? "mesa" : "mesas")
+            </span>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <!-- Filtros de Status -->
+            <div class="btn-group btn-group-sm shadow-sm" role="group">
+                <button type="button" class="btn @(filtroStatus == "Todas" ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick='() => AlterarFiltroStatus("Todas")'>
+                    Todas <span class="badge bg-light text-dark ms-1">@TotalMesas</span>
+                </button>
+                <button type="button" class="btn @(filtroStatus == StatusMesa.Livre ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick='() => AlterarFiltroStatus(StatusMesa.Livre)'>
+                    Livres <span class="badge @(filtroStatus == StatusMesa.Livre ? "bg-white text-primary" : "bg-success-subtle text-success") ms-1">@QtdLivres</span>
+                </button>
+                <button type="button" class="btn @(filtroStatus == StatusMesa.Ocupada ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick='() => AlterarFiltroStatus(StatusMesa.Ocupada)'>
+                    Ocupadas <span class="badge @(filtroStatus == StatusMesa.Ocupada ? "bg-white text-primary" : "bg-danger-subtle text-danger") ms-1">@QtdOcupadas</span>
+                </button>
+                <button type="button" class="btn @(filtroStatus == StatusMesa.AguardandoPagamento ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick='() => AlterarFiltroStatus(StatusMesa.AguardandoPagamento)'>
+                    Aguardando Pgto <span class="badge @(filtroStatus == StatusMesa.AguardandoPagamento ? "bg-white text-primary" : "bg-warning-subtle text-warning") ms-1">@QtdAguardando</span>
+                </button>
+            </div>
+
+            <!-- Seletor de Itens por Página -->
+            <div class="d-flex align-items-center gap-1.5 ms-md-2">
+                <span class="small text-muted d-none d-sm-inline">Exibir:</span>
+                <select class="form-select form-select-sm" style="width: 80px;" value="@PageSize" @onchange="AlterarPageSize">
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+        </div>
     </div>
+
     <div class="card-body p-0">
         <DataGrid TItem="Mesa" 
-                  Items="Mesas" 
+                  Items="ItensPaginados" 
+                  Columns="gridColumns"
                   IsLoading="IsLoading" 
+                  SortSelectors="SortSelectors"
+                  OnSortChanged="HandleSortChanged"
+                  PageSize="PageSize"
+                  TotalItems="TotalMesasFiltradas"
+                  CurrentPage="CurrentPage"
+                  OnPageChanged="MudarPagina"
+                  UseServerPagination="true"
+                  EnableIA="true"
+                  NomeEntidade="Mesa"
+                  EnableSearch="true"
+                  OnSearchChanged="AplicarPesquisa"
+                  ShowFilterButton="true"
+                  OnFilterToggled="AlternarFiltros"
+                  EnableColumnToggle="true"
+                  EnableColumnReorder="true"
                   EnableRowClick="true"
-                  OnRowClick="HandleRowClick"
-                  UseServerPagination="false">
-            <HeaderTemplate>
-                <th>Identificação</th>
-                <th>Capacidade</th>
-                <th>Status</th>
-                <th class="text-end">Ações</th>
-            </HeaderTemplate>
-            <RowTemplate Context="mesa">
-                <td>@mesa.Identificacao</td>
-                <td>@mesa.Capacidade</td>
-                <td>
-                    <span class="badge @GetStatusClass(mesa.Status)">@mesa.Status</span>
-                </td>
-                <td class="text-end" @onclick:stopPropagation="true">
-                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => OnEdit.InvokeAsync(mesa)"><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" @onclick="() => OnDelete.InvokeAsync(mesa)"><i class="bi bi-trash"></i></button>
-                </td>
-            </RowTemplate>
+                  OnRowClick="HandleRowClick">
+            <EmptyTemplate>
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-grid-3x3 fs-1 text-muted opacity-50 d-block mb-2"></i>
+                    <h6 class="fw-semibold text-dark">Nenhuma mesa encontrada</h6>
+                    <p class="small text-muted mb-0">Tente ajustar a busca ou adicionar novas mesas ao salão.</p>
+                </div>
+            </EmptyTemplate>
         </DataGrid>
+    </div>
+
+    <!-- Totais e Indicadores Consolidados -->
+    <div class="card-footer totals-footer d-flex flex-wrap gap-3 justify-content-between align-items-center py-2.5 px-3">
+        <div class="d-flex flex-wrap gap-3 align-items-center small">
+            <span><strong>Total Mesas:</strong> @TotalMesas</span>
+            <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace">@QtdLivres livres</span>
+            <span class="badge bg-danger-subtle text-danger border border-danger-subtle font-monospace">@QtdOcupadas ocupadas</span>
+            @if (QtdAguardando > 0)
+            {
+                <span class="badge bg-warning-subtle text-warning border border-warning-subtle font-monospace">@QtdAguardando aguardando pgto</span>
+            }
+            @if (QtdReservadas > 0)
+            {
+                <span class="badge bg-info-subtle text-info border border-info-subtle font-monospace">@QtdReservadas reservadas</span>
+            }
+            <span><strong>Capacidade Total:</strong> @CapacidadeTotal pessoas</span>
+        </div>
     </div>
 </div>
 
@@ -39,6 +105,165 @@
     [Parameter] public bool IsLoading { get; set; }
     [Parameter] public EventCallback<Mesa> OnEdit { get; set; }
     [Parameter] public EventCallback<Mesa> OnDelete { get; set; }
+    [Parameter] public int PageSize { get; set; } = 10;
+
+    private List<DataGridColumn<Mesa>> gridColumns = new();
+    private IReadOnlyDictionary<string, Func<Mesa, IComparable?>> SortSelectors = new Dictionary<string, Func<Mesa, IComparable?>>();
+
+    private string termoPesquisa = "";
+    private string filtroStatus = "Todas";
+    public int CurrentPage { get; set; } = 1;
+
+    private string? _currentSortKey;
+    private DataGrid<Mesa>.SortDirection _currentSortDirection = DataGrid<Mesa>.SortDirection.Asc;
+
+    protected override void OnInitialized()
+    {
+        InicializarSortSelectors();
+        InicializarColunas();
+    }
+
+    private void InicializarSortSelectors()
+    {
+        SortSelectors = new Dictionary<string, Func<Mesa, IComparable?>>
+        {
+            ["Identificacao"] = m => m.Identificacao ?? string.Empty,
+            ["Capacidade"] = m => m.Capacidade,
+            ["Status"] = m => m.Status ?? string.Empty
+        };
+    }
+
+    private void InicializarColunas()
+    {
+        gridColumns.Clear();
+
+        gridColumns.Add(new DataGridColumn<Mesa>("Identificacao", "Identificação", sortable: true, visible: true, order: 0)
+        {
+            CellTemplate = m => @<span class="fw-bold text-dark"><i class="bi bi-tag me-1 text-primary"></i>@m.Identificacao</span>
+        });
+
+        gridColumns.Add(new DataGridColumn<Mesa>("Capacidade", "Capacidade", sortable: true, visible: true, order: 1)
+        {
+            CellTemplate = m => @<span><i class="bi bi-people me-1 text-muted"></i>@m.Capacidade pessoas</span>
+        });
+
+        gridColumns.Add(new DataGridColumn<Mesa>("Status", "Status", sortable: true, visible: true, order: 2)
+        {
+            CellTemplate = m => @<span class="badge @GetStatusClass(m.Status)">@m.Status</span>
+        });
+
+        gridColumns.Add(new DataGridColumn<Mesa>("Acoes", "Ações", sortable: false, visible: true, order: 3)
+        {
+            CellTemplate = m => @<div class="text-end" @onclick:stopPropagation="true">
+                <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => OnEdit.InvokeAsync(m)" title="Editar Mesa">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" @onclick="() => OnDelete.InvokeAsync(m)" title="Excluir Mesa">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        });
+    }
+
+    private IEnumerable<Mesa> MesasBase => Mesas ?? Enumerable.Empty<Mesa>();
+
+    private IEnumerable<Mesa> MesasFiltradas
+    {
+        get
+        {
+            var query = MesasBase;
+
+            if (filtroStatus != "Todas")
+            {
+                query = query.Where(m => string.Equals(m.Status, filtroStatus, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(termoPesquisa))
+            {
+                string t = termoPesquisa.Trim().ToLowerInvariant();
+                query = query.Where(m =>
+                    (m.Identificacao != null && m.Identificacao.ToLowerInvariant().Contains(t)) ||
+                    (m.Status != null && m.Status.ToLowerInvariant().Contains(t)) ||
+                    m.Capacidade.ToString().Contains(t)
+                );
+            }
+
+            return query;
+        }
+    }
+
+    private int TotalMesasFiltradas => MesasFiltradas.Count();
+
+    private IEnumerable<Mesa> ItensPaginados
+    {
+        get
+        {
+            var items = MesasFiltradas;
+            if (!string.IsNullOrEmpty(_currentSortKey) && SortSelectors.TryGetValue(_currentSortKey, out var selector))
+            {
+                items = _currentSortDirection == DataGrid<Mesa>.SortDirection.Asc
+                    ? items.OrderBy(selector)
+                    : items.OrderByDescending(selector);
+            }
+            else
+            {
+                items = items.OrderBy(m => m.Identificacao);
+            }
+
+            return items.Skip((CurrentPage - 1) * PageSize).Take(PageSize);
+        }
+    }
+
+    // Totais
+    private int TotalMesas => MesasBase.Count();
+    private int QtdLivres => MesasBase.Count(m => m.Status == StatusMesa.Livre);
+    private int QtdOcupadas => MesasBase.Count(m => m.Status == StatusMesa.Ocupada);
+    private int QtdAguardando => MesasBase.Count(m => m.Status == StatusMesa.AguardandoPagamento);
+    private int QtdReservadas => MesasBase.Count(m => m.Status == StatusMesa.Reservada);
+    private int CapacidadeTotal => MesasBase.Sum(m => m.Capacidade);
+
+    private void HandleSortChanged(DataGrid<Mesa>.SortChangedEventArgs args)
+    {
+        _currentSortKey = args.Key;
+        _currentSortDirection = args.Direction;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+
+    private void MudarPagina(int novaPagina)
+    {
+        CurrentPage = novaPagina;
+        StateHasChanged();
+    }
+
+    private void AlterarFiltroStatus(string status)
+    {
+        filtroStatus = status;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+
+    private void AlterarPageSize(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int novoTamanho) && novoTamanho > 0)
+        {
+            PageSize = novoTamanho;
+            CurrentPage = 1;
+            StateHasChanged();
+        }
+    }
+
+    private void AplicarPesquisa(string termo)
+    {
+        termoPesquisa = termo;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+
+    private void AlternarFiltros()
+    {
+        FiltroService?.ToggleFiltros();
+    }
 
     private async Task HandleRowClick(Mesa mesa)
     {
@@ -50,10 +275,10 @@
 
     private string GetStatusClass(string status) => status switch
     {
-        StatusMesa.Livre => "bg-success",
-        StatusMesa.Ocupada => "bg-danger",
-        StatusMesa.AguardandoPagamento => "bg-warning text-dark",
-        StatusMesa.Reservada => "bg-info",
-        _ => "bg-secondary"
+        StatusMesa.Livre => "bg-success-subtle text-success border border-success-subtle",
+        StatusMesa.Ocupada => "bg-danger-subtle text-danger border border-danger-subtle",
+        StatusMesa.AguardandoPagamento => "bg-warning-subtle text-warning border border-warning-subtle",
+        StatusMesa.Reservada => "bg-info-subtle text-info border border-info-subtle",
+        _ => "bg-secondary-subtle text-secondary border border-secondary-subtle"
     };
-}
+}

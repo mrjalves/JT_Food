@@ -1,102 +1,99 @@
 @using JT_Classes.Restaurante
 @using JT_Food.Shared.Services
 @using JT_UserInterface.Shared.Components.Core
+@using JT_UserInterface.Shared.Services.Comum
 @inject NavigationManager Navigation
+@inject FiltroService FiltroService
 
 <div class="card shadow-sm border-0 mb-4">
     <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <h5 class="mb-0 fw-bold text-dark">
-            <i class="bi bi-receipt me-2 text-primary"></i>Controle de Comandas
-        </h5>
+        <div class="d-flex align-items-center gap-2">
+            <h5 class="mb-0 fw-bold text-dark">
+                <i class="bi bi-receipt me-2 text-primary"></i>Controle de Comandas
+            </h5>
+            <span class="badge rounded-pill bg-light text-dark border font-monospace small px-2 py-1">
+                @TotalComandas @(TotalComandas == 1 ? "registro" : "registros")
+            </span>
+        </div>
 
         <div class="d-flex flex-wrap gap-2 align-items-center">
-            <!-- Barra de Pesquisa Instantânea -->
-            <div class="input-group input-group-sm" style="width: 250px;">
-                <span class="input-group-text bg-light border-end-0">
-                    <i class="bi bi-search text-muted"></i>
-                </span>
-                <input type="text"
-                       class="form-control border-start-0 ps-0"
-                       placeholder="Buscar por Nº, Nome ou Mesa..."
-                       @bind="termoPesquisa"
-                       @bind:event="oninput" />
-                @if (!string.IsNullOrEmpty(termoPesquisa))
-                {
-                    <button class="btn btn-outline-secondary" @onclick="() => termoPesquisa = string.Empty">
-                        <i class="bi bi-x"></i>
-                    </button>
-                }
+            <!-- Filtros Rápidos de Status -->
+            <div class="btn-group btn-group-sm shadow-sm" role="group">
+                <button type="button" class="btn @(filtroStatus == "Todas" ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick='() => AlterarFiltroStatus("Todas")'>
+                    Todas <span class="badge bg-light text-dark ms-1">@QtdTodas</span>
+                </button>
+                <button type="button" class="btn @(filtroStatus == "Aberta" ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick='() => AlterarFiltroStatus("Aberta")'>
+                    Abertas <span class="badge @(filtroStatus == "Aberta" ? "bg-white text-primary" : "bg-primary-subtle text-primary") ms-1">@QtdAbertas</span>
+                </button>
+                <button type="button" class="btn @(filtroStatus == "AguardandoPagamento" ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick='() => AlterarFiltroStatus("AguardandoPagamento")'>
+                    Aguardando Pgto <span class="badge @(filtroStatus == "AguardandoPagamento" ? "bg-white text-primary" : "bg-warning-subtle text-warning") ms-1">@QtdAguardando</span>
+                </button>
+                <button type="button" class="btn @(filtroStatus == "Fechada" ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick='() => AlterarFiltroStatus("Fechada")'>
+                    Fechadas <span class="badge @(filtroStatus == "Fechada" ? "bg-white text-primary" : "bg-secondary-subtle text-secondary") ms-1">@QtdFechadas</span>
+                </button>
             </div>
 
-            <!-- Filtros de Status -->
-            <div class="btn-group btn-group-sm">
-                <button class="btn @(filtroStatus == "Todas" ? "btn-primary" : "btn-outline-secondary")"
-                        @onclick='() => filtroStatus = "Todas"'>
-                    Todas
-                </button>
-                <button class="btn @(filtroStatus == "Aberta" ? "btn-primary" : "btn-outline-secondary")"
-                        @onclick='() => filtroStatus = "Aberta"'>
-                    Abertas
-                </button>
-                <button class="btn @(filtroStatus == "Fechada" ? "btn-primary" : "btn-outline-secondary")"
-                        @onclick='() => filtroStatus = "Fechada"'>
-                    Fechadas
-                </button>
+            <!-- Seletor de Itens por Página -->
+            <div class="d-flex align-items-center gap-1.5 ms-md-2">
+                <span class="small text-muted d-none d-sm-inline">Exibir:</span>
+                <select class="form-select form-select-sm" style="width: 80px;" value="@PageSize" @onchange="AlterarPageSize">
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
             </div>
         </div>
     </div>
 
     <div class="card-body p-0">
         <DataGrid TItem="Comanda" 
-                  Items="ComandasFiltradas" 
+                  Items="ItensPaginados" 
+                  Columns="gridColumns"
                   IsLoading="IsLoading" 
+                  SortSelectors="SortSelectors"
+                  OnSortChanged="HandleSortChanged"
+                  PageSize="PageSize"
+                  TotalItems="TotalComandasFiltradas"
+                  CurrentPage="CurrentPage"
+                  OnPageChanged="MudarPagina"
+                  UseServerPagination="true"
+                  EnableIA="true"
+                  NomeEntidade="Comanda"
+                  EnableSearch="true"
+                  OnSearchChanged="AplicarPesquisa"
+                  ShowFilterButton="true"
+                  OnFilterToggled="AlternarFiltros"
+                  EnableColumnToggle="true"
+                  EnableColumnReorder="true"
                   EnableRowClick="true"
-                  OnRowClick="HandleRowClick"
-                  UseServerPagination="false">
-            <HeaderTemplate>
-                <th>ID</th>
-                <th>Identificação / Cliente</th>
-                <th>Mesa</th>
-                <th>Abertura</th>
-                <th class="text-end">Total Acumulado</th>
-                <th>Status</th>
-                <th class="text-end">Ações Rápidas</th>
-            </HeaderTemplate>
-            <RowTemplate Context="c">
-                <td class="fw-bold text-primary">#@c.Id</td>
-                <td>
-                    <span class="fw-semibold text-dark">@(string.IsNullOrWhiteSpace(c.NomeCliente) ? "Consumidor" : c.NomeCliente)</span>
-                </td>
-                <td>
-                    @if (string.IsNullOrEmpty(c.MesaId))
-                    {
-                        <span class="badge bg-light text-muted border">Balcão / S/ Mesa</span>
-                    }
-                    else
-                    {
-                        <span class="badge bg-secondary">@(c.MesaId.StartsWith("Mesa", StringComparison.OrdinalIgnoreCase) ? c.MesaId : $"Mesa {c.MesaId}")</span>
-                    }
-                </td>
-                <td>@c.DataAbertura.ToString("HH:mm")</td>
-                <td class="text-end fw-bold text-success">R$ @c.Total.ToString("F2")</td>
-                <td>
-                    <span class="badge @(c.Status == "Aberta" ? "bg-primary" : (c.Status == "AguardandoPagamento" ? "bg-warning text-dark" : "bg-secondary"))">
-                        @c.Status
-                    </span>
-                </td>
-                <td class="text-end" @onclick:stopPropagation="true">
-                    <button class="btn btn-sm btn-outline-success me-1" @onclick="() => IrParaFechamento(c.Id)" title="Fechar / Pagar">
-                        <i class="bi bi-cash-coin"></i>
-                    </button>
-                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => OnEdit.InvokeAsync(c)" title="Editar / Pedidos">
-                        <i class="bi bi-pencil"></i>
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger" @onclick="() => OnDelete.InvokeAsync(c)" title="Excluir">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </td>
-            </RowTemplate>
+                  OnRowClick="HandleRowClick">
+            <EmptyTemplate>
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox fs-1 text-muted opacity-50 d-block mb-2"></i>
+                    <h6 class="fw-semibold text-dark">Nenhuma comanda encontrada</h6>
+                    <p class="small text-muted mb-0">Tente ajustar a busca, alterar o status selecionado ou abrir uma nova comanda.</p>
+                </div>
+            </EmptyTemplate>
         </DataGrid>
+    </div>
+
+    <!-- Totais e Indicadores Consolidados -->
+    <div class="card-footer totals-footer d-flex flex-wrap gap-3 justify-content-between align-items-center py-2.5 px-3">
+        <div class="d-flex flex-wrap gap-3 align-items-center small">
+            <span><strong>Total Comandas:</strong> @TotalComandas</span>
+            <span class="text-primary"><strong>Total em Aberto:</strong> R$ @ValorTotalAberto.ToString("F2")</span>
+            <span class="text-success"><strong>Total Geral:</strong> R$ @ValorTotalGeral.ToString("F2")</span>
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace">@QtdAbertas abertas</span>
+            @if (QtdAguardando > 0)
+            {
+                <span class="badge bg-warning-subtle text-warning border border-warning-subtle font-monospace">@QtdAguardando aguardando pgto</span>
+            }
+        </div>
     </div>
 </div>
 
@@ -105,21 +102,114 @@
     [Parameter] public bool IsLoading { get; set; }
     [Parameter] public EventCallback<Comanda> OnEdit { get; set; }
     [Parameter] public EventCallback<Comanda> OnDelete { get; set; }
+    [Parameter] public int PageSize { get; set; } = 10;
+
+    private List<DataGridColumn<Comanda>> gridColumns = new();
+    private IReadOnlyDictionary<string, Func<Comanda, IComparable?>> SortSelectors = new Dictionary<string, Func<Comanda, IComparable?>>();
 
     private string termoPesquisa = "";
     private string filtroStatus = "Aberta";
+    public int CurrentPage { get; set; } = 1;
+
+    private string? _currentSortKey;
+    private DataGrid<Comanda>.SortDirection _currentSortDirection = DataGrid<Comanda>.SortDirection.Asc;
+
+    protected override void OnInitialized()
+    {
+        InicializarSortSelectors();
+        InicializarColunas();
+    }
+
+    private void InicializarSortSelectors()
+    {
+        SortSelectors = new Dictionary<string, Func<Comanda, IComparable?>>
+        {
+            ["Id"] = c => c.Id,
+            ["NomeCliente"] = c => c.NomeCliente ?? string.Empty,
+            ["MesaId"] = c => c.MesaId ?? string.Empty,
+            ["DataAbertura"] = c => c.DataAbertura,
+            ["Total"] = c => (IComparable?)c.Total,
+            ["Status"] = c => c.Status ?? string.Empty
+        };
+    }
+
+    private void InicializarColunas()
+    {
+        gridColumns.Clear();
+
+        gridColumns.Add(new DataGridColumn<Comanda>("Id", "ID", sortable: true, visible: true, order: 0)
+        {
+            CellTemplate = c => @<span class="fw-bold text-primary">#@c.Id</span>
+        });
+
+        gridColumns.Add(new DataGridColumn<Comanda>("NomeCliente", "Identificação / Cliente", sortable: true, visible: true, order: 1)
+        {
+            CellTemplate = c => @<span class="fw-semibold text-dark">@(string.IsNullOrWhiteSpace(c.NomeCliente) ? "Consumidor" : c.NomeCliente)</span>
+        });
+
+        gridColumns.Add(new DataGridColumn<Comanda>("MesaId", "Mesa", sortable: true, visible: true, order: 2)
+        {
+            CellTemplate = c => {
+                if (string.IsNullOrEmpty(c.MesaId))
+                {
+                    return @<span class="badge bg-light text-muted border">Balcão / S/ Mesa</span>;
+                }
+                else
+                {
+                    return @<span class="badge bg-secondary">@(c.MesaId.StartsWith("Mesa", StringComparison.OrdinalIgnoreCase) ? c.MesaId : $"Mesa {c.MesaId}")</span>;
+                }
+            }
+        });
+
+        gridColumns.Add(new DataGridColumn<Comanda>("DataAbertura", "Abertura", sortable: true, visible: true, order: 3)
+        {
+            CellTemplate = c => @<span class="small text-muted">@c.DataAbertura.ToString("HH:mm")</span>
+        });
+
+        gridColumns.Add(new DataGridColumn<Comanda>("Total", "Total Acumulado", sortable: true, visible: true, order: 4)
+        {
+            CellTemplate = c => @<span class="fw-bold text-success text-end d-block">R$ @c.Total.ToString("F2")</span>
+        });
+
+        gridColumns.Add(new DataGridColumn<Comanda>("Status", "Status", sortable: true, visible: true, order: 5)
+        {
+            CellTemplate = c => @<span class="badge @ObterStatusBadgeClass(c.Status)">@c.Status</span>
+        });
+
+        gridColumns.Add(new DataGridColumn<Comanda>("Acoes", "Ações Rápidas", sortable: false, visible: true, order: 6)
+        {
+            CellTemplate = c => @<div class="text-end" @onclick:stopPropagation="true">
+                <button class="btn btn-sm btn-outline-success me-1" @onclick="() => IrParaFechamento(c.Id)" title="Fechar / Pagar">
+                    <i class="bi bi-cash-coin"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => OnEdit.InvokeAsync(c)" title="Editar / Pedidos">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" @onclick="() => OnDelete.InvokeAsync(c)" title="Excluir">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        });
+    }
+
+    private IEnumerable<Comanda> ComandasBase => Comandas ?? Enumerable.Empty<Comanda>();
 
     private IEnumerable<Comanda> ComandasFiltradas
     {
         get
         {
-            if (Comandas == null) return Enumerable.Empty<Comanda>();
-
-            var query = Comandas;
+            var query = ComandasBase;
 
             if (filtroStatus != "Todas")
             {
-                query = query.Where(c => string.Equals(c.Status, filtroStatus, StringComparison.OrdinalIgnoreCase));
+                if (filtroStatus == "AguardandoPagamento")
+                {
+                    query = query.Where(c => c.Status == "AguardandoPagamento" || c.Status == "Aguardando Pagamento");
+                }
+                else
+                {
+                    query = query.Where(c => string.Equals(c.Status, filtroStatus, StringComparison.OrdinalIgnoreCase));
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(termoPesquisa))
@@ -132,8 +222,82 @@
                 );
             }
 
-            return query.OrderByDescending(c => c.DataAbertura);
+            return query;
         }
+    }
+
+    private int TotalComandasFiltradas => ComandasFiltradas.Count();
+
+    private IEnumerable<Comanda> ItensPaginados
+    {
+        get
+        {
+            var items = ComandasFiltradas;
+            if (!string.IsNullOrEmpty(_currentSortKey) && SortSelectors.TryGetValue(_currentSortKey, out var selector))
+            {
+                items = _currentSortDirection == DataGrid<Comanda>.SortDirection.Asc
+                    ? items.OrderBy(selector)
+                    : items.OrderByDescending(selector);
+            }
+            else
+            {
+                items = items.OrderByDescending(c => c.DataAbertura);
+            }
+
+            return items.Skip((CurrentPage - 1) * PageSize).Take(PageSize);
+        }
+    }
+
+    // Totais Consolidados
+    private int TotalComandas => ComandasBase.Count();
+    private int QtdTodas => ComandasBase.Count();
+    private int QtdAbertas => ComandasBase.Count(c => c.Status == "Aberta");
+    private int QtdAguardando => ComandasBase.Count(c => c.Status == "AguardandoPagamento" || c.Status == "Aguardando Pagamento");
+    private int QtdFechadas => ComandasBase.Count(c => c.Status == "Fechada");
+    private double ValorTotalAberto => ComandasBase.Where(c => c.Status != "Fechada" && c.Status != "Cancelada").Sum(c => c.Total);
+    private double ValorTotalGeral => ComandasBase.Sum(c => c.Total);
+
+    private void HandleSortChanged(DataGrid<Comanda>.SortChangedEventArgs args)
+    {
+        _currentSortKey = args.Key;
+        _currentSortDirection = args.Direction;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+
+    private void MudarPagina(int novaPagina)
+    {
+        CurrentPage = novaPagina;
+        StateHasChanged();
+    }
+
+    private void AlterarFiltroStatus(string status)
+    {
+        filtroStatus = status;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+
+    private void AlterarPageSize(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int novoTamanho) && novoTamanho > 0)
+        {
+            PageSize = novoTamanho;
+            CurrentPage = 1;
+            StateHasChanged();
+        }
+    }
+
+    private void AplicarPesquisa(string termo)
+    {
+        termoPesquisa = termo;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+
+    private void AlternarFiltros()
+    {
+        FiltroService?.ToggleFiltros();
     }
 
     private async Task HandleRowClick(Comanda comanda)
@@ -148,4 +312,13 @@
     {
         Navigation.NavigateTo($"/fechamento/{comandaId}");
     }
+
+    private string ObterStatusBadgeClass(string? status) => status switch
+    {
+        "Aberta" => "bg-primary-subtle text-primary border border-primary-subtle",
+        "AguardandoPagamento" or "Aguardando Pagamento" => "bg-warning-subtle text-warning border border-warning-subtle",
+        "Fechada" => "bg-secondary-subtle text-secondary border border-secondary-subtle",
+        "Cancelada" => "bg-danger-subtle text-danger border border-danger-subtle",
+        _ => "bg-light text-dark border"
+    };
 }
