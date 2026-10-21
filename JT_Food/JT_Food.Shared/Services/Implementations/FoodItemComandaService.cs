@@ -16,7 +16,7 @@ namespace JT_Food.Shared.Services.Implementations
         private static readonly ConcurrentDictionary<int, MItemComanda> _cacheItens = new();
         private static int _nextLocalId = 1000;
 
-        public FoodItemComandaService(HttpClient? httpClient = null) : base()
+        public FoodItemComandaService(HttpClient? httpClient = null) : base(httpClient)
         {
             _client = httpClient ?? CriarFallbackHttpClient();
 
@@ -118,7 +118,31 @@ namespace JT_Food.Shared.Services.Implementations
                     Console.WriteLine($"[FoodItemComandaService GetAll API Error]: {ex.Message}");
                 }
 
-                // Fallback para banco direto se a API não retornou itens ou falhou (apenas quando não executando no WebAssembly do browser)
+                // Fallback para base.GetAll() se a API não retornou itens (ex: 401 sem token ou offline)
+                if (resultado.Count == 0)
+                {
+                    try
+                    {
+                        var baseItens = await base.GetAll();
+                        if (baseItens != null)
+                        {
+                            foreach (var item in baseItens)
+                            {
+                                if (item.Id > 0)
+                                {
+                                    resultado[item.Id] = item;
+                                    _cacheItens[item.Id] = item;
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception exBase)
+                    {
+                        Console.WriteLine($"[FoodItemComandaService GetAll Base Fallback Error]: {exBase.Message}");
+                    }
+                }
+
+                // Fallback para banco direto se a API e base não retornaram itens ou falhou (apenas quando não executando no WebAssembly do browser)
                 if (!OperatingSystem.IsBrowser() && resultado.Count == 0 && !string.IsNullOrWhiteSpace(JT_Aplicacao.Config.Config.Instancia?.Conexao?.StringConexao))
                 {
                     try
@@ -356,7 +380,7 @@ namespace JT_Food.Shared.Services.Implementations
         private static readonly ConcurrentDictionary<int, MAdicionaisItemComanda> _cacheAds = new();
         private static int _nextLocalId = 2000;
 
-        public FoodAdicionaisItemComandaService(HttpClient? httpClient = null) : base()
+        public FoodAdicionaisItemComandaService(HttpClient? httpClient = null) : base(httpClient)
         {
             _client = httpClient ?? CriarFallbackHttpClient();
 
@@ -449,6 +473,27 @@ namespace JT_Food.Shared.Services.Implementations
                     }
                 }
                 catch { }
+
+                // Fallback para base.GetAll() se a API não retornou adicionais
+                if (resultado.Count == 0)
+                {
+                    try
+                    {
+                        var baseAds = await base.GetAll();
+                        if (baseAds != null)
+                        {
+                            foreach (var item in baseAds)
+                            {
+                                if (item.Id > 0)
+                                {
+                                    resultado[item.Id] = item;
+                                    _cacheAds[item.Id] = item;
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
 
                 // Fallback para banco direto se a API não retornou itens ou falhou (apenas quando não executando no WebAssembly do browser)
                 if (!OperatingSystem.IsBrowser() && resultado.Count == 0 && !string.IsNullOrWhiteSpace(JT_Aplicacao.Config.Config.Instancia?.Conexao?.StringConexao))

@@ -7,16 +7,24 @@
 @using JT_Food.Shared.Services.Interfaces
 
 @inject ComandaService ComandaService
+@inject IComandaService ComandaOperacionalService
 @inject ItemComandaService ItemComandaService
 @inject AdicionaisItemComandaService AdicionaisItemComandaService
 @inject PagamentoComandaService PagamentoComandaService
 @inject MesaService MesaService
 @inject CaixaLogic CaixaLogic
 @inject IImpressaoRedeService ImpressaoService
+@inject NavigationManager Navigation
 
 <PageTitle>Fechamento de Conta - JT Food</PageTitle>
 
 <div class="container-fluid py-4">
+    <div class="mb-3">
+        <button class="btn btn-outline-secondary btn-sm rounded-pill px-3 shadow-sm" @onclick='() => Navigation.NavigateTo("/comandas")'>
+            <i class="bi bi-arrow-left me-1"></i> Voltar para Comandas
+        </button>
+    </div>
+
     @if (!string.IsNullOrEmpty(mensagemAlerta))
     {
         <div class="alert @classeAlerta alert-dismissible fade show shadow-sm mb-4" role="alert">
@@ -69,7 +77,16 @@
                                 <tbody>
                                     @if (!itens.Any())
                                     {
-                                        <tr><td colspan="5" class="text-center text-muted py-4">Nenhum item consumido.</td></tr>
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted py-4">
+                                                <i class="bi bi-cart-x fs-3 d-block mb-2 opacity-50"></i>
+                                                <span class="d-block fw-semibold">Nenhum item consumido registrado para esta comanda.</span>
+                                                <small class="text-muted d-block mt-1">Lançamentos de pedidos podem ser feitos no Mapa de Mesas ou na listagem de Comandas.</small>
+                                                <button class="btn btn-sm btn-outline-primary mt-3 rounded-pill px-3" @onclick='() => Navigation.NavigateTo("/comandas")'>
+                                                    <i class="bi bi-cart-plus me-1"></i> Ir para Lançamento de Pedidos
+                                                </button>
+                                            </td>
+                                        </tr>
                                     }
                                     else
                                     {
@@ -114,6 +131,9 @@
                     <div class="card-footer bg-light p-3 d-flex justify-content-between align-items-center">
                         <button class="btn btn-outline-dark btn-sm" @onclick="ImprimirPreContaAsync">
                             <i class="bi bi-printer me-1"></i> Imprimir Pré-Conta ESC/POS
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" @onclick='() => Navigation.NavigateTo("/comandas")'>
+                            <i class="bi bi-arrow-left me-1"></i> Voltar para Comandas
                         </button>
                     </div>
                 </div>
@@ -315,10 +335,13 @@
                         }
                         else
                         {
-                            <div class="alert alert-secondary text-center">
-                                <i class="bi bi-lock-fill fs-3 d-block mb-1 text-muted"></i>
+                            <div class="alert alert-secondary text-center py-4">
+                                <i class="bi bi-check-circle-fill fs-2 d-block mb-2 text-success"></i>
                                 <h6 class="fw-bold mb-1">Comanda Quitada e Encerrada</h6>
-                                <small class="text-muted">A comanda já foi baixada no caixa e a mesa liberada.</small>
+                                <p class="text-muted small mb-3">A comanda já foi baixada no caixa e a mesa liberada.</p>
+                                <button class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" @onclick='() => Navigation.NavigateTo("/comandas")'>
+                                    <i class="bi bi-arrow-left me-1"></i> Voltar para Comandas
+                                </button>
                             </div>
                         }
                     </div>
@@ -371,11 +394,38 @@
             comanda = await ComandaService.GetById(id);
             if (comanda != null)
             {
+                double totalOriginalComanda = comanda.Total;
                 var allItens = await ItemComandaService.GetAll();
                 string cid = comanda.Id.ToString();
+
+                var idsValidos = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { cid, $"#{cid}" };
+
+                // Se houver mesa vinculada, também buscar itens associados à mesa ou comandas irmãs da mesma mesa
+                if (!string.IsNullOrWhiteSpace(comanda.MesaId))
+                {
+                    idsValidos.Add(comanda.MesaId);
+                    string mesaNorm = comanda.MesaId.Replace("Mesa ", "").Trim();
+                    idsValidos.Add(mesaNorm);
+                    idsValidos.Add($"Mesa {mesaNorm}");
+
+                    try
+                    {
+                        var comandasDaMesa = await ComandaOperacionalService.ObterComandasDaMesaAsync(comanda.MesaId);
+                        if (comandasDaMesa != null)
+                        {
+                            foreach (var sc in comandasDaMesa)
+                            {
+                                idsValidos.Add(sc.Id.ToString());
+                                idsValidos.Add($"#{sc.Id}");
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
                 itens = (allItens ?? Enumerable.Empty<MItemComanda>())
                     .Where(i => !string.IsNullOrWhiteSpace(i.ComandaId) &&
-                                (i.ComandaId == cid || i.ComandaId.Trim().TrimStart('#') == cid))
+                                (idsValidos.Contains(i.ComandaId) || idsValidos.Contains(i.ComandaId.Trim().TrimStart('#'))))
                     .ToList();
 
                 var allAds = await AdicionaisItemComandaService.GetAll();
@@ -390,8 +440,27 @@
 
                 var allPagamentos = await PagamentoComandaService.GetAll();
                 pagamentosRegistrados = (allPagamentos ?? Enumerable.Empty<MPagamentoComanda>())
-                    .Where(p => p.ComandaId == comanda.Id.ToString())
+                    .Where(p => !string.IsNullOrWhiteSpace(p.ComandaId) &&
+                                (idsValidos.Contains(p.ComandaId) || idsValidos.Contains(p.ComandaId.Trim().TrimStart('#'))))
                     .ToList();
+
+                // Se não há itens discriminados individualmente, mas a comanda possui total registrado > 0,
+                // insere uma linha sintética de consumo para que o saldo e o fechamento fiquem consistentes e visíveis
+                if (!itens.Any() && totalOriginalComanda > 0)
+                {
+                    itens.Add(new MItemComanda
+                    {
+                        Id = 999000 + comanda.Id,
+                        ComandaId = cid,
+                        NomeProduto = $"Consumo Registrado ({comanda.NomeCliente ?? "Comanda #" + cid})",
+                        Quantidade = 1,
+                        PrecoUnitario = totalOriginalComanda,
+                        TotalItem = totalOriginalComanda,
+                        Status = "Confirmado",
+                        Observacao = "Consumo acumulado na comanda"
+                    });
+                    subtotal = totalOriginalComanda;
+                }
 
                 cobrarCouvert = comanda.TaxaServico > 0;
                 desconto = comanda.Desconto;
@@ -423,13 +492,22 @@
     {
         if (comanda == null) return;
 
-        subtotal = itens
+        double somaItens = itens
             .Where(x => x.Status != "Cancelado")
             .Sum(x =>
             {
                 var ads = adicionaisPorItem.GetValueOrDefault(x.Id.ToString(), new());
                 return x.TotalItem + ads.Sum(a => a.TotalAdicional);
             });
+
+        if (itens.Any())
+        {
+            subtotal = somaItens;
+        }
+        else if (comanda.Total > 0 && subtotal == 0)
+        {
+            subtotal = comanda.Total;
+        }
 
         comanda.TaxaServico = valorCouvertTotal + valorServico;
         comanda.Desconto = desconto;
@@ -465,13 +543,21 @@
 
         if (result.Sucesso)
         {
-            ExibirAlerta(result.Mensagem, "alert-success");
             valorNovoPagamento = 0;
             var allPagamentos = await PagamentoComandaService.GetAll();
             pagamentosRegistrados = (allPagamentos ?? Enumerable.Empty<MPagamentoComanda>())
                 .Where(p => p.ComandaId == comanda.Id.ToString())
                 .ToList();
             Recalcular();
+
+            if (saldoPendente <= 0.01)
+            {
+                await ConfirmarQuitacaoELiberarAsync();
+            }
+            else
+            {
+                ExibirAlerta(result.Mensagem, "alert-success");
+            }
         }
         else
         {
@@ -500,7 +586,10 @@
         if (resultado.Sucesso)
         {
             comanda.Status = "Fechada";
-            ExibirAlerta("Comanda quitada com sucesso! A mesa foi liberada no salão.", "alert-success");
+            ExibirAlerta("Comanda quitada com sucesso! Redirecionando para a lista de comandas...", "alert-success");
+            StateHasChanged();
+            await Task.Delay(1200);
+            Navigation.NavigateTo("/comandas");
         }
         else
         {
