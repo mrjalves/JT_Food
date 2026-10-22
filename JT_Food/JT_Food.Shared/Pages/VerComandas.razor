@@ -49,7 +49,7 @@
     }
 
     <div data-tutorial="comandas-grid">
-        <GridComandas Comandas="comandas" IsLoading="loading" OnEdit="EditarComanda" OnDelete="ExcluirComanda" />
+        <GridComandas Comandas="comandas" IsLoading="loading" OnEdit="EditarComanda" OnLancarPedidos="LancarPedidosComanda" OnDelete="ExcluirComanda" />
     </div>
 </div>
 
@@ -90,10 +90,16 @@
         modalComanda.Open(comandaSelecionada, "dados");
     }
 
-    private void EditarComanda(Comanda c)
+    private void LancarPedidosComanda(Comanda c)
     {
         comandaSelecionada = c;
         modalComanda.Open(comandaSelecionada, "pedidos");
+    }
+
+    private void EditarComanda(Comanda c)
+    {
+        comandaSelecionada = c;
+        modalComanda.Open(comandaSelecionada, "dados");
     }
 
     private async Task ExcluirComanda(Comanda c)

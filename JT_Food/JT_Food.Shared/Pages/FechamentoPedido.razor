@@ -18,7 +18,7 @@
 
 <PageTitle>Fechamento de Conta - JT Food</PageTitle>
 
-<div class="container-fluid py-4">
+<div class="container-fluid py-3">
     <div class="mb-3">
         <button class="btn btn-outline-secondary btn-sm rounded-pill px-3 shadow-sm" @onclick='() => Navigation.NavigateTo("/comandas")'>
             <i class="bi bi-arrow-left me-1"></i> Voltar para Comandas
@@ -45,28 +45,57 @@
         <div class="row g-4">
             <!-- Coluna Esquerda: Itens do Pedido -->
             <div class="col-lg-7">
-                <div class="card shadow-sm border-0" data-tutorial="fechamento-itens">
-                    <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center" data-tutorial="fechamento-header">
+                <div class="card shadow-sm border" data-tutorial="fechamento-itens">
+                    <div class="card-header border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2" data-tutorial="fechamento-header">
                         <div>
-                            <h2 class="h4 mb-0 fw-bold text-dark">
+                            <h2 class="h4 mb-0 fw-bold">
                                 Comanda #@comanda.Id — @(string.IsNullOrWhiteSpace(comanda.NomeCliente) ? "Consumidor" : comanda.NomeCliente)
                             </h2>
                             <small class="text-muted">
                                 @(string.IsNullOrEmpty(comanda.MesaId) ? "Balcão / Sem Mesa" : $"Mesa: {comanda.MesaId}") | Abertura: @comanda.DataAbertura.ToString("dd/MM HH:mm")
                             </small>
                         </div>
-                        <div>
+                        <div class="d-flex align-items-center gap-2">
+                            @if (itens.Any())
+                            {
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary btn-sm" @onclick="SelecionarTodos" title="Selecionar todos os itens da comanda">
+                                        <i class="bi bi-check-all me-1"></i> Todos (@(itens.Count(i => i.Status != "Cancelado")))
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-sm" @onclick="DesmarcarTodos" title="Desmarcar todos">
+                                        <i class="bi bi-x me-1"></i> Limpar
+                                    </button>
+                                </div>
+                            }
                             <span class="badge @ObterClasseStatusComanda(comanda.Status) px-3 py-2 fs-6">
                                 @comanda.Status.ToUpper()
                             </span>
                         </div>
                     </div>
 
+                    @if (comandasConsolidadas.Count > 1)
+                    {
+                        <div class="alert alert-info border-info-subtle bg-info-subtle text-info-emphasis d-flex align-items-center mb-0 rounded-0 border-start-0 border-end-0 py-2.5 px-3">
+                            <i class="bi bi-collection-fill text-primary fs-5 me-2.5"></i>
+                            <div class="small">
+                                <strong>Consolidando @comandasConsolidadas.Count comandas abertas</strong> para @(string.IsNullOrWhiteSpace(comanda.NomeCliente) ? "este cliente" : comanda.NomeCliente)
+                                (Comandas: @string.Join(", ", comandasConsolidadas.Select(c => $"#{c.Id}"))).
+                                <span class="ms-1 opacity-75">Todos os itens consumidos foram reunidos nesta tela para seleção e fechamento.</span>
+                            </div>
+                        </div>
+                    }
+
                     <div class="card-body p-0">
                         <div class="table-responsive">
                             <table class="table table-hover align-middle mb-0">
-                                <thead class="table-light">
+                                <thead class="border-bottom bg-body-tertiary">
                                     <tr>
+                                        <th style="width: 44px;" class="text-center">
+                                            <input type="checkbox" class="form-check-input"
+                                                   checked="@(itens.Any(i => i.Status != "Cancelado") && itensSelecionadosIds.Count == itens.Count(i => i.Status != "Cancelado"))"
+                                                   @onchange="ToggleSelecionarTodos"
+                                                   title="Selecionar / Desmarcar Todos" />
+                                        </th>
                                         <th>Item Consumido</th>
                                         <th class="text-center">Qtd</th>
                                         <th class="text-end">V. Unit</th>
@@ -78,7 +107,7 @@
                                     @if (!itens.Any())
                                     {
                                         <tr>
-                                            <td colspan="5" class="text-center text-muted py-4">
+                                            <td colspan="6" class="text-center text-muted py-4">
                                                 <i class="bi bi-cart-x fs-3 d-block mb-2 opacity-50"></i>
                                                 <span class="d-block fw-semibold">Nenhum item consumido registrado para esta comanda.</span>
                                                 <small class="text-muted d-block mt-1">Lançamentos de pedidos podem ser feitos no Mapa de Mesas ou na listagem de Comandas.</small>
@@ -93,9 +122,21 @@
                                         @foreach (var item in itens)
                                         {
                                             var adicionaisDoItem = adicionaisPorItem.GetValueOrDefault(item.Id.ToString(), new());
-                                            <tr class="@(item.Status == "Cancelado" ? "text-decoration-line-through text-muted" : "")">
+                                            bool isCancelado = item.Status == "Cancelado";
+                                            bool isSelected = itensSelecionadosIds.Contains(item.Id);
+                                            <tr class="@(isCancelado ? "text-decoration-line-through text-muted" : (!isSelected ? "opacity-50" : ""))">
+                                                <td class="text-center">
+                                                    <input type="checkbox" class="form-check-input"
+                                                           checked="@isSelected"
+                                                           disabled="@isCancelado"
+                                                           @onchange="(e) => ToggleItem(item.Id, (bool)(e.Value ?? false))" />
+                                                </td>
                                                 <td>
-                                                    <span class="fw-semibold">@item.NomeProduto</span>
+                                                    @if (comandasConsolidadas.Count > 1 && !string.IsNullOrEmpty(item.ComandaId))
+                                                    {
+                                                        <span class="badge bg-secondary-subtle text-body border border-secondary-subtle me-1 font-monospace small" title="Comanda de origem">#@item.ComandaId.TrimStart('#')</span>
+                                                    }
+                                                    <span class="fw-semibold @(isSelected ? "" : "text-muted")">@item.NomeProduto</span>
                                                     @if (!string.IsNullOrEmpty(item.Observacao))
                                                     {
                                                         <br /><small class="text-secondary"><i class="bi bi-chat-left-text me-1"></i>@item.Observacao</small>
@@ -105,14 +146,14 @@
                                                         <div class="mt-1">
                                                             @foreach (var ad in adicionaisDoItem)
                                                             {
-                                                                <small class="badge bg-info text-dark me-1">+ @ad.NomeProduto (x@ad.Quantidade)</small>
+                                                                <small class="badge bg-info-subtle text-info-emphasis border border-info-subtle me-1">+ @ad.NomeProduto (x@ad.Quantidade)</small>
                                                             }
                                                         </div>
                                                     }
                                                 </td>
                                                 <td class="text-center">@item.Quantidade</td>
                                                 <td class="text-end">R$ @item.PrecoUnitario.ToString("F2")</td>
-                                                <td class="text-end fw-bold text-dark">
+                                                <td class="text-end fw-bold @(isSelected ? "" : "text-muted")">
                                                     R$ @((item.TotalItem + adicionaisDoItem.Sum(a => a.TotalAdicional)).ToString("F2"))
                                                 </td>
                                                 <td class="text-center">
@@ -128,21 +169,31 @@
                         </div>
                     </div>
 
-                    <div class="card-footer bg-light p-3 d-flex justify-content-between align-items-center">
-                        <button class="btn btn-outline-dark btn-sm" @onclick="ImprimirPreContaAsync">
-                            <i class="bi bi-printer me-1"></i> Imprimir Pré-Conta ESC/POS
-                        </button>
-                        <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" @onclick='() => Navigation.NavigateTo("/comandas")'>
-                            <i class="bi bi-arrow-left me-1"></i> Voltar para Comandas
-                        </button>
+                    <div class="card-footer bg-body-tertiary border-top p-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-primary px-3 py-2">
+                                <i class="bi bi-check2-square me-1"></i> @itensSelecionadosIds.Count de @(itens.Count(i => i.Status != "Cancelado")) itens selecionados
+                            </span>
+                            <span class="small text-muted">
+                                Subtotal selecionado: <strong>R$ @subtotal.ToString("F2")</strong>
+                            </span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <button class="btn btn-outline-secondary btn-sm" @onclick="ImprimirPreContaAsync">
+                                <i class="bi bi-printer me-1"></i> Imprimir Pré-Conta ESC/POS
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" @onclick='() => Navigation.NavigateTo("/comandas")'>
+                                <i class="bi bi-arrow-left me-1"></i> Voltar para Comandas
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Coluna Direita: Resumo Financeiro, Couvert, Taxa e Divisão de Conta -->
             <div class="col-lg-5">
-                <div class="card shadow-sm border-0 mb-4" data-tutorial="fechamento-totais">
-                    <div class="card-header bg-white py-3">
+                <div class="card shadow-sm border mb-4" data-tutorial="fechamento-totais">
+                    <div class="card-header border-bottom py-3">
                         <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-calculator me-2"></i>Fechamento e Totais</h5>
                     </div>
                     <div class="card-body">
@@ -153,13 +204,13 @@
                         </div>
 
                         <!-- Couvert Artístico -->
-                        <div class="card bg-light border p-2 mb-3">
+                        <div class="card bg-body-secondary border border-secondary-subtle p-3 mb-3">
                             <div class="d-flex justify-content-between align-items-center mb-1">
                                 <div class="form-check form-switch mb-0">
                                     <input class="form-check-input" type="checkbox" id="checkCouvertFechamento"
                                            checked="@cobrarCouvert"
                                            @onchange="ToggleCouvert" />
-                                    <label class="form-check-label fw-bold text-dark small" for="checkCouvertFechamento">
+                                    <label class="form-check-label fw-bold small" for="checkCouvertFechamento">
                                         🎵 Couvert Artístico
                                     </label>
                                 </div>
@@ -202,7 +253,7 @@
                                     Taxa Serviço (10%):
                                 </label>
                             </div>
-                            <strong class="text-dark">R$ @valorServico.ToString("F2")</strong>
+                            <strong>R$ @valorServico.ToString("F2")</strong>
                         </div>
 
                         <!-- Desconto -->
@@ -218,7 +269,7 @@
 
                         <!-- TOTAL FINAL -->
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <span class="fs-5 fw-bold text-dark">TOTAL FINAL:</span>
+                            <span class="fs-5 fw-bold">TOTAL FINAL:</span>
                             <span class="fs-3 fw-bold text-success">R$ @totalFinal.ToString("F2")</span>
                         </div>
 
@@ -228,7 +279,7 @@
                             <div class="p-2 mb-3 bg-primary bg-opacity-10 border border-primary border-opacity-25 rounded d-flex justify-content-between align-items-center">
                                 <div>
                                     <i class="bi bi-people-fill text-primary me-2"></i>
-                                    <span class="fw-semibold text-dark">Divisão por Pagante:</span>
+                                    <span class="fw-semibold">Divisão por Pagante:</span>
                                     <small class="d-block text-muted">Dividido igualmente entre @quantidadePessoas pessoas</small>
                                 </div>
                                 <span class="fs-5 fw-bold text-primary">R$ @(valorPorPessoa.ToString("F2")) / pes.</span>
@@ -240,7 +291,7 @@
                         {
                             @if (pagamentosRegistrados.Any())
                             {
-                                <div class="bg-light p-3 rounded mb-3 border">
+                                <div class="bg-body-secondary p-3 rounded mb-3 border border-secondary-subtle">
                                     <h6 class="text-muted fw-bold mb-2">Pagamentos Lançados:</h6>
                                     @foreach (var pag in pagamentosRegistrados)
                                     {
@@ -270,9 +321,9 @@
                             <!-- Inserir Parcela de Pagamento -->
                             @if (saldoPendente > 0.01)
                             {
-                                <div class="card bg-light border-0 mb-3" data-tutorial="fechamento-pagamentos">
+                                <div class="card bg-body-secondary border border-secondary-subtle mb-3" data-tutorial="fechamento-pagamentos">
                                     <div class="card-body p-3">
-                                        <h6 class="text-dark fw-bold mb-2">
+                                        <h6 class="fw-bold mb-2">
                                             <i class="bi bi-wallet2 me-1"></i> Registrar Pagamento
                                         </h6>
                                         <div class="row g-2 mb-2">
@@ -355,7 +406,9 @@
     [Parameter] public string ComandaId { get; set; } = string.Empty;
 
     private JT_Classes.Restaurante.Comanda? comanda;
+    private List<JT_Classes.Restaurante.Comanda> comandasConsolidadas = new();
     private List<MItemComanda> itens = new();
+    private HashSet<int> itensSelecionadosIds = new();
     private Dictionary<string, List<MAdicionaisItemComanda>> adicionaisPorItem = new();
     private List<MPagamentoComanda> pagamentosRegistrados = new();
 
@@ -394,38 +447,40 @@
             comanda = await ComandaService.GetById(id);
             if (comanda != null)
             {
-                double totalOriginalComanda = comanda.Total;
-                var allItens = await ItemComandaService.GetAll();
-                string cid = comanda.Id.ToString();
+                // Obter todas as comandas irmãs abertas (do mesmo cartão ou da mesma mesa)
+                try
+                {
+                    comandasConsolidadas = await ComandaOperacionalService.ObterComandasIrmasAsync(id);
+                }
+                catch
+                {
+                    comandasConsolidadas = new List<JT_Classes.Restaurante.Comanda>();
+                }
 
-                var idsValidos = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { cid, $"#{cid}" };
+                if (!comandasConsolidadas.Any(c => c.Id == comanda.Id))
+                {
+                    comandasConsolidadas.Insert(0, comanda);
+                }
 
-                // Se houver mesa vinculada, também buscar itens associados à mesa ou comandas irmãs da mesma mesa
+                var idsValidos = comandasConsolidadas.Select(c => c.Id.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                foreach (var cid in idsValidos.ToList())
+                {
+                    idsValidos.Add($"#{cid}");
+                }
+
                 if (!string.IsNullOrWhiteSpace(comanda.MesaId))
                 {
                     idsValidos.Add(comanda.MesaId);
                     string mesaNorm = comanda.MesaId.Replace("Mesa ", "").Trim();
                     idsValidos.Add(mesaNorm);
                     idsValidos.Add($"Mesa {mesaNorm}");
-
-                    try
-                    {
-                        var comandasDaMesa = await ComandaOperacionalService.ObterComandasDaMesaAsync(comanda.MesaId);
-                        if (comandasDaMesa != null)
-                        {
-                            foreach (var sc in comandasDaMesa)
-                            {
-                                idsValidos.Add(sc.Id.ToString());
-                                idsValidos.Add($"#{sc.Id}");
-                            }
-                        }
-                    }
-                    catch { }
                 }
 
+                var allItens = await ItemComandaService.GetAll();
                 itens = (allItens ?? Enumerable.Empty<MItemComanda>())
                     .Where(i => !string.IsNullOrWhiteSpace(i.ComandaId) &&
                                 (idsValidos.Contains(i.ComandaId) || idsValidos.Contains(i.ComandaId.Trim().TrimStart('#'))))
+                    .OrderBy(i => i.Id)
                     .ToList();
 
                 var allAds = await AdicionaisItemComandaService.GetAll();
@@ -444,30 +499,86 @@
                                 (idsValidos.Contains(p.ComandaId) || idsValidos.Contains(p.ComandaId.Trim().TrimStart('#'))))
                     .ToList();
 
-                // Se não há itens discriminados individualmente, mas a comanda possui total registrado > 0,
-                // insere uma linha sintética de consumo para que o saldo e o fechamento fiquem consistentes e visíveis
-                if (!itens.Any() && totalOriginalComanda > 0)
+                // Couvert: se alguma das comandas consolidadas tiver couvert registrado
+                double totalCouvertRegistrado = comandasConsolidadas.Sum(c => c.TaxaServico);
+                if (totalCouvertRegistrado > 0)
                 {
-                    itens.Add(new MItemComanda
-                    {
-                        Id = 999000 + comanda.Id,
-                        ComandaId = cid,
-                        NomeProduto = $"Consumo Registrado ({comanda.NomeCliente ?? "Comanda #" + cid})",
-                        Quantidade = 1,
-                        PrecoUnitario = totalOriginalComanda,
-                        TotalItem = totalOriginalComanda,
-                        Status = "Confirmado",
-                        Observacao = "Consumo acumulado na comanda"
-                    });
-                    subtotal = totalOriginalComanda;
+                    cobrarCouvert = true;
+                    valorCouvertUnitario = 15.00;
+                    quantidadePessoas = Math.Max(1, (int)Math.Round(totalCouvertRegistrado / 15.00));
+                }
+                else
+                {
+                    cobrarCouvert = false;
                 }
 
-                cobrarCouvert = comanda.TaxaServico > 0;
-                desconto = comanda.Desconto;
+                // Se não há nenhum item lançado individualmente em nenhuma das comandas irmãs, mas há total acumulado
+                double somaTotalComandas = comandasConsolidadas.Sum(c => c.Total);
+                if (!itens.Any() && somaTotalComandas > 0)
+                {
+                    double saldoConsumo = somaTotalComandas - (cobrarCouvert ? valorCouvertTotal : 0);
+                    if (saldoConsumo > 0.01)
+                    {
+                        itens.Add(new MItemComanda
+                        {
+                            Id = 999000 + comanda.Id,
+                            ComandaId = comanda.Id.ToString(),
+                            NomeProduto = $"Consumo Registrado ({comanda.NomeCliente ?? "Comanda #" + comanda.Id})",
+                            Quantidade = 1,
+                            PrecoUnitario = saldoConsumo,
+                            TotalItem = saldoConsumo,
+                            Status = "Confirmado",
+                            Observacao = "Consumo acumulado na comanda"
+                        });
+                    }
+                }
+
+                // Por padrão, todos os itens ativos vêm selecionados
+                itensSelecionadosIds = itens.Where(i => i.Status != "Cancelado").Select(i => i.Id).ToHashSet();
+
+                desconto = comandasConsolidadas.Sum(c => c.Desconto);
 
                 Recalcular();
             }
         }
+    }
+
+    private void ToggleItem(int itemId, bool selecionado)
+    {
+        if (selecionado)
+        {
+            itensSelecionadosIds.Add(itemId);
+        }
+        else
+        {
+            itensSelecionadosIds.Remove(itemId);
+        }
+        Recalcular();
+    }
+
+    private void ToggleSelecionarTodos(ChangeEventArgs e)
+    {
+        bool marcar = (bool)(e.Value ?? false);
+        if (marcar)
+        {
+            SelecionarTodos();
+        }
+        else
+        {
+            DesmarcarTodos();
+        }
+    }
+
+    private void SelecionarTodos()
+    {
+        itensSelecionadosIds = itens.Where(i => i.Status != "Cancelado").Select(i => i.Id).ToHashSet();
+        Recalcular();
+    }
+
+    private void DesmarcarTodos()
+    {
+        itensSelecionadosIds.Clear();
+        Recalcular();
     }
 
     private void ToggleCouvert(ChangeEventArgs e)
@@ -493,21 +604,14 @@
         if (comanda == null) return;
 
         double somaItens = itens
-            .Where(x => x.Status != "Cancelado")
+            .Where(x => x.Status != "Cancelado" && itensSelecionadosIds.Contains(x.Id))
             .Sum(x =>
             {
                 var ads = adicionaisPorItem.GetValueOrDefault(x.Id.ToString(), new());
                 return x.TotalItem + ads.Sum(a => a.TotalAdicional);
             });
 
-        if (itens.Any())
-        {
-            subtotal = somaItens;
-        }
-        else if (comanda.Total > 0 && subtotal == 0)
-        {
-            subtotal = comanda.Total;
-        }
+        subtotal = somaItens;
 
         comanda.TaxaServico = valorCouvertTotal + valorServico;
         comanda.Desconto = desconto;
@@ -538,15 +642,18 @@
             comanda.Id.ToString(),
             formaPagamentoNovo,
             valorNovoPagamento,
-            "1"
+            "1",
+            $"Pagamento ({formaPagamentoNovo}) - {comanda.NomeCliente}"
         );
 
         if (result.Sucesso)
         {
             valorNovoPagamento = 0;
+            var idsValidos = comandasConsolidadas.Select(c => c.Id.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var allPagamentos = await PagamentoComandaService.GetAll();
             pagamentosRegistrados = (allPagamentos ?? Enumerable.Empty<MPagamentoComanda>())
-                .Where(p => p.ComandaId == comanda.Id.ToString())
+                .Where(p => !string.IsNullOrWhiteSpace(p.ComandaId) &&
+                            (idsValidos.Contains(p.ComandaId) || idsValidos.Contains(p.ComandaId.Trim().TrimStart('#'))))
                 .ToList();
             Recalcular();
 
@@ -577,29 +684,36 @@
         }
 
         quitando = true;
-        // Salva comanda com total ajustado
-        await ComandaService.SaveAsync(comanda);
 
-        var resultado = await CaixaLogic.FinalizarComandaELiberarMesaAsync(comanda.Id);
+        // Salva e quita todas as comandas irmãs consolidadas
+        foreach (var c in comandasConsolidadas)
+        {
+            c.Status = "Fechada";
+            c.DataFechamento = DateTime.UtcNow;
+            await ComandaService.SaveAsync(c);
+            await CaixaLogic.FinalizarComandaELiberarMesaAsync(c.Id);
+        }
+
         quitando = false;
-
-        if (resultado.Sucesso)
-        {
-            comanda.Status = "Fechada";
-            ExibirAlerta("Comanda quitada com sucesso! Redirecionando para a lista de comandas...", "alert-success");
-            StateHasChanged();
-            await Task.Delay(1200);
-            Navigation.NavigateTo("/comandas");
-        }
-        else
-        {
-            ExibirAlerta(resultado.Mensagem, "alert-danger");
-        }
+        comanda.Status = "Fechada";
+        ExibirAlerta("Comanda quitada com sucesso! Redirecionando para a lista de comandas...", "alert-success");
+        StateHasChanged();
+        await Task.Delay(1200);
+        Navigation.NavigateTo("/comandas");
     }
 
     private async Task ImprimirPreContaAsync()
     {
         if (comanda == null) return;
+
+        var itensParaImpressao = itens
+            .Where(i => i.Status != "Cancelado" && (itensSelecionadosIds.Count == 0 || itensSelecionadosIds.Contains(i.Id)))
+            .Select(i => new ItemPedido
+            {
+                NomeProduto = i.NomeProduto ?? "",
+                Quantidade = i.Quantidade,
+                PrecoUnitario = i.PrecoUnitario
+            }).ToList();
 
         var domainCmd = new JT_Food.Shared.Domain.Entities.Comanda
         {
@@ -613,12 +727,7 @@
             QuantidadePessoas = quantidadePessoas,
             TaxaServico = valorServico,
             Desconto = desconto,
-            Itens = itens.Select(i => new ItemPedido
-            {
-                NomeProduto = i.NomeProduto ?? "",
-                Quantidade = i.Quantidade,
-                PrecoUnitario = i.PrecoUnitario
-            }).ToList()
+            Itens = itensParaImpressao
         };
 
         var res = await ImpressaoService.ImprimirContaAsync(domainCmd);

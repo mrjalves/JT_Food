@@ -101,6 +101,7 @@
     [Parameter] public IEnumerable<Comanda>? Comandas { get; set; }
     [Parameter] public bool IsLoading { get; set; }
     [Parameter] public EventCallback<Comanda> OnEdit { get; set; }
+    [Parameter] public EventCallback<Comanda> OnLancarPedidos { get; set; }
     [Parameter] public EventCallback<Comanda> OnDelete { get; set; }
     [Parameter] public int PageSize { get; set; } = 10;
 
@@ -179,10 +180,13 @@
         gridColumns.Add(new DataGridColumn<Comanda>("Acoes", "Ações Rápidas", sortable: false, visible: true, order: 6)
         {
             CellTemplate = c => @<div class="text-end" @onclick:stopPropagation="true">
-                <button class="btn btn-sm btn-outline-success me-1" @onclick="() => IrParaFechamento(c.Id)" title="Fechar / Pagar">
+                <button class="btn btn-sm btn-outline-success me-1" @onclick="() => IrParaFechamento(c.Id)" title="Fechar / Pagar Comanda">
                     <i class="bi bi-cash-coin"></i>
                 </button>
-                <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => OnEdit.InvokeAsync(c)" title="Editar / Pedidos">
+                <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => (OnLancarPedidos.HasDelegate ? OnLancarPedidos.InvokeAsync(c) : OnEdit.InvokeAsync(c))" title="Lançar Pedidos nesta Comanda">
+                    <i class="bi bi-cart-plus"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => OnEdit.InvokeAsync(c)" title="Editar Dados / Couvert">
                     <i class="bi bi-pencil"></i>
                 </button>
                 <button class="btn btn-sm btn-outline-danger" @onclick="() => OnDelete.InvokeAsync(c)" title="Excluir">

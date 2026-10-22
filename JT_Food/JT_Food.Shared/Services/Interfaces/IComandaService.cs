@@ -17,6 +17,7 @@ namespace JT_Food.Shared.Services.Interfaces
         // Métodos Operacionais Expandidos
         Task<List<Comanda>> BuscarComandasAsync(string? termoPesquisa, string? status = null);
         Task<List<Comanda>> ObterComandasDaMesaAsync(string mesaId);
+        Task<List<Comanda>> ObterComandasIrmasAsync(int comandaId);
         Task<Comanda> AbrirComandaFlexivelAsync(string? numeroCartao, string? nomeCliente, string? mesaId, int quantidadePessoas = 1, bool ativarCouvert = false, double valorCouvert = 0);
         Task<bool> TransferirMesaAsync(int comandaId, string novaMesaId);
         Task<bool> AtualizarCouvertAsync(int comandaId, bool cobrarCouvert, double valorCouvert, int pessoas = 1);

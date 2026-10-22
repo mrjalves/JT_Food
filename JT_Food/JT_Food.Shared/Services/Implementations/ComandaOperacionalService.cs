@@ -142,6 +142,63 @@ namespace JT_Food.Shared.Services.Implementations
                 .ToList();
         }
 
+        public async Task<List<Comanda>> ObterComandasIrmasAsync(int comandaId)
+        {
+            var todas = await GetAllAsync();
+            var comandaBase = todas.FirstOrDefault(c => c.Id == comandaId) ?? await GetByIdAsync(comandaId);
+            if (comandaBase == null) return new List<Comanda>();
+
+            var abertas = todas.Where(c => c.Status != "Fechada" && c.Status != "Cancelada").ToList();
+            string idCartao = ExtrairNumeroCartao(comandaBase.NomeCliente);
+
+            var irmas = abertas.Where(c =>
+                c.Id == comandaBase.Id ||
+                (!string.IsNullOrEmpty(idCartao) && ComandaPertenceAoCartao(c, idCartao)) ||
+                (!string.IsNullOrWhiteSpace(comandaBase.MesaId) &&
+                 !comandaBase.MesaId.Contains("Balcão", StringComparison.OrdinalIgnoreCase) &&
+                 !comandaBase.MesaId.Contains("Balcao", StringComparison.OrdinalIgnoreCase) &&
+                 MesmaMesa(c.MesaId, comandaBase.MesaId))
+            ).OrderBy(c => c.Id).ToList();
+
+            if (!irmas.Any(c => c.Id == comandaBase.Id))
+            {
+                irmas.Insert(0, comandaBase);
+            }
+
+            return irmas;
+        }
+
+        public static string ExtrairNumeroCartao(string? valor)
+        {
+            if (string.IsNullOrWhiteSpace(valor)) return string.Empty;
+            var match = System.Text.RegularExpressions.Regex.Match(valor, @"\d+");
+            return match.Success ? match.Value : valor.Trim();
+        }
+
+        public static bool ComandaPertenceAoCartao(Comanda comanda, string numeroCartaoOuTexto)
+        {
+            if (string.IsNullOrWhiteSpace(numeroCartaoOuTexto) || string.IsNullOrWhiteSpace(comanda.NomeCliente)) return false;
+            string idBuscado = ExtrairNumeroCartao(numeroCartaoOuTexto);
+            if (string.IsNullOrEmpty(idBuscado)) return false;
+
+            string idComanda = ExtrairNumeroCartao(comanda.NomeCliente);
+            if (!string.IsNullOrEmpty(idComanda) && idComanda == idBuscado) return true;
+
+            string nome = comanda.NomeCliente;
+            return nome.Equals($"Cartão #{idBuscado}", StringComparison.OrdinalIgnoreCase) ||
+                   nome.Equals($"Cartão #{numeroCartaoOuTexto.Trim()}", StringComparison.OrdinalIgnoreCase) ||
+                   nome.Contains($"[Cartão {idBuscado}]", StringComparison.OrdinalIgnoreCase) ||
+                   nome.Contains($"Cartão #{idBuscado}", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool MesmaMesa(string? m1, string? m2)
+        {
+            if (string.IsNullOrWhiteSpace(m1) || string.IsNullOrWhiteSpace(m2)) return false;
+            string n1 = m1.Replace("Mesa ", "", StringComparison.OrdinalIgnoreCase).Trim();
+            string n2 = m2.Replace("Mesa ", "", StringComparison.OrdinalIgnoreCase).Trim();
+            return string.Equals(m1, m2, StringComparison.OrdinalIgnoreCase) || string.Equals(n1, n2, StringComparison.OrdinalIgnoreCase);
+        }
+
         public async Task<Comanda> AbrirComandaFlexivelAsync(
             string? numeroCartao,
             string? nomeCliente,
@@ -164,26 +221,42 @@ namespace JT_Food.Shared.Services.Implementations
                 string? clienteLimpo = !string.IsNullOrWhiteSpace(nomeCliente) ? nomeCliente.Trim() : null;
                 string? mNorm = !string.IsNullOrWhiteSpace(mesaId) ? mesaId.Replace("Mesa ", "").Trim() : null;
 
+                // Tentar extrair cartão tanto do campo de número de cartão quanto do nomeCliente digitado
+                string? idCartao = !string.IsNullOrWhiteSpace(cartaoLimpo) 
+                    ? ExtrairNumeroCartao(cartaoLimpo) 
+                    : (!string.IsNullOrWhiteSpace(clienteLimpo) && clienteLimpo.Contains("Cartão", StringComparison.OrdinalIgnoreCase) ? ExtrairNumeroCartao(clienteLimpo) : null);
+
                 // 1. REGRA ANTI-DUPLICAÇÃO: Se já existe comanda aberta com este número de cartão, REUTILIZAR
-                if (!string.IsNullOrWhiteSpace(cartaoLimpo))
+                if (!string.IsNullOrWhiteSpace(idCartao))
                 {
                     var abertaComCartao = todas.FirstOrDefault(c =>
                         c.Status != "Fechada" && c.Status != "Cancelada" &&
-                        (c.NomeCliente != null && (
-                            c.NomeCliente.Equals($"Cartão #{cartaoLimpo}", StringComparison.OrdinalIgnoreCase) ||
-                            c.NomeCliente.Contains($"[Cartão {cartaoLimpo}]", StringComparison.OrdinalIgnoreCase) ||
-                            c.NomeCliente.Equals(cartaoLimpo, StringComparison.OrdinalIgnoreCase)
-                        ))
+                        ComandaPertenceAoCartao(c, idCartao)
                     );
 
                     if (abertaComCartao != null)
                     {
                         // Cartão já aberto no salão! Atualiza mesa se fornecida e retorna a comanda existente (NUNCA DUPLICA!)
+                        bool alterou = false;
                         if (!string.IsNullOrWhiteSpace(mesaId) && abertaComCartao.MesaId != mesaId)
                         {
                             abertaComCartao.MesaId = mesaId;
+                            alterou = true;
+                        }
+
+                        if (ativarCouvert && abertaComCartao.TaxaServico == 0)
+                        {
+                            double taxaAdicional = valorCouvert * Math.Max(1, quantidadePessoas);
+                            abertaComCartao.TaxaServico = taxaAdicional;
+                            abertaComCartao.Total += taxaAdicional;
+                            alterou = true;
+                        }
+
+                        if (alterou)
+                        {
                             await _comandaService.SaveAsync(abertaComCartao);
                         }
+
                         await GarantirMesaOcupadaAsync(mesaId);
                         return abertaComCartao;
                     }
@@ -229,10 +302,10 @@ namespace JT_Food.Shared.Services.Implementations
 
                 // Formatar nome / cartão
                 string nomeFormatado = "";
-                if (!string.IsNullOrWhiteSpace(cartaoLimpo) && !string.IsNullOrWhiteSpace(clienteLimpo))
-                    nomeFormatado = $"[Cartão {cartaoLimpo}] {clienteLimpo}";
-                else if (!string.IsNullOrWhiteSpace(cartaoLimpo))
-                    nomeFormatado = $"Cartão #{cartaoLimpo}";
+                if (!string.IsNullOrWhiteSpace(idCartao) && !string.IsNullOrWhiteSpace(clienteLimpo) && !clienteLimpo.Equals($"Cartão #{idCartao}", StringComparison.OrdinalIgnoreCase))
+                    nomeFormatado = $"[Cartão {idCartao}] {clienteLimpo}";
+                else if (!string.IsNullOrWhiteSpace(idCartao))
+                    nomeFormatado = $"Cartão #{idCartao}";
                 else if (!string.IsNullOrWhiteSpace(clienteLimpo))
                     nomeFormatado = clienteLimpo;
                 else
@@ -247,7 +320,7 @@ namespace JT_Food.Shared.Services.Implementations
                     NomeCliente = nomeFormatado,
                     DataAbertura = DateTime.UtcNow,
                     Status = "Aberta",
-                    TaxaServico = 0.0,
+                    TaxaServico = taxaCouvertCalculada,
                     Desconto = 0.0,
                     Total = taxaCouvertCalculada
                 };
