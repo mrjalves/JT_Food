@@ -198,7 +198,7 @@
 
     private async Task GarantirComandaParaPedidoAsync()
     {
-        if (comandaParaPedido != null || string.IsNullOrWhiteSpace(Mesa.Identificacao)) return;
+        if (string.IsNullOrWhiteSpace(Mesa.Identificacao)) return;
         try
         {
             var comandas = await ComandaService.ObterComandasDaMesaAsync(Mesa.Identificacao);
@@ -211,6 +211,22 @@
                     NomeCliente = ativa.NomeCliente,
                     MesaId = ativa.MesaId,
                     Subtotal = ativa.Total
+                };
+                StateHasChanged();
+            }
+            else if (abaAtiva == "pedido")
+            {
+                var nova = await ComandaService.AbrirComandaFlexivelAsync(
+                    numeroCartao: null,
+                    nomeCliente: null,
+                    mesaId: Mesa.Identificacao
+                );
+                comandaParaPedido = new JT_Food.Shared.Domain.Entities.Comanda
+                {
+                    Id = nova.Id,
+                    NomeCliente = nova.NomeCliente,
+                    MesaId = nova.MesaId,
+                    Subtotal = nova.Total
                 };
                 StateHasChanged();
             }
@@ -269,6 +285,7 @@
         {
             await MesaService.SaveAsync(Mesa);
         }
+        await GarantirComandaParaPedidoAsync();
         await OnSaved.InvokeAsync();
         StateHasChanged();
     }

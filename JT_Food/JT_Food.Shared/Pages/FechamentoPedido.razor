@@ -685,21 +685,24 @@
 
         quitando = true;
 
-        // Salva e quita todas as comandas irmãs consolidadas
-        foreach (var c in comandasConsolidadas)
-        {
-            c.Status = "Fechada";
-            c.DataFechamento = DateTime.UtcNow;
-            await ComandaService.SaveAsync(c);
-            await CaixaLogic.FinalizarComandaELiberarMesaAsync(c.Id);
-        }
+        var idsConsolidados = comandasConsolidadas.Select(c => c.Id).ToList();
+        var resultado = await CaixaLogic.FinalizarComandaConsolidadaELiberarMesaAsync(comanda.Id, idsConsolidados);
 
         quitando = false;
-        comanda.Status = "Fechada";
-        ExibirAlerta("Comanda quitada com sucesso! Redirecionando para a lista de comandas...", "alert-success");
-        StateHasChanged();
-        await Task.Delay(1200);
-        Navigation.NavigateTo("/comandas");
+
+        if (resultado.Sucesso)
+        {
+            comanda.Status = "Fechada";
+            ExibirAlerta("Comanda quitada com sucesso! Todos os registros foram encerrados. Redirecionando...", "alert-success");
+            StateHasChanged();
+            await Task.Delay(1200);
+            Navigation.NavigateTo("/comandas");
+        }
+        else
+        {
+            ExibirAlerta(resultado.Mensagem, "alert-danger");
+            StateHasChanged();
+        }
     }
 
     private async Task ImprimirPreContaAsync()

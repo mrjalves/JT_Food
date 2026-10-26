@@ -421,6 +421,20 @@
 
         if (resultado.Sucesso)
         {
+            if (resultado.PedidoCriado != null && (ComandaAtiva == null || ComandaAtiva.Id <= 0))
+            {
+                var c = await ComandaService.GetByIdAsync(resultado.PedidoCriado.ComandaId);
+                if (c != null)
+                {
+                    ComandaAtiva = new JT_Food.Shared.Domain.Entities.Comanda
+                    {
+                        Id = c.Id,
+                        NomeCliente = c.NomeCliente,
+                        MesaId = c.MesaId,
+                        Subtotal = c.Total
+                    };
+                }
+            }
             classeFeedback = "alert-success";
             mensagemFeedback = resultado.Mensagem;
             itensSelecionados.Clear();

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using JT_Classes.Restaurante;
 using JT_Food.Shared.Domain.Entities;
 using JT_Food.Shared.Domain.Enums;
+using JT_Food.Shared.Services.Implementations;
 using JT_Food.Shared.Services.Interfaces;
 using JT_Servicos.Restaurante;
 using ComandaDb = JT_Classes.Restaurante.Comanda;
@@ -25,6 +26,7 @@ namespace JT_Food.Shared.BusinessLogic
         private readonly ICardapioService _cardapioService;
         private readonly IMesaLayoutService _mesaLayoutService;
         private readonly CaixaLogic _caixaLogic;
+        private readonly IComandaService _comandaOperacionalService;
 
         public ComercialLogic(
             CompraRestauranteService compraService,
@@ -38,7 +40,8 @@ namespace JT_Food.Shared.BusinessLogic
             PromocaoLogic promocaoLogic,
             ICardapioService cardapioService,
             IMesaLayoutService mesaLayoutService,
-            CaixaLogic caixaLogic)
+            CaixaLogic caixaLogic,
+            IComandaService comandaOperacionalService)
         {
             _compraService = compraService;
             _itemCompraService = itemCompraService;
@@ -52,6 +55,7 @@ namespace JT_Food.Shared.BusinessLogic
             _cardapioService = cardapioService;
             _mesaLayoutService = mesaLayoutService;
             _caixaLogic = caixaLogic;
+            _comandaOperacionalService = comandaOperacionalService;
         }
 
         /// <summary>
@@ -75,43 +79,27 @@ namespace JT_Food.Shared.BusinessLogic
                 return (false, "Não é possível lançar pedidos com o caixa fechado. Por favor, realize a abertura do caixa no menu Caixa & PDV antes de registrar novos pedidos.", null);
             }
 
-            // 1. Resolver comanda de destino
+            // 1. Resolver comanda de destino garantindo unicidade
             ComandaDb? comandaDestino = null;
 
             if (comandaId.HasValue && comandaId.Value > 0)
             {
-                comandaDestino = await _comandaService.GetById(comandaId.Value);
+                comandaDestino = await _comandaOperacionalService.GetByIdAsync(comandaId.Value);
             }
             
             if (comandaDestino == null && !string.IsNullOrWhiteSpace(mesaIdentificacao))
             {
-                // Modo 1: Pedido direto na mesa - busca comanda aberta existente da mesa para NUNCA duplicar
-                var todasComandas = await _comandaService.GetAll() ?? new List<ComandaDb>();
-                string mesaNorm = mesaIdentificacao.Replace("Mesa ", "").Trim();
-
-                var comandasDaMesa = todasComandas
-                    .Where(c => c.Status != "Fechada" && c.Status != "Cancelada" &&
-                                !string.IsNullOrWhiteSpace(c.MesaId) &&
-                                (c.MesaId.Equals(mesaIdentificacao, StringComparison.OrdinalIgnoreCase) ||
-                                 c.MesaId.Replace("Mesa ", "").Trim().Equals(mesaNorm, StringComparison.OrdinalIgnoreCase)))
-                    .OrderBy(c => c.Id)
-                    .ToList();
-
+                // Busca comanda aberta existente da mesa ou obtém/cria via serviço operacional com lock anti-duplicação
+                var comandasDaMesa = await _comandaOperacionalService.ObterComandasDaMesaAsync(mesaIdentificacao);
                 comandaDestino = comandasDaMesa.FirstOrDefault();
 
                 if (comandaDestino == null)
                 {
-                    // Cria uma única comanda global para a mesa caso não haja nenhuma aberta
-                    comandaDestino = new ComandaDb
-                    {
-                        UserId = "1",
-                        MesaId = mesaIdentificacao,
-                        NomeCliente = $"Conta Geral {mesaIdentificacao}",
-                        DataAbertura = DateTime.UtcNow,
-                        Status = "Aberta",
-                        GarcomId = garcomId
-                    };
-                    await _comandaService.SaveAsync(comandaDestino);
+                    comandaDestino = await _comandaOperacionalService.AbrirComandaFlexivelAsync(
+                        numeroCartao: null,
+                        nomeCliente: null,
+                        mesaId: mesaIdentificacao
+                    );
                 }
             }
 
@@ -123,11 +111,9 @@ namespace JT_Food.Shared.BusinessLogic
             if (!string.IsNullOrWhiteSpace(mesaVinculada))
             {
                 var todasMesas = await _mesaService.GetAll() ?? new List<JT_Classes.Restaurante.Mesa>();
-                string mvNorm = mesaVinculada.Replace("Mesa ", "").Trim();
                 var mesa = todasMesas.FirstOrDefault(m =>
-                    m.Identificacao != null &&
-                    (m.Identificacao.Equals(mesaVinculada, StringComparison.OrdinalIgnoreCase) ||
-                     m.Identificacao.Replace("Mesa ", "").Trim().Equals(mvNorm, StringComparison.OrdinalIgnoreCase)));
+                    !string.IsNullOrWhiteSpace(m.Identificacao) &&
+                    ComandaOperacionalService.MesmaMesa(m.Identificacao, mesaVinculada));
 
                 if (mesa != null && mesa.Status != StatusMesaConsts.Ocupada)
                 {
@@ -171,26 +157,18 @@ namespace JT_Food.Shared.BusinessLogic
                 item.Id = mItem.Id;
             }
 
-            // 4. Atualizar o total acumulado na comanda
-            comandaDestino.Total += pedido.ValorTotal;
+            // 4. Atualizar o total acumulado na comanda de forma consistente
             if (descontoCombo > 0)
             {
                 comandaDestino.Desconto += descontoCombo;
+                await _comandaService.SaveAsync(comandaDestino);
             }
-            await _comandaService.SaveAsync(comandaDestino);
+            await _comandaOperacionalService.RecalcularTotalComandaAsync(comandaDestino.Id);
 
             // 5. Atualizar estado no Mapa do Salão em tempo real
             if (!string.IsNullOrEmpty(pedido.MesaId))
             {
-                var todasComandas = await _comandaService.GetAll() ?? new List<ComandaDb>();
-                string pMesaNorm = pedido.MesaId.Replace("Mesa ", "").Trim();
-                var todasComandasMesa = todasComandas.Where(c =>
-                    c.Status != "Fechada" && c.Status != "Cancelada" &&
-                    !string.IsNullOrWhiteSpace(c.MesaId) &&
-                    (c.MesaId.Equals(pedido.MesaId, StringComparison.OrdinalIgnoreCase) ||
-                     c.MesaId.Replace("Mesa ", "").Trim().Equals(pMesaNorm, StringComparison.OrdinalIgnoreCase))
-                ).ToList();
-
+                var todasComandasMesa = await _comandaOperacionalService.ObterComandasDaMesaAsync(pedido.MesaId);
                 int totalComandas = todasComandasMesa.Count > 0 ? todasComandasMesa.Count : 1;
                 double subtotalMesa = todasComandasMesa.Count > 0 ? todasComandasMesa.Sum(c => c.Total) : comandaDestino.Total;
 

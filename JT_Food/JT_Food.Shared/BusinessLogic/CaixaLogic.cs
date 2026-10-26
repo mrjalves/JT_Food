@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using JT_Classes.Restaurante;
 using JT_Food.Shared.Domain.Enums;
+using JT_Food.Shared.Services.Implementations;
 using JT_Food.Shared.Services.Interfaces;
 using JT_Servicos.Restaurante;
 
@@ -268,39 +270,96 @@ namespace JT_Food.Shared.BusinessLogic
 
         public async Task<(bool Sucesso, string Mensagem)> FinalizarComandaELiberarMesaAsync(int comandaId)
         {
-            var comanda = await _comandaService.GetById(comandaId);
-            if (comanda == null) return (false, "Comanda não encontrada.");
+            return await FinalizarComandaConsolidadaELiberarMesaAsync(comandaId, null);
+        }
 
-            var (quitada, totalPago, saldoPendente) = await VerificarComandaQuitadaAsync(comanda.Id.ToString(), comanda.Total);
-            if (!quitada)
+        public async Task<(bool Sucesso, string Mensagem)> FinalizarComandaConsolidadaELiberarMesaAsync(
+            int comandaId,
+            List<int>? idsComandasConsolidadas = null)
+        {
+            var todasComandas = await _comandaService.GetAll() ?? new List<Comanda>();
+            var comandaPrincipal = todasComandas.FirstOrDefault(c => c.Id == comandaId);
+            if (comandaPrincipal == null) return (false, "Comanda não encontrada.");
+
+            var abertas = todasComandas.Where(c => c.Status != "Fechada" && c.Status != "Cancelada").ToList();
+            List<Comanda> grupoComandas = new();
+
+            if (idsComandasConsolidadas != null && idsComandasConsolidadas.Any())
+            {
+                var setIds = idsComandasConsolidadas.ToHashSet();
+                grupoComandas = abertas.Where(c => setIds.Contains(c.Id)).ToList();
+            }
+
+            if (!grupoComandas.Any(c => c.Id == comandaPrincipal.Id))
+            {
+                grupoComandas.Insert(0, comandaPrincipal);
+            }
+
+            // Se não foi fornecida lista explícita, agrupa por cartão ou por mesa
+            if (idsComandasConsolidadas == null || !idsComandasConsolidadas.Any())
+            {
+                string idCartao = ComandaOperacionalService.ExtrairNumeroCartao(comandaPrincipal.NomeCliente);
+                var irmas = abertas.Where(c =>
+                    c.Id == comandaPrincipal.Id ||
+                    (!string.IsNullOrEmpty(idCartao) && ComandaOperacionalService.ComandaPertenceAoCartao(c, idCartao)) ||
+                    (!string.IsNullOrWhiteSpace(comandaPrincipal.MesaId) &&
+                     !comandaPrincipal.MesaId.Contains("Balcão", StringComparison.OrdinalIgnoreCase) &&
+                     !comandaPrincipal.MesaId.Contains("Balcao", StringComparison.OrdinalIgnoreCase) &&
+                     ComandaOperacionalService.MesmaMesa(c.MesaId, comandaPrincipal.MesaId))
+                ).ToList();
+
+                foreach (var irma in irmas)
+                {
+                    if (!grupoComandas.Any(g => g.Id == irma.Id))
+                        grupoComandas.Add(irma);
+                }
+            }
+
+            // Calcular o total e verificar os pagamentos consolidados do grupo
+            double totalConsolidado = grupoComandas.Sum(c => c.Total);
+            var todosPagamentos = await _pagamentoComandaService.GetAll() ?? new List<MPagamentoComanda>();
+            var idsString = grupoComandas.Select(c => c.Id.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var pagamentosDoGrupo = todosPagamentos
+                .Where(p => !string.IsNullOrWhiteSpace(p.ComandaId) &&
+                            (idsString.Contains(p.ComandaId) || idsString.Contains(p.ComandaId.Trim().TrimStart('#'))))
+                .ToList();
+
+            double totalPago = pagamentosDoGrupo.Sum(p => p.Valor);
+            double saldoPendente = totalConsolidado - totalPago;
+
+            if (saldoPendente > 0.01)
             {
                 return (false, $"Não é possível fechar a comanda. Saldo pendente: R$ {saldoPendente:F2}");
             }
 
-            comanda.Status = "Fechada";
-            comanda.DataFechamento = DateTime.UtcNow;
-            await _comandaService.SaveAsync(comanda);
-
-            // Verificar se ainda há outras comandas abertas na mesa
-            if (!string.IsNullOrWhiteSpace(comanda.MesaId))
+            // Fecha TODOS os registros abertos da mesma comanda
+            DateTime dataFechamento = DateTime.UtcNow;
+            foreach (var c in grupoComandas)
             {
-                var todasComandas = await _comandaService.GetAll();
-                string mesaNorm = comanda.MesaId.Replace("Mesa ", "").Trim();
-                var outrasComandas = (todasComandas ?? Enumerable.Empty<Comanda>())
-                    .Where(c => c.Id != comandaId && c.Status != "Fechada" && c.Status != "Cancelada" &&
-                        !string.IsNullOrWhiteSpace(c.MesaId) &&
-                        (c.MesaId.Equals(comanda.MesaId, StringComparison.OrdinalIgnoreCase) ||
-                         c.MesaId.Replace("Mesa ", "").Trim().Equals(mesaNorm, StringComparison.OrdinalIgnoreCase)))
+                c.Status = "Fechada";
+                c.DataFechamento = dataFechamento;
+                await _comandaService.SaveAsync(c);
+            }
+
+            // Verificar se ainda há outras comandas abertas na mesa que NÃO pertencem a este grupo
+            string? mesaId = comandaPrincipal.MesaId ?? grupoComandas.FirstOrDefault(g => !string.IsNullOrWhiteSpace(g.MesaId))?.MesaId;
+            if (!string.IsNullOrWhiteSpace(mesaId))
+            {
+                var outrasComandasMesa = todasComandas
+                    .Where(c => !grupoComandas.Any(g => g.Id == c.Id) &&
+                                c.Status != "Fechada" && c.Status != "Cancelada" &&
+                                !string.IsNullOrWhiteSpace(c.MesaId) &&
+                                ComandaOperacionalService.MesmaMesa(c.MesaId, mesaId))
                     .ToList();
 
-                if (!outrasComandas.Any())
+                if (!outrasComandasMesa.Any())
                 {
                     // Libera a mesa no banco
-                    var todasMesas = await _mesaService.GetAll();
-                    var mesa = (todasMesas ?? Enumerable.Empty<Mesa>())
-                        .FirstOrDefault(m => !string.IsNullOrWhiteSpace(m.Identificacao) &&
-                            (m.Identificacao.Equals(comanda.MesaId, StringComparison.OrdinalIgnoreCase) ||
-                             m.Identificacao.Replace("Mesa ", "").Trim().Equals(mesaNorm, StringComparison.OrdinalIgnoreCase)));
+                    var todasMesas = await _mesaService.GetAll() ?? new List<Mesa>();
+                    var mesa = todasMesas.FirstOrDefault(m =>
+                        !string.IsNullOrWhiteSpace(m.Identificacao) &&
+                        ComandaOperacionalService.MesmaMesa(m.Identificacao, mesaId));
 
                     if (mesa != null)
                     {
@@ -309,11 +368,18 @@ namespace JT_Food.Shared.BusinessLogic
                     }
 
                     // Libera no mapa do salão
-                    await _mesaLayoutService.AtualizarStatusOperacionalAsync(comanda.MesaId, StatusMesaConsts.Livre, 0, 0);
+                    await _mesaLayoutService.AtualizarStatusOperacionalAsync(mesaId, StatusMesaConsts.Livre, 0, 0);
+                }
+                else
+                {
+                    // Atualiza contagem e total das comandas que permaneceram na mesa
+                    int totalCmds = outrasComandasMesa.Count;
+                    double totalSub = outrasComandasMesa.Sum(c => c.Total);
+                    await _mesaLayoutService.AtualizarStatusOperacionalAsync(mesaId, StatusMesaConsts.Ocupada, totalCmds, totalSub);
                 }
             }
 
-            return (true, $"Comanda #{comanda.Id} encerrada com sucesso!");
+            return (true, $"Comanda #{comandaPrincipal.Id} e todos os registros associados foram fechados com sucesso!");
         }
     }
 }
