@@ -34,12 +34,15 @@ namespace JT_Food.Shared.Domain.Entities
             if (!Ativa) return false;
             
             var agora = dataHoraReferencia ?? DateTime.Now;
+            int diaDaSemana = (int)agora.DayOfWeek;
+
+            if (DiasSemana != null && DiasSemana.Any() && !DiasSemana.Contains(diaDaSemana))
+            {
+                return false;
+            }
             
             if (Tipo == TipoRegraPromocao.HappyHour)
             {
-                int diaDaSemana = (int)agora.DayOfWeek;
-                if (!DiasSemana.Contains(diaDaSemana)) return false;
-                
                 var horaAtual = agora.TimeOfDay;
                 if (HoraInicio.HasValue && horaAtual < HoraInicio.Value) return false;
                 if (HoraFim.HasValue && horaAtual > HoraFim.Value) return false;

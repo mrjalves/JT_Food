@@ -25,14 +25,16 @@ namespace JT_Food.Shared
 
             // Serviços do Módulo Restaurante (Banco / API)
             services.AddScoped<JT_Servicos.Restaurante.MesaService>();
-            services.AddScoped<JT_Servicos.Restaurante.ComandaService>();
+            services.AddScoped<FoodComandaService>();
+            services.AddScoped<JT_Servicos.Restaurante.ComandaService>(sp => sp.GetRequiredService<FoodComandaService>());
             services.AddScoped<JT_Servicos.Restaurante.ProdutoRestauranteService>();
             services.AddScoped<JT_Servicos.Restaurante.CompraRestauranteService>();
             services.AddScoped<FoodItemComandaService>();
             services.AddScoped<JT_Servicos.Restaurante.ItemComandaService>(sp => sp.GetRequiredService<FoodItemComandaService>());
             services.AddScoped<FoodAdicionaisItemComandaService>();
             services.AddScoped<JT_Servicos.Restaurante.AdicionaisItemComandaService>(sp => sp.GetRequiredService<FoodAdicionaisItemComandaService>());
-            services.AddScoped<JT_Servicos.Restaurante.PagamentoComandaService>();
+            services.AddScoped<FoodPagamentoComandaService>();
+            services.AddScoped<JT_Servicos.Restaurante.PagamentoComandaService>(sp => sp.GetRequiredService<FoodPagamentoComandaService>());
             services.AddScoped<FoodCaixaService>();
             services.AddScoped<JT_Servicos.Restaurante.CaixaService>(sp => sp.GetRequiredService<FoodCaixaService>());
             services.AddScoped<FoodMovimentacaoCaixaService>();

@@ -160,7 +160,7 @@ namespace JT_Food.Shared.BusinessLogic
             // 4. Atualizar o total acumulado na comanda de forma consistente
             if (descontoCombo > 0)
             {
-                comandaDestino.Desconto += descontoCombo;
+                comandaDestino.Desconto = Math.Max(comandaDestino.Desconto, descontoCombo);
                 await _comandaService.SaveAsync(comandaDestino);
             }
             await _comandaOperacionalService.RecalcularTotalComandaAsync(comandaDestino.Id);

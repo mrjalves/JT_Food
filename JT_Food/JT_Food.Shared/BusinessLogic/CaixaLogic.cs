@@ -218,20 +218,36 @@ namespace JT_Food.Shared.BusinessLogic
                 Observacao = observacao
             };
 
-            bool salvo = await _pagamentoComandaService.SaveAsync(pagamento) > 0;
-            if (!salvo)
-                return (false, "Erro ao gravar o pagamento parcial.");
+            bool salvo = false;
+            try
+            {
+                salvo = await _pagamentoComandaService.SaveAsync(pagamento) > 0;
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Erro ao gravar o pagamento parcial: {ex.Message}");
+            }
 
-            await RegistrarMovimentacaoAsync(
-                resultCaixa.CaixaAtual!.Id.ToString(),
-                operadorId,
-                "Venda",
-                "Entrada",
-                valor,
-                formaPagamento,
-                $"Pagamento parcial Comanda #{comandaId} ({formaPagamento})",
-                comandaId
-            );
+            if (!salvo)
+                return (false, "Não foi possível confirmar a gravação do pagamento parcial.");
+
+            try
+            {
+                await RegistrarMovimentacaoAsync(
+                    resultCaixa.CaixaAtual!.Id.ToString(),
+                    operadorId,
+                    "Venda",
+                    "Entrada",
+                    valor,
+                    formaPagamento,
+                    $"Pagamento parcial Comanda #{comandaId} ({formaPagamento})",
+                    comandaId
+                );
+            }
+            catch (Exception exMov)
+            {
+                Console.WriteLine($"[CaixaLogic] Aviso ao registrar movimentação de caixa: {exMov.Message}");
+            }
 
             return (true, $"Pagamento de R$ {valor:F2} via {formaPagamento} registrado.");
         }

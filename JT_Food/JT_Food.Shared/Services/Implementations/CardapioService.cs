@@ -154,17 +154,6 @@ namespace JT_Food.Shared.Services.Implementations
                     ImpressoraDestinoId = 1,
                     TempoMedioPreparoMinutos = 8,
                     ObservacoesSugeridas = new() { "Sem calda", "Calda à parte" }
-                },
-                new ProdutoCardapio
-                {
-                    Id = 601,
-                    Nome = "Couvert Artístico ao Vivo",
-                    Descricao = "Taxa artística para shows de voz e violão e atrações ao vivo.",
-                    CategoriaId = 7,
-                    Grupo = CategoriaCardapioEnum.TaxasCouvert,
-                    PrecoBase = 15.00,
-                    TempoMedioPreparoMinutos = 0,
-                    ObservacoesSugeridas = new() { "Cobrança individual", "Isenção aniversariante" }
                 }
             });
 
@@ -193,6 +182,7 @@ namespace JT_Food.Shared.Services.Implementations
                     Tipo = TipoRegraPromocao.Combo,
                     ProdutosComboIds = new() { 301, 201, 101 },
                     DescontoPercentual = 20,
+                    DiasSemana = new() { 5 }, // Sexta-feira
                     Ativa = true
                 }
             });
@@ -200,7 +190,7 @@ namespace JT_Food.Shared.Services.Implementations
 
         public Task<List<ProdutoCardapio>> ObterProdutosAsync(CategoriaCardapioEnum? grupo = null, bool apenasDisponiveis = false)
         {
-            var query = _produtos.AsEnumerable();
+            var query = _produtos.Where(p => p.Grupo != CategoriaCardapioEnum.TaxasCouvert).AsEnumerable();
             if (grupo.HasValue)
                 query = query.Where(p => p.Grupo == grupo.Value);
             if (apenasDisponiveis)

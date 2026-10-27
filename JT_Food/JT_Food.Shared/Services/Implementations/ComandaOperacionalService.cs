@@ -256,17 +256,20 @@ namespace JT_Food.Shared.Services.Implementations
                             alterou = true;
                         }
 
-                        if (ativarCouvert && abertaComCartao.TaxaServico == 0)
+                        if (ativarCouvert)
                         {
                             double taxaAdicional = valorCouvert * Math.Max(1, quantidadePessoas);
-                            abertaComCartao.TaxaServico = taxaAdicional;
-                            abertaComCartao.Total += taxaAdicional;
-                            alterou = true;
+                            if (abertaComCartao.TaxaServico != taxaAdicional)
+                            {
+                                abertaComCartao.TaxaServico = taxaAdicional;
+                                alterou = true;
+                            }
                         }
 
                         if (alterou)
                         {
                             await _comandaService.SaveAsync(abertaComCartao);
+                            await RecalcularTotalComandaAsync(abertaComCartao.Id);
                         }
 
                         await GarantirMesaOcupadaAsync(mesaId ?? abertaComCartao.MesaId);
@@ -325,14 +328,17 @@ namespace JT_Food.Shared.Services.Implementations
                                 contaGeralOuSemCartao.NomeCliente = novoNome;
                             }
 
-                            if (ativarCouvert && contaGeralOuSemCartao.TaxaServico == 0)
+                            if (ativarCouvert)
                             {
                                 double taxaAdicional = valorCouvert * Math.Max(1, quantidadePessoas);
-                                contaGeralOuSemCartao.TaxaServico = taxaAdicional;
-                                contaGeralOuSemCartao.Total += taxaAdicional;
+                                if (contaGeralOuSemCartao.TaxaServico != taxaAdicional)
+                                {
+                                    contaGeralOuSemCartao.TaxaServico = taxaAdicional;
+                                }
                             }
 
                             await _comandaService.SaveAsync(contaGeralOuSemCartao);
+                            await RecalcularTotalComandaAsync(contaGeralOuSemCartao.Id);
                             await GarantirMesaOcupadaAsync(mesaId);
                             return contaGeralOuSemCartao;
                         }

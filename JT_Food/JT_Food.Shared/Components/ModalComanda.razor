@@ -281,7 +281,15 @@
         }
 
         cobrarCouvert = Comanda.TaxaServico > 0;
-        quantidadePessoas = 1;
+        if (Comanda.TaxaServico > 0)
+        {
+            valorCouvertUnitario = 15.00;
+            quantidadePessoas = Math.Max(1, (int)Math.Round(Comanda.TaxaServico / 15.00));
+        }
+        else
+        {
+            quantidadePessoas = 1;
+        }
 
         if (Comanda.Id > 0)
         {
@@ -390,8 +398,13 @@
                 {
                     Comanda.TaxaServico = quantidadePessoas * valorCouvertUnitario;
                 }
+                else
+                {
+                    Comanda.TaxaServico = 0;
+                }
 
                 await ComandaService.SaveAsync(Comanda);
+                await ComandaService.RecalcularTotalComandaAsync(Comanda.Id);
             }
 
             await OnSaved.InvokeAsync();
