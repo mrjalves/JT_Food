@@ -63,8 +63,8 @@ namespace JT_Food.Shared.Services.Implementations
         public AuthPerfilService(ISecureStorageService storage)
         {
             _storage = storage;
-            // Princípio do menor privilégio: inicia como Garçom até autenticação explícita
-            _usuarioAtual = _usuariosPreConfigurados.First(u => u.Perfil == PerfilAcesso.Garcom);
+            // Padrão inicial: Gerente (para navegação completa do menu lateral)
+            _usuarioAtual = ClonarSemSegredo(_usuariosPreConfigurados.First());
         }
 
         private static string HashSecret(string secret, string salt)

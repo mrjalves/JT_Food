@@ -24,10 +24,11 @@ namespace JT_Food.Shared.Layout
 
             if (perfil == PerfilAcesso.Garcom)
             {
-                // Interface do Garçom: Acessos focados no atendimento rápido móvel
+                // Interface do Garçom: Acessos focados no atendimento rápido móvel + Caixa
                 itens.Add(new SItemMenu { Titulo = "Mesas", Texto = "Mesas", Url = "/mesas", Icone = "bi-table" });
                 itens.Add(new SItemMenu { Titulo = "Comandas", Texto = "Comandas", Url = "/comandas", Icone = "bi-card-checklist" });
                 itens.Add(new SItemMenu { Titulo = "KDS (Cozinha)", Texto = "KDS", Url = "/kds", Icone = "bi-display" });
+                itens.Add(new SItemMenu { Titulo = "Caixa", Texto = "Caixa", Url = "/caixa", Icone = "bi-cash-coin" });
             }
             else if (perfil == PerfilAcesso.Caixa)
             {

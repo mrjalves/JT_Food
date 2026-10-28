@@ -242,8 +242,8 @@ namespace JT_Food.Tests
             var storage = new FakeSecureStorage();
             var auth = new AuthPerfilService(storage);
 
-            // Inicia com menor privilégio (Garçom)
-            Assert.Equal(PerfilAcesso.Garcom, auth.ObterPerfilAtual());
+            // Inicia como Gerente por padrão
+            Assert.Equal(PerfilAcesso.Gerente, auth.ObterPerfilAtual());
 
             // Login com PIN válido do Gerente
             var ok = await auth.LoginPorPinAsync("1234");
