@@ -1,8 +1,12 @@
+@using JT_Classes.Restaurante
+@using JT_Servicos.Restaurante
 @using JT_Food.Shared.BusinessLogic
 @using JT_Food.Shared.Domain.Entities
 @using JT_Food.Shared.Domain.Enums
 @using JT_Food.Shared.Services.Interfaces
+@using JT_Food.Shared.Services.Implementations
 @inject IMesaLayoutService MesaLayoutService
+@inject MesaService MesaService
 @inject LayoutSalaoLogic LayoutLogic
 @inject IJSRuntime JSRuntime
 @implements IDisposable
@@ -552,6 +556,35 @@
     private async Task SalvarLayoutAsync()
     {
         await MesaLayoutService.SalvarElementosEmLoteAsync(elementosAmbiente);
+
+        try
+        {
+            var todasDb = await MesaService.GetAll() ?? new();
+            foreach (var elem in elementosAmbiente.Where(e => e.Capacidade > 0 && !string.IsNullOrWhiteSpace(e.Identificacao)))
+            {
+                var existente = todasDb.FirstOrDefault(m =>
+                    !string.IsNullOrWhiteSpace(m.Identificacao) &&
+                    ComandaOperacionalService.MesmaMesa(m.Identificacao, elem.Identificacao));
+
+                if (existente == null)
+                {
+                    await MesaService.SaveAsync(new JT_Classes.Restaurante.Mesa
+                    {
+                        Identificacao = elem.Identificacao,
+                        Capacidade = elem.Capacidade,
+                        Status = string.IsNullOrWhiteSpace(elem.Status) ? StatusMesaConsts.Livre : elem.Status
+                    });
+                }
+                else if (existente.Capacidade != elem.Capacidade || existente.Identificacao != elem.Identificacao)
+                {
+                    existente.Capacidade = elem.Capacidade;
+                    existente.Identificacao = elem.Identificacao;
+                    await MesaService.SaveAsync(existente);
+                }
+            }
+        }
+        catch { }
+
         feedbackClass = "alert-success";
         feedbackMsg = "Layout do salão salvo com sucesso!";
     }

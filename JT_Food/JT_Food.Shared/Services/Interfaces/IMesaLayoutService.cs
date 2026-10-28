@@ -16,5 +16,8 @@ namespace JT_Food.Shared.Services.Interfaces
         Task<bool> ExcluirElementoAsync(int id);
         Task<ElementoSalao?> ObterElementoPorIdentificacaoAsync(string identificacao);
         Task<bool> AtualizarStatusOperacionalAsync(string identificacaoMesa, string novoStatus, int totalComandas, double subtotal);
+        Task<ElementoSalao> GarantirElementoParaMesaAsync(JT_Classes.Restaurante.Mesa mesa, int ambientePadraoId = 1);
+        Task<bool> RemoverElementoPorIdentificacaoAsync(string identificacaoMesa);
+        Task<List<JT_Classes.Restaurante.Mesa>> ObterMesasSincronizadasAsync();
     }
 }

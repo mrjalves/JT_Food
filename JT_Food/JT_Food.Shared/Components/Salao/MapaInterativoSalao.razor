@@ -188,6 +188,8 @@
     private int ambienteAtivoId = 1;
     private bool carregando = true;
 
+    public int AmbienteAtivoId => ambienteAtivoId;
+
     protected override async Task OnInitializedAsync()
     {
         await CarregarAmbientesAsync();

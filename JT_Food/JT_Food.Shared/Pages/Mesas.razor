@@ -5,8 +5,10 @@
 @using JT_Food.Shared.Components.Salao
 @using JT_Food.Shared.Domain.Entities
 @using JT_Food.Shared.Services.Interfaces
+@using JT_Food.Shared.Services.Implementations
 @using JT_Food.Shared.BusinessLogic
 @inject MesaService MesaService
+@inject IMesaLayoutService MesaLayoutService
 @inject IAuthPerfilService AuthService
 @inject CaixaLogic CaixaLogic
 @inject NavigationManager Navigation
@@ -30,20 +32,20 @@
             <div class="btn-group shadow-sm" role="group" data-tutorial="mesas-modos">
                 <button type="button"
                         class="btn @(modoVisualizacao == "mapa" ? "btn-primary" : "btn-outline-primary")"
-                        @onclick='() => modoVisualizacao = "mapa"'>
+                        @onclick='() => AlterarModoVisualizacaoAsync("mapa")'>
                     <i class="bi bi-map-fill me-1"></i> Mapa Operacional
                 </button>
                 @if (AuthService.IsGerente())
                 {
                     <button type="button"
                             class="btn @(modoVisualizacao == "construtor" ? "btn-primary" : "btn-outline-primary")"
-                            @onclick='() => modoVisualizacao = "construtor"'>
+                            @onclick='() => AlterarModoVisualizacaoAsync("construtor")'>
                         <i class="bi bi-pencil-square me-1"></i> Construtor de Salão
                     </button>
                 }
                 <button type="button"
                         class="btn @(modoVisualizacao == "grid" ? "btn-primary" : "btn-outline-primary")"
-                        @onclick='() => modoVisualizacao = "grid"'>
+                        @onclick='() => AlterarModoVisualizacaoAsync("grid")'>
                     <i class="bi bi-list-ul me-1"></i> Lista em Tabela
                 </button>
             </div>
@@ -78,7 +80,7 @@
         }
         else if (modoVisualizacao == "construtor")
         {
-            <ConstrutorLayoutMesas OnCancelar='() => modoVisualizacao = "mapa"' />
+            <ConstrutorLayoutMesas OnCancelar='() => AlterarModoVisualizacaoAsync("mapa")' />
         }
         else
         {
@@ -106,10 +108,16 @@
         await CarregarMesasAsync();
     }
 
+    private async Task AlterarModoVisualizacaoAsync(string novoModo)
+    {
+        modoVisualizacao = novoModo;
+        await RecarregarAsync();
+    }
+
     private async Task CarregarMesasAsync()
     {
         loading = true;
-        mesas = await MesaService.GetAll();
+        mesas = await MesaLayoutService.ObterMesasSincronizadasAsync();
         loading = false;
         StateHasChanged();
     }
@@ -127,44 +135,70 @@
 
     private void NovaMesa()
     {
-        mesaSelecionada = new JT_Classes.Restaurante.Mesa();
-        modalMesa.Open(mesaSelecionada, "dados");
+        mesaSelecionada = new JT_Classes.Restaurante.Mesa { Capacidade = 4 };
+        int ambAtivo = mapaSalaoRef?.AmbienteAtivoId ?? 1;
+        modalMesa.Open(mesaSelecionada, "dados", ambAtivo);
     }
 
     private void EditarMesa(JT_Classes.Restaurante.Mesa mesa)
     {
         mesaSelecionada = mesa;
-        modalMesa.Open(mesaSelecionada, "comandas");
+        int ambAtivo = mapaSalaoRef?.AmbienteAtivoId ?? 1;
+        modalMesa.Open(mesaSelecionada, "comandas", ambAtivo);
     }
 
     private async Task ExcluirMesa(JT_Classes.Restaurante.Mesa mesa)
     {
-        if (await MesaService.Delete(mesa.Id))
+        var todasDb = await MesaService.GetAll() ?? new();
+        var correspondentes = todasDb
+            .Where(m => m.Id == mesa.Id || ComandaOperacionalService.MesmaMesa(m.Identificacao, mesa.Identificacao))
+            .ToList();
+
+        foreach (var item in correspondentes)
         {
-            await RecarregarAsync();
+            if (item.Id > 0)
+            {
+                try { await MesaService.Delete(item.Id); } catch { }
+            }
         }
+
+        await MesaLayoutService.RemoverElementoPorIdentificacaoAsync(mesa.Identificacao);
+        await RecarregarAsync();
     }
 
     private async Task HandleElementoSelecionado(ElementoSalao elemento)
     {
-        // Se for um elemento com capacidade (mesa/balcão)
-        var mesaCorrespondente = mesas?.FirstOrDefault(m => string.Equals(m.Identificacao, elemento.Identificacao, StringComparison.OrdinalIgnoreCase));
+        // Se for um elemento com capacidade (mesa/balcão), busca por identificação normalizada para nunca duplicar
+        var mesaCorrespondente = mesas?.FirstOrDefault(m =>
+            ComandaOperacionalService.MesmaMesa(m.Identificacao, elemento.Identificacao));
         
-        if (mesaCorrespondente == null)
+        if (mesaCorrespondente == null || mesaCorrespondente.Id == 0)
         {
-            // Cria no banco se não existia
-            mesaCorrespondente = new JT_Classes.Restaurante.Mesa
+            var todasDb = await MesaService.GetAll() ?? new();
+            var existenteDb = todasDb.FirstOrDefault(m =>
+                ComandaOperacionalService.MesmaMesa(m.Identificacao, elemento.Identificacao));
+
+            if (existenteDb != null)
             {
-                Identificacao = elemento.Identificacao,
-                Capacidade = elemento.Capacidade,
-                Status = elemento.Status
-            };
-            await MesaService.SaveAsync(mesaCorrespondente);
-            mesas = await MesaService.GetAll();
+                mesaCorrespondente = existenteDb;
+            }
+            else
+            {
+                mesaCorrespondente = new JT_Classes.Restaurante.Mesa
+                {
+                    Identificacao = MesaLayoutService.FormatarIdentificacaoCanonica(elemento.Identificacao),
+                    Capacidade = elemento.Capacidade > 0 ? elemento.Capacidade : 4,
+                    Status = elemento.Status
+                };
+                await MesaService.SaveAsync(mesaCorrespondente);
+            }
+            mesas = await MesaLayoutService.ObterMesasSincronizadasAsync();
+            mesaCorrespondente = mesas.FirstOrDefault(m =>
+                ComandaOperacionalService.MesmaMesa(m.Identificacao, elemento.Identificacao)) ?? mesaCorrespondente;
         }
 
         mesaSelecionada = mesaCorrespondente;
-        modalMesa.Open(mesaSelecionada, "comandas");
+        modalMesa.Open(mesaSelecionada, "comandas", elemento.AmbienteId > 0 ? elemento.AmbienteId : 1);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

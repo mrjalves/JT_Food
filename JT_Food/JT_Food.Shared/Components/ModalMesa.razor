@@ -3,15 +3,17 @@
 @using JT_Food.Shared.Domain.Entities
 @using JT_Food.Shared.Domain.Enums
 @using JT_Food.Shared.Services.Interfaces
+@using JT_Food.Shared.Services.Implementations
 @using JT_Servicos.Restaurante
 @using JT_UserInterface.Shared.Components.Core
 @inject MesaService MesaService
 @inject ItemComandaService ItemComandaService
 @inject IComandaService ComandaService
+@inject IMesaLayoutService MesaLayoutService
 
-<Modal @ref="modalRef" Title="@(Mesa.Id == 0 ? "Nova Mesa" : $"Operação: {Mesa.Identificacao} ({Mesa.Status})")" Size="Modal.ModalSize.ExtraLarge" EntidadeContexto="Mesa">
+<Modal @ref="modalRef" Title="@(modoCriacao ? "Nova Mesa" : $"Operação: {Mesa.Identificacao} ({Mesa.Status})")" Size="Modal.ModalSize.ExtraLarge" EntidadeContexto="Mesa">
     <BodyContent>
-        @if (Mesa.Id > 0)
+        @if (!modoCriacao)
         {
             <!-- Abas de Operação da Mesa -->
             <ul class="nav nav-tabs mb-3">
@@ -38,20 +40,20 @@
             </ul>
         }
 
-        @if (abaAtiva == "comandas" && Mesa.Id > 0)
+        @if (abaAtiva == "comandas" && !modoCriacao)
         {
             <GestorComandasMesa MesaIdentificacao="@Mesa.Identificacao"
                                 OnSelecionarComanda="SelecionarComandaParaPedido"
                                 OnComandaCriada="HandleComandaCriada" />
         }
-        else if (abaAtiva == "pedido" && Mesa.Id > 0)
+        else if (abaAtiva == "pedido" && !modoCriacao)
         {
             <LancamentoRapido MesaIdentificacao="@Mesa.Identificacao"
                               ComandaAtiva="comandaParaPedido"
                               OnTrocarComanda='() => MudarAba("comandas")'
                               OnPedidoEnviado="HandlePedidoEnviado" />
         }
-        else if (abaAtiva == "consumo" && Mesa.Id > 0)
+        else if (abaAtiva == "consumo" && !modoCriacao)
         {
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
@@ -136,6 +138,19 @@
                     <input type="number" class="form-control" @bind="Mesa.Capacidade" min="1" max="50" />
                 </div>
 
+                @if (ambientesDisponiveis.Any())
+                {
+                    <div class="mb-3">
+                        <label class="form-label">Ambiente no Mapa Operacional</label>
+                        <select class="form-select" @bind="ambienteSelecionadoId">
+                            @foreach (var amb in ambientesDisponiveis)
+                            {
+                                <option value="@amb.Id">@amb.Nome</option>
+                            }
+                        </select>
+                    </div>
+                }
+
                 <div class="mb-3">
                     <label class="form-label">Status Atual</label>
                     <select class="form-select" @bind="Mesa.Status">
@@ -165,19 +180,54 @@
     private string abaAtiva = "comandas";
     private JT_Food.Shared.Domain.Entities.Comanda? comandaParaPedido;
     private List<MItemComanda> itensMesa = new();
+    private List<AmbienteSalao> ambientesDisponiveis = new();
+    private int ambienteSelecionadoId = 1;
     private bool carregandoItens = false;
+    private bool modoCriacao = false;
 
-    public void Open(JT_Classes.Restaurante.Mesa? mesa = null, string abaInicial = "comandas")
+    public void Open(JT_Classes.Restaurante.Mesa? mesa = null, string abaInicial = "comandas", int ambientePadraoId = 1)
     {
         if (mesa != null)
         {
             Mesa = mesa;
         }
-        abaAtiva = Mesa.Id == 0 ? "dados" : abaInicial;
+        modoCriacao = Mesa.Id == 0 && string.IsNullOrWhiteSpace(Mesa.Identificacao);
+        if (Mesa.Capacidade <= 0)
+        {
+            Mesa.Capacidade = 4;
+        }
+        if (string.IsNullOrWhiteSpace(Mesa.Status))
+        {
+            Mesa.Status = StatusMesaConsts.Livre;
+        }
+        ambienteSelecionadoId = ambientePadraoId > 0 ? ambientePadraoId : 1;
+        abaAtiva = modoCriacao ? "dados" : abaInicial;
         comandaParaPedido = null;
         modalRef.Open();
-        _ = GarantirComandaParaPedidoAsync();
-        _ = CarregarItensConsumoAsync();
+        _ = CarregarAmbientesMapaAsync();
+        if (!modoCriacao)
+        {
+            _ = GarantirComandaParaPedidoAsync();
+            _ = CarregarItensConsumoAsync();
+        }
+    }
+
+    private async Task CarregarAmbientesMapaAsync()
+    {
+        try
+        {
+            ambientesDisponiveis = await MesaLayoutService.ObterAmbientesAsync();
+            if (!string.IsNullOrWhiteSpace(Mesa.Identificacao))
+            {
+                var elem = await MesaLayoutService.ObterElementoPorIdentificacaoAsync(Mesa.Identificacao);
+                if (elem != null && elem.AmbienteId > 0)
+                {
+                    ambienteSelecionadoId = elem.AmbienteId;
+                }
+            }
+            StateHasChanged();
+        }
+        catch { }
     }
 
     public void Close() => modalRef.Close();
@@ -271,11 +321,27 @@
 
     private async Task Salvar()
     {
-        if (await MesaService.SaveAsync(Mesa) > 0)
+        Mesa.Identificacao = MesaLayoutService.FormatarIdentificacaoCanonica(Mesa.Identificacao);
+        if (Mesa.Capacidade <= 0) Mesa.Capacidade = 4;
+        if (string.IsNullOrWhiteSpace(Mesa.Status)) Mesa.Status = StatusMesaConsts.Livre;
+
+        // Evita criar linhas duplicadas no banco caso a mesa já exista com a mesma identificação normalizada
+        if (Mesa.Id == 0)
         {
-            await OnSaved.InvokeAsync();
-            Close();
+            var todas = await MesaService.GetAll() ?? new();
+            var existente = todas.FirstOrDefault(m =>
+                !string.IsNullOrWhiteSpace(m.Identificacao) &&
+                ComandaOperacionalService.MesmaMesa(m.Identificacao, Mesa.Identificacao));
+            if (existente != null)
+            {
+                Mesa.Id = existente.Id;
+            }
         }
+
+        await MesaService.SaveAsync(Mesa);
+        await MesaLayoutService.GarantirElementoParaMesaAsync(Mesa, ambienteSelecionadoId);
+        await OnSaved.InvokeAsync();
+        Close();
     }
 
     private async Task HandleComandaCriada()

@@ -8,6 +8,7 @@
 @using JT_Food.Shared.Domain.Enums
 @using JT_Food.Shared.Services.Interfaces
 @inject MesaService MesaService
+@inject IMesaLayoutService MesaLayoutService
 @inject ComandaService ComandaService
 @inject ItemComandaService ItemComandaService
 @inject ICardapioService CardapioService
@@ -627,9 +628,9 @@
 
     private async Task CarregarMetricasAsync()
     {
-        var mesas = await MesaService.GetAll() ?? new();
+        var mesas = await MesaLayoutService.ObterMesasSincronizadasAsync();
         totalMesas = mesas.Count;
-        mesasOcupadas = mesas.Count(m => m.Status != StatusMesaConsts.Livre);
+        mesasOcupadas = mesas.Count(m => m.Status != StatusMesaConsts.Livre && m.Status != StatusMesaConsts.Reservada);
         taxaOcupacaoPercentual = totalMesas > 0 ? (int)Math.Round((double)mesasOcupadas / totalMesas * 100) : 0;
 
         var comandas = await ComandaService.GetAll() ?? new();
