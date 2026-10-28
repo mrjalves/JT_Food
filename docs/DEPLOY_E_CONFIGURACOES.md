@@ -24,21 +24,21 @@ A aplicação utiliza o sistema de configuração hierárquico padrão do .NET. 
       "StringConexao": "Data Source=...;Initial Catalog=...;User ID=...;Password=...;"
     },
     "FirebaseConfig": {
-      "ApiKey": "AIzaSy...",
-      "DatabaseUrl": "https://controlefinanceiro-35e2a-default-rtdb.firebaseio.com/",
+      "ApiKey": "<FIREBASE_PUBLIC_API_KEY>",
+      "DatabaseUrl": "https://api.jtecsistemas.com.br",
       "BaseApiUrl": "https://api.jtecsistemas.com.br",
-      "ProjetoID": "controlefinanceiro-35e2a",
+      "ProjetoID": "<FIREBASE_PROJECT_ID>",
       "AuthorizedDomains": [
         "localhost",
         "127.0.0.1",
         "food.jtecsistemas.com.br"
       ],
-      "GoogleClientIdAndroid": "521428017393-g4lhesrtp79b33vanf8r2dj0k9mrqebf.apps.googleusercontent.com",
-      "GoogleClientIdWindows": "521428017393-4cb04fiv5givuo43ffcj46i5p191pdbp.apps.googleusercontent.com",
+      "GoogleClientIdAndroid": "<GOOGLE_CLIENT_ID_ANDROID>.apps.googleusercontent.com",
+      "GoogleClientIdWindows": "<GOOGLE_CLIENT_ID_WINDOWS>.apps.googleusercontent.com",
       "AppMani": {
         "type": "service_account",
-        "project_id": "controlefinanceiro-35e2a",
-        "client_email": "firebase-adminsdk-...@controlefinanceiro-35e2a.iam.gserviceaccount.com"
+        "project_id": "<FIREBASE_PROJECT_ID>",
+        "client_email": "firebase-adminsdk-xxxx@<FIREBASE_PROJECT_ID>.iam.gserviceaccount.com"
       }
     }
   }
@@ -162,6 +162,9 @@ Configure em **Settings** > **Secrets and variables** > **Actions**:
 | `VPS_PORT` | Porta SSH do servidor | `22` |
 | `VPS_USER` | Usuário com permissão de escrita e sudo | `ubuntu` ou `deploy` |
 | `VPS_SSH_KEY` | Chave privada SSH (formato OpenSSH/ED25519) | `-----BEGIN OPENSSH PRIVATE KEY-----` |
+| `VPS_PATH` | *(Opcional)* Caminho de destino na VPS (padrão: `/var/www/jt_food`) | `/var/www/jt_food` |
+| `VPS_KNOWN_HOSTS` | *(Recomendado)* Chave pública do host SSH (`ssh-keyscan`) para evitar MITM | `185.123.45.67 ssh-ed25519 AAAA...` |
+| `GH_PAT` | Token de leitura para clonar o repositório `JT_ApplicationLayer` | `ghp_...` |
 
 ### 5.2. Etapas do Pipeline
 

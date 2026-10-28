@@ -5,21 +5,22 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using JT_Classes.IA;
-using JT_Food.Shared.Services.Implementations;
+using JT_Food.Shared.Services.Interfaces;
 using Microsoft.Extensions.Configuration;
 
 namespace JT_Food.Shared.Services.Implementations
 {
     /// <summary>
     /// Implementação resiliente de ConfiguracaoIAService para o JT_Food.
-    /// Garante que o modelo padrão nunca seja 'gpt-4o' vazio, sincroniza com o GeminiRelatorioService,
+    /// Garante que o modelo padrão nunca seja 'gpt-4o' vazio, sincroniza com o IIAAnalyticsService,
     /// resolve chaves de appsettings / variáveis de ambiente e previne que o dropdown de modelos fique em branco.
     /// </summary>
     public class FoodConfiguracaoIAService : JT_Servicos.IA.ConfiguracaoIAService
     {
         private readonly IConfiguration _configuration;
-        private static readonly ConcurrentDictionary<int, ConfiguracaoIA> _cacheConfig = new();
-        private static ConfiguracaoIA _configPadrao = new()
+        private readonly IIAAnalyticsService? _iaAnalyticsService;
+        private readonly ConcurrentDictionary<int, ConfiguracaoIA> _cacheConfig = new();
+        private ConfiguracaoIA _configPadrao = new()
         {
             Id = 1,
             Modelo = "gemini-1.5-flash",
@@ -32,9 +33,11 @@ namespace JT_Food.Shared.Services.Implementations
 
         public FoodConfiguracaoIAService(
             IConfiguration configuration,
+            IIAAnalyticsService? iaAnalyticsService = null,
             HttpClient? httpClient = null) : base(httpClient)
         {
             _configuration = configuration;
+            _iaAnalyticsService = iaAnalyticsService;
         }
 
         public override async Task<List<ConfiguracaoIA>> GetAll()
@@ -113,13 +116,16 @@ namespace JT_Food.Shared.Services.Implementations
             _configPadrao = entity;
             _cacheConfig[entity.Id] = entity;
 
-            if (!string.IsNullOrWhiteSpace(entity.ApiKey))
+            if (_iaAnalyticsService != null)
             {
-                GeminiRelatorioService.CustomApiKey = entity.ApiKey;
-            }
-            if (!string.IsNullOrWhiteSpace(entity.Modelo))
-            {
-                GeminiRelatorioService.CustomModel = entity.Modelo;
+                if (!string.IsNullOrWhiteSpace(entity.ApiKey))
+                {
+                    _iaAnalyticsService.CustomApiKey = entity.ApiKey;
+                }
+                if (!string.IsNullOrWhiteSpace(entity.Modelo))
+                {
+                    _iaAnalyticsService.CustomModel = entity.Modelo;
+                }
             }
 
             try
@@ -151,7 +157,7 @@ namespace JT_Food.Shared.Services.Implementations
             };
 
             string? key = overrideApiKey
-                      ?? GeminiRelatorioService.CustomApiKey
+                      ?? _iaAnalyticsService?.CustomApiKey
                       ?? ObterApiKeyConfigurada();
 
             if (!string.IsNullOrWhiteSpace(key))
@@ -181,13 +187,13 @@ namespace JT_Food.Shared.Services.Implementations
             // 1. ApiKey
             if (string.IsNullOrWhiteSpace(cfg.ApiKey))
             {
-                cfg.ApiKey = GeminiRelatorioService.CustomApiKey ?? ObterApiKeyConfigurada();
+                cfg.ApiKey = _iaAnalyticsService?.CustomApiKey ?? ObterApiKeyConfigurada();
             }
 
             // 2. Modelo: nunca permitir gpt-4o ou vazio para o motor Gemini do Food
             if (string.IsNullOrWhiteSpace(cfg.Modelo) || cfg.Modelo.Equals("gpt-4o", StringComparison.OrdinalIgnoreCase))
             {
-                cfg.Modelo = GeminiRelatorioService.CustomModel ?? "gemini-1.5-flash";
+                cfg.Modelo = _iaAnalyticsService?.CustomModel ?? "gemini-1.5-flash";
             }
 
             // 3. Provedor

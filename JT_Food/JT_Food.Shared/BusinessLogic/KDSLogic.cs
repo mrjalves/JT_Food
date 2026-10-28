@@ -12,6 +12,8 @@ namespace JT_Food.Shared.BusinessLogic
         private readonly ItemComandaService _itemComandaService;
         private readonly ProducaoLogic _producaoLogic;
 
+        public event Action? OnKdsAtualizado;
+
         public static readonly string[] CicloStatus = { "Pendente", "Em Produção", "Saída para Entrega", "Entregue" };
 
         public KDSLogic(
@@ -96,7 +98,11 @@ namespace JT_Food.Shared.BusinessLogic
                     return (false, $"Erro na produção: {prodResult.Mensagem}", item.Status);
                 }
 
-                await _producaoLogic.ProcessarAdicionaisItemAsync(item.Id.ToString(), "1");
+                var adicResult = await _producaoLogic.ProcessarAdicionaisItemAsync(item.Id.ToString(), "1");
+                if (!adicResult.Sucesso)
+                {
+                    return (false, $"Erro na baixa de adicionais: {adicResult.Mensagem}", item.Status);
+                }
             }
 
             string logEntry = $"[{DateTime.UtcNow:dd/MM HH:mm}] {item.Status} → {novoStatus}";
@@ -107,6 +113,10 @@ namespace JT_Food.Shared.BusinessLogic
             item.Status = novoStatus;
 
             bool salvo = await _itemComandaService.SaveAsync(item) > 0;
+            if (salvo)
+            {
+                OnKdsAtualizado?.Invoke();
+            }
 
             return salvo
                 ? (true, $"Status avançado para '{novoStatus}'.", novoStatus)

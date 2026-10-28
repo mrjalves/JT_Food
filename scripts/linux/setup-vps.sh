@@ -18,6 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "=== [1/6] Configurando diretórios da aplicação em $APP_DIR ==="
 mkdir -p "$APP_DIR"
 mkdir -p "$APP_DIR/uploads"
+mkdir -p "$APP_DIR/files"
 mkdir -p "$APP_DIR/Logs"
 
 # O usuário do deploy precisa conseguir gravar via rsync; www-data precisa ler/executar

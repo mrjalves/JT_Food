@@ -181,19 +181,22 @@ namespace JT_Food.Shared.BusinessLogic
             }
 
             // 6. Roteamento automático para impressoras de rede por setor (Bar, Cozinha, Chapa)
-            _ = Task.Run(async () =>
+            string avisoImpressao = string.Empty;
+            try
             {
-                try
+                var resultadosImp = await _impressaoService.RoteamentoEImpressaoPedidoAsync(pedido);
+                var falhas = resultadosImp.Where(r => !r.Sucesso).ToList();
+                if (falhas.Any())
                 {
-                    await _impressaoService.RoteamentoEImpressaoPedidoAsync(pedido);
+                    avisoImpressao = $" [Aviso Impressão: {string.Join("; ", falhas.Select(f => $"{f.Setor}: {f.Mensagem}"))}]";
                 }
-                catch
-                {
-                    // Log silencioso de background
-                }
-            });
+            }
+            catch (Exception exImp)
+            {
+                avisoImpressao = $" [Aviso Impressão: {exImp.Message}]";
+            }
 
-            string msg = $"Pedido lançado com sucesso na Comanda #{comandaDestino.Id}!";
+            string msg = $"Pedido lançado com sucesso na Comanda #{comandaDestino.Id}!{avisoImpressao}";
             if (temCombo && descontoCombo > 0)
             {
                 msg += $" (Desconto Combo aplicado: -R$ {descontoCombo:F2})";
@@ -207,11 +210,13 @@ namespace JT_Food.Shared.BusinessLogic
             if (itens == null || !itens.Any())
                 return (false, "A compra deve ter pelo menos um item.");
 
-            compra.Valor = (decimal)itens.Sum(x => x.ValorTotal);
+            compra.Valor = itens.Sum(x => Math.Round((decimal)x.ValorTotal, 2));
             
             bool salvouCompra = await _compraService.SaveAsync(compra) > 0;
             if (!salvouCompra)
                 return (false, "Erro ao salvar o cabeçalho da compra.");
+
+            var todosLotesCache = (await _loteInsumoService.GetAll() ?? Enumerable.Empty<MLoteInsumo>()).ToList();
 
             foreach (var item in itens)
             {
@@ -229,17 +234,19 @@ namespace JT_Food.Shared.BusinessLogic
                         CustoTotalLote = item.ValorTotal,
                         CustoUnitario = item.ValorUnitario,
                         DataEntrada = DateTime.UtcNow,
+                        Status = "Ativo"
                     };
 
                     await _loteInsumoService.SaveAsync(novoLote);
-                    await AtualizarCustoMedioInsumoAsync(item.InsumoId);
+                    todosLotesCache.Add(novoLote);
+                    await AtualizarCustoMedioInsumoAsync(item.InsumoId, todosLotesCache);
                 }
             }
 
             return (true, "Compra finalizada com sucesso. Estoque atualizado.");
         }
 
-        private async Task AtualizarCustoMedioInsumoAsync(string? insumoId)
+        private async Task AtualizarCustoMedioInsumoAsync(string? insumoId, List<MLoteInsumo>? lotesPreCarregados = null)
         {
             if (string.IsNullOrEmpty(insumoId)) return;
 
@@ -248,18 +255,22 @@ namespace JT_Food.Shared.BusinessLogic
                 var insumo = await _insumoService.GetById(id);
                 if (insumo != null)
                 {
-                    var todosLotes = await _loteInsumoService.GetAll();
-                    var lotes = (todosLotes ?? Enumerable.Empty<MLoteInsumo>())
-                        .Where(x => x.InsumoId == insumoId)
+                    var todosLotes = lotesPreCarregados ?? (await _loteInsumoService.GetAll() ?? Enumerable.Empty<MLoteInsumo>()).ToList();
+                    var lotesAtivos = todosLotes
+                        .Where(x => x.InsumoId == insumoId &&
+                                    x.QuantidadeDisponivel > 0 &&
+                                    !string.Equals(x.Status, "Finalizado", StringComparison.OrdinalIgnoreCase))
                         .ToList();
-                    if (lotes.Any())
-                    {
-                        double custoTotal = lotes.Sum(x => x.CustoTotalLote);
-                        double qtdTotal = lotes.Sum(x => x.QuantidadeDisponivel);
 
-                        if (qtdTotal > 0)
+                    if (lotesAtivos.Any())
+                    {
+                        // Custo médio ponderado real do saldo em estoque: Soma(QuantidadeDisponivel * CustoUnitario) / Soma(QuantidadeDisponivel)
+                        decimal valorEstoqueAtual = lotesAtivos.Sum(x => (decimal)x.QuantidadeDisponivel * (decimal)x.CustoUnitario);
+                        decimal qtdTotalDisponivel = lotesAtivos.Sum(x => (decimal)x.QuantidadeDisponivel);
+
+                        if (qtdTotalDisponivel > 0m)
                         {
-                            insumo.CustoMedio = custoTotal / qtdTotal;
+                            insumo.CustoMedio = (double)Math.Round(valorEstoqueAtual / qtdTotalDisponivel, 4);
                             await _insumoService.SaveAsync(insumo);
                         }
                     }

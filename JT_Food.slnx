@@ -9,4 +9,5 @@
   <Project Path="JT_Food/JT_Food.Web.Client/JT_Food.Web.Client.csproj" />
   <Project Path="JT_Food/JT_Food.Web/JT_Food.Web.csproj" />
   <Project Path="JT_Food/JT_Food/JT_Food.csproj" />
+  <Project Path="JT_Food/JT_Food.Tests/JT_Food.Tests.csproj" />
 </Solution>

@@ -69,11 +69,15 @@ builder.Services.AddJTUserInterface();
 builder.Services.AddScoped<ISecureStorageService, JT_Food.Shared.Services.WebSecureStorageService>();
 builder.Services.AddJTFoodServices();
 
-// Acionar o migrador de banco de dados para os módulos que o JT_Food utiliza
-var stringConexao = builder.Configuration["Config:Conexao:StringConexao"];
+// Migração de schema sob controle explícito (--migrate ou Config:AutoMigrateOnStartup=true)
+bool runMigrations = args.Contains("--migrate", StringComparer.OrdinalIgnoreCase)
+                  || builder.Configuration.GetValue<bool>("Config:AutoMigrateOnStartup");
+
+var stringConexao = builder.Configuration["Config:Conexao:StringConexao"]
+                 ?? Environment.GetEnvironmentVariable("JT_FOOD_CONNECTION_STRING");
 var tipoBanco = builder.Configuration["Config:Conexao:TipoBanco"] ?? "SqlServer";
 
-if (!string.IsNullOrWhiteSpace(stringConexao))
+if (runMigrations && !string.IsNullOrWhiteSpace(stringConexao))
 {
     var configCliente = new JT_Aplicacao.Config.ConfigCliente
     {
@@ -88,40 +92,30 @@ if (!string.IsNullOrWhiteSpace(stringConexao))
     };
 
     var orquestrador = new JT_Infra_Data.Schemas.ModuloMigrationOrchestrator();
-    try
-    {
-        orquestrador.Executar("JT_Food_Auto", configCliente);
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"[MIGRACAO][ERRO] Falha na migração automática: {ex.Message}");
-        Console.WriteLine("[MIGRACAO][AVISO] A aplicação continuará normalmente. Verifique o schema manualmente se necessário.");
-    }
+    orquestrador.Executar("JT_Food_Auto", configCliente);
 
-    try
+    var migrador = new JT_Infra_Data.Schemas.DbSchemaMigrator(stringConexao);
+    migrador.AplicarMigracoes(new List<Type>
     {
-        var migrador = new JT_Infra_Data.Schemas.DbSchemaMigrator(stringConexao);
-        migrador.AplicarMigracoes(new List<Type>
-        {
-            typeof(JT_Classes.Restaurante.MItemComanda),
-            typeof(JT_Classes.Restaurante.MAdicionaisItemComanda),
-            typeof(JT_Classes.Restaurante.MCaixa),
-            typeof(JT_Classes.Restaurante.MMovimentacaoCaixa),
-            typeof(JT_Classes.Restaurante.MInsumo),
-            typeof(JT_Classes.Restaurante.MLoteInsumo),
-            typeof(JT_Classes.Restaurante.MReceita),
-            typeof(JT_Classes.Restaurante.MProducao),
-            typeof(JT_Classes.Restaurante.MPagamentoComanda),
-            typeof(JT_Classes.Restaurante.MMemoriaCalculo),
-            typeof(JT_Classes.Restaurante.MItemCompra),
-            typeof(JT_Classes.Restaurante.MEstoque),
-            typeof(JT_Classes.Restaurante.MFoodConfiguracao)
-        });
-        Console.WriteLine("[MIGRACAO][FOOD] Tabelas do ecossistema Food migradas/verificadas com sucesso.");
-    }
-    catch (Exception exMig)
+        typeof(JT_Classes.Restaurante.MItemComanda),
+        typeof(JT_Classes.Restaurante.MAdicionaisItemComanda),
+        typeof(JT_Classes.Restaurante.MCaixa),
+        typeof(JT_Classes.Restaurante.MMovimentacaoCaixa),
+        typeof(JT_Classes.Restaurante.MInsumo),
+        typeof(JT_Classes.Restaurante.MLoteInsumo),
+        typeof(JT_Classes.Restaurante.MReceita),
+        typeof(JT_Classes.Restaurante.MProducao),
+        typeof(JT_Classes.Restaurante.MPagamentoComanda),
+        typeof(JT_Classes.Restaurante.MMemoriaCalculo),
+        typeof(JT_Classes.Restaurante.MItemCompra),
+        typeof(JT_Classes.Restaurante.MEstoque),
+        typeof(JT_Classes.Restaurante.MFoodConfiguracao)
+    });
+    Console.WriteLine("[MIGRACAO][FOOD] Tabelas do ecossistema Food migradas/verificadas com sucesso.");
+
+    if (args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase))
     {
-        Console.WriteLine($"[MIGRACAO][FOOD] Aviso ao migrar tabelas do Food: {exMig.Message}");
+        return;
     }
 }
 
@@ -158,9 +152,30 @@ app.UseRouting();
 app.UseAntiforgery();
 app.MapStaticAssets();
 
-app.MapGet("/api/gemini/models", async (string? key, IHttpClientFactory factory) =>
+app.MapGet("/health", () => Results.Ok(new
 {
-    if (string.IsNullOrWhiteSpace(key))
+    status = "Healthy",
+    service = "JT_Food.Web",
+    timestamp = DateTime.UtcNow
+}));
+
+static string? ResolverGeminiKey(HttpContext ctx, IConfiguration cfg)
+{
+    if (ctx.Request.Headers.TryGetValue("X-Gemini-Api-Key", out var headerKey) && !string.IsNullOrWhiteSpace(headerKey))
+    {
+        return headerKey.ToString().Trim();
+    }
+
+    return cfg["Config:Gemini:ApiKey"]
+        ?? cfg["Gemini:ApiKey"]
+        ?? cfg["GeminiApiKey"]
+        ?? Environment.GetEnvironmentVariable("GEMINI_API_KEY");
+}
+
+app.MapGet("/api/gemini/models", async (HttpContext context, IConfiguration config, IHttpClientFactory factory) =>
+{
+    var apiKey = ResolverGeminiKey(context, config);
+    if (string.IsNullOrWhiteSpace(apiKey))
     {
         return Results.BadRequest(new { error = new { message = "Chave de API não informada.", reason = "API_KEY_INVALID" } });
     }
@@ -168,8 +183,10 @@ app.MapGet("/api/gemini/models", async (string? key, IHttpClientFactory factory)
     try
     {
         var client = factory.CreateClient("GeminiCleanClient");
-        var response = await client.GetAsync($"https://generativelanguage.googleapis.com/v1beta/models?key={Uri.EscapeDataString(key.Trim())}");
-        var content = await response.Content.ReadAsStringAsync();
+        using var req = new HttpRequestMessage(HttpMethod.Get, "https://generativelanguage.googleapis.com/v1beta/models");
+        req.Headers.TryAddWithoutValidation("x-goog-api-key", apiKey);
+        var response = await client.SendAsync(req, context.RequestAborted);
+        var content = await response.Content.ReadAsStringAsync(context.RequestAborted);
         return Results.Content(content, "application/json", statusCode: (int)response.StatusCode);
     }
     catch (Exception ex)
@@ -178,29 +195,72 @@ app.MapGet("/api/gemini/models", async (string? key, IHttpClientFactory factory)
     }
 });
 
-app.MapPost("/api/gemini/generate", async (string? key, string? model, HttpContext context, IHttpClientFactory factory) =>
+app.MapPost("/api/gemini/generate", async (string? model, HttpContext context, IConfiguration config, IHttpClientFactory factory) =>
 {
-    if (string.IsNullOrWhiteSpace(key))
+    var apiKey = ResolverGeminiKey(context, config);
+    if (string.IsNullOrWhiteSpace(apiKey))
     {
         return Results.BadRequest(new { error = new { message = "Chave de API não informada.", reason = "API_KEY_INVALID" } });
     }
 
     try
     {
-        string modelo = !string.IsNullOrWhiteSpace(model) ? model : "gemini-1.5-flash";
+        string modelo = !string.IsNullOrWhiteSpace(model) ? model.Trim() : "gemini-1.5-flash";
         var client = factory.CreateClient("GeminiCleanClient");
         using var reader = new StreamReader(context.Request.Body);
-        var body = await reader.ReadToEndAsync();
-        using var content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
+        var body = await reader.ReadToEndAsync(context.RequestAborted);
 
-        var response = await client.PostAsync($"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={Uri.EscapeDataString(key.Trim())}", content);
-        var resContent = await response.Content.ReadAsStringAsync();
+        using var req = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(modelo)}:generateContent")
+        {
+            Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json")
+        };
+        req.Headers.TryAddWithoutValidation("x-goog-api-key", apiKey);
+
+        var response = await client.SendAsync(req, context.RequestAborted);
+        var resContent = await response.Content.ReadAsStringAsync(context.RequestAborted);
         return Results.Content(resContent, "application/json", statusCode: (int)response.StatusCode);
     }
     catch (Exception ex)
     {
         return Results.Problem(detail: ex.Message, statusCode: 500);
     }
+});
+
+// Endpoints transacionais de retaguarda para execução segura no servidor
+var apiOperacoes = app.MapGroup("/api/operacoes");
+
+apiOperacoes.MapPost("/producao/processar", async (
+    ProducaoRequest req,
+    JT_Food.Shared.BusinessLogic.ProducaoLogic producaoLogic) =>
+{
+    var (sucesso, mensagem) = await producaoLogic.ProcessarProducaoAsync(req.ProdutoId, req.QuantidadeProduzida, req.ResponsavelId);
+    return sucesso ? Results.Ok(new { sucesso, mensagem }) : Results.BadRequest(new { sucesso, mensagem });
+});
+
+apiOperacoes.MapPost("/caixa/abrir", async (
+    AbrirCaixaRequest req,
+    JT_Food.Shared.BusinessLogic.CaixaLogic caixaLogic) =>
+{
+    var (sucesso, mensagem) = await caixaLogic.AbrirCaixaAsync(req.OperadorId, req.SaldoInicial, req.Observacao);
+    return sucesso ? Results.Ok(new { sucesso, mensagem }) : Results.BadRequest(new { sucesso, mensagem });
+});
+
+apiOperacoes.MapPost("/caixa/fechar", async (
+    FecharCaixaRequest req,
+    JT_Food.Shared.BusinessLogic.CaixaLogic caixaLogic) =>
+{
+    var (sucesso, mensagem) = await caixaLogic.FecharCaixaAsync(req.CaixaId, req.OperadorId, req.SaldoInformado, req.Observacao);
+    return sucesso ? Results.Ok(new { sucesso, mensagem }) : Results.BadRequest(new { sucesso, mensagem });
+});
+
+apiOperacoes.MapPost("/kds/avancar/{itemId:int}", async (
+    int itemId,
+    JT_Food.Shared.BusinessLogic.KDSLogic kdsLogic) =>
+{
+    var (sucesso, mensagem, novoStatus) = await kdsLogic.AvancarStatusItemAsync(itemId);
+    return sucesso ? Results.Ok(new { sucesso, mensagem, novoStatus }) : Results.BadRequest(new { sucesso, mensagem, novoStatus });
 });
 
 app.MapRazorComponents<App>()
@@ -214,3 +274,6 @@ app.MapRazorComponents<App>()
 
 app.Run();
 
+public record ProducaoRequest(string ProdutoId, double QuantidadeProduzida, string ResponsavelId);
+public record AbrirCaixaRequest(string OperadorId, double SaldoInicial, string? Observacao);
+public record FecharCaixaRequest(string CaixaId, string OperadorId, double SaldoInformado, string? Observacao);

@@ -13,6 +13,16 @@ RestartSec=10
 KillSignal=SIGINT
 SyslogIdentifier=jt_sistemas_food
 
+# Hardening de Segurança do Systemd
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ReadWritePaths=/var/www/jt_food/uploads /var/www/jt_food/files /var/www/jt_food/Logs
+
 # Variáveis de ambiente da aplicação
 Environment=ASPNETCORE_ENVIRONMENT=Production
 Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false

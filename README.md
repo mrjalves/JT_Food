@@ -3,8 +3,8 @@
 [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Blazor](https://img.shields.io/badge/Blazor-InteractiveAuto-512BD4?logo=blazor&logoColor=white)](https://dotnet.microsoft.com/apps/aspnet/web-apps/blazor)
 [![.NET MAUI](https://img.shields.io/badge/.NET%20MAUI-Hybrid-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/apps/maui)
-[![License](https://img.shields.io/badge/License-Proprietary-red)](#)
-[![Deploy Status](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=github-actions&logoColor=white)](.github/workflows/deploy.yml)
+[![License](https://img.shields.io/badge/License-Proprietary-red)](LICENSE)
+[![CI & Deploy Food](https://github.com/mrjalves/JT_Food/actions/workflows/deploy.yml/badge.svg)](https://github.com/mrjalves/JT_Food/actions/workflows/deploy.yml)
 
 Sistema omnicanal para gestão de restaurantes, bares, lanchonetes e operações de *food service*, unificando controle de salão (mesas e comandas), tela de produção na cozinha (KDS), baixa automática de insumos por FIFO, gestão de compras e frente de caixa (PDV).
 
@@ -109,14 +109,21 @@ JT_Food/
 │       └── README_DEPLOY.md           # Guia operacional de deploy em VPS Linux
 ├── JT_Food/
 │   ├── JT_Food/                       # Projeto nativo .NET MAUI (Android/iOS/Mac/Windows)
-│   ├── JT_Food.Shared/                # Razor Class Library compartilhada (Páginas e Regras)
-│   │   ├── BusinessLogic/             # CaixaLogic, ProducaoLogic, KDSLogic, ComercialLogic
-│   │   ├── Components/                # Grids e Modais reutilizáveis
+│   ├── JT_Food.Shared/                # Razor Class Library compartilhada (Páginas, Domínio e Regras)
+│   │   ├── BusinessLogic/             # CaixaLogic, ProducaoLogic, KDSLogic, ComercialLogic, PromocaoLogic
+│   │   ├── Components/                # Grids, Modais e PainelRelatorioIA
+│   │   ├── Domain/                    # Entidades (Mesa, Comanda, RegraPromocao, ImpressoraRede) e Enums
 │   │   ├── Layout/                    # MenuLateral e provedores de navegação
 │   │   ├── Pages/                     # Telas do sistema (KDS, Mesas, Caixa, etc.)
-│   │   └── Services/                  # Interfaces e implementações Web
-│   ├── JT_Food.Web/                   # Servidor ASP.NET Core e host Blazor
-│   └── JT_Food.Web.Client/            # Cliente Blazor WebAssembly
+│   │   └── Services/                  # Interfaces e implementações (ComandaOperacionalService, EscPosPrintService, AuthPerfilService, GeminiRelatorioService)
+│   ├── JT_Food.Web/                   # Servidor ASP.NET Core, endpoints /health, /api/operacoes e host Blazor
+│   ├── JT_Food.Web.Client/            # Cliente Blazor WebAssembly
+│   └── JT_Food.Tests/                 # Testes unitários automatizados (xUnit)
+├── global.json                        # Fixação da versão do .NET SDK
+├── Directory.Build.props              # Propriedades globais de compilação e análise
+├── .editorconfig                      # Padronização de estilo de código
+├── LICENSE                            # Termos de licença proprietária
+├── CONTRIBUTING.md                    # Diretrizes de contribuição e execução de testes
 ├── JT_Food.slnx                       # Arquivo de solução moderno do .NET
 └── README.md                          # Este documento
 ```
@@ -163,13 +170,24 @@ dotnet build -t:Run -f net10.0-android
 
 ## ⚙️ Configuração de Ambiente
 
-As configurações são definidas no arquivo `appsettings.json` de cada projeto de inicialização:
+As configurações públicas de endpoint residem no `appsettings.json`, enquanto segredos de banco de dados e chaves de serviço devem ficar **exclusivamente no servidor Web** (`JT_Food.Web/appsettings.Production.json` ou variáveis de ambiente) — nunca nos projetos clientes (`JT_Food.Web.Client` ou `JT_Food` MAUI):
 
 - **`Config:Conexao:BaseApiUrl`**: URL da API REST backend (`JT_API`).
-- **`Config:Conexao:StringConexao`**: String de conexão SQL Server para auto-migração de schema.
-- **`Config:FirebaseConfig`**: Parâmetros de autenticação do Firebase / Google OAuth.
+- **`Config:Conexao:StringConexao`** *(Somente Servidor)*: String de conexão SQL Server ou variável `JT_FOOD_CONNECTION_STRING` para migração de schema sob demanda (`--migrate` ou `Config:AutoMigrateOnStartup=true`).
+- **`Config:FirebaseConfig:AppMani`** *(Somente Servidor)*: Credenciais da Service Account no backend.
+- **`GEMINI_API_KEY`** *(Somente Servidor)*: Chave de API para diagnóstico inteligente via proxy seguro `/api/gemini/*`.
 
-Em servidores de produção, utilize o arquivo `appsettings.Production.json` para manter segredos protegidos. Consulte [docs/DEPLOY_E_CONFIGURACOES.md](docs/DEPLOY_E_CONFIGURACOES.md) para o modelo completo.
+Consulte [docs/DEPLOY_E_CONFIGURACOES.md](docs/DEPLOY_E_CONFIGURACOES.md) para o modelo completo.
+
+---
+
+## 🎯 Escopo Funcional e Roadmap Brasil
+
+O **JT_Food** foca na operação interna de salão, comandas, KDS, ficha técnica/FIFO e controle gerencial de caixa. Itens atualmente fora do escopo nativo (planejados via integrações externas no ecossistema `JT_API`):
+- Emissão fiscal direta (NFC-e / SAT / CF-e).
+- Homologação TEF dedicado / Webhook PIX bancário direto no PDV.
+- Integração nativa com marketplaces de delivery (iFood / Rappi).
+- Impressão térmica ESC/POS em nuvem requer execução via app nativo MAUI na LAN do restaurante ou agente local de impressão.
 
 ---
 

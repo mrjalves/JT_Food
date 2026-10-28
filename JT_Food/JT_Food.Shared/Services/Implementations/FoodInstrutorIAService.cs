@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using JT_Classes.IA;
-using JT_Food.Shared.Services.Implementations;
+using JT_Food.Shared.Services.Interfaces;
 using JT_Servicos.IA;
 using JT_Servicos.IA.Interfaces;
 using Microsoft.Extensions.Configuration;
@@ -21,15 +21,18 @@ namespace JT_Food.Shared.Services.Implementations
         private readonly InstrutorIAService _innerService;
         private readonly ConfiguracaoIAService _configService;
         private readonly IConfiguration _configuration;
+        private readonly IIAAnalyticsService? _iaAnalyticsService;
 
         public FoodInstrutorIAService(
             InstrutorIAService innerService,
             ConfiguracaoIAService configService,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IIAAnalyticsService? iaAnalyticsService = null)
         {
             _innerService = innerService;
             _configService = configService;
             _configuration = configuration;
+            _iaAnalyticsService = iaAnalyticsService;
         }
 
         public async Task<MensagemChat> EnviarMensagemAsync(
@@ -43,7 +46,7 @@ namespace JT_Food.Shared.Services.Implementations
             var configs = await _configService.GetAll();
             var config = configs.FirstOrDefault();
             string apiKey = config?.ApiKey
-                         ?? GeminiRelatorioService.CustomApiKey
+                         ?? _iaAnalyticsService?.CustomApiKey
                          ?? _configuration["Config:Gemini:ApiKey"]
                          ?? _configuration["Gemini:ApiKey"]
                          ?? _configuration["GeminiApiKey"]
@@ -68,7 +71,7 @@ Olá! Para que eu possa responder suas perguntas e analisar os dados do seu rest
 2. **Acesse as Configurações:** No menu lateral do sistema, vá em **Configurações ➔ aba Inteligência Artificial (Gemini)**.
 3. **Salve a Chave:** Cole sua chave no campo **Google Gemini API Key**, clique em **Identificar Modelos** e depois no botão verde **Salvar Configurações de IA**.
 
-*(Dica: Você também pode informar a chave no arquivo `appsettings.json` na chave `Config:Gemini:ApiKey`).*"
+*(Dica: Você também pode informar a chave no arquivo `appsettings.Production.json` ou variável de ambiente `GEMINI_API_KEY`).*"
                 };
             }
 

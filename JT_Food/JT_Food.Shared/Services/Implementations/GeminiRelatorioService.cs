@@ -20,8 +20,8 @@ namespace JT_Food.Shared.Services.Implementations
         private readonly IConfiguration _configuration;
         private HttpClient? _cleanHttpClient;
 
-        public static string? CustomApiKey { get; set; }
-        public static string CustomModel { get; set; } = "gemini-1.5-flash";
+        public string? CustomApiKey { get; set; }
+        public string CustomModel { get; set; } = "gemini-1.5-flash";
 
         public GeminiRelatorioService(
             IConfiguration configuration,
@@ -124,48 +124,52 @@ namespace JT_Food.Shared.Services.Implementations
 
         public async Task<(bool Sucesso, string Mensagem, List<GeminiModelInfo> Modelos)> IdentificarModelosDisponiveisAsync(string apiKey)
         {
-            if (string.IsNullOrWhiteSpace(apiKey))
-            {
-                return (false, "Informe a Google Gemini API Key antes de identificar os modelos.", new List<GeminiModelInfo>());
-            }
-
-            string key = apiKey.Trim();
-            string googleEndpoint = $"https://generativelanguage.googleapis.com/v1beta/models?key={Uri.EscapeDataString(key)}";
+            string key = (apiKey ?? ObterApiKey() ?? string.Empty).Trim();
 
             HttpResponseMessage? response = null;
             string? responseJson = null;
 
-            // 1. Tentar consulta direta usando HttpClient limpo (sem cabeçalhos customizados que causam bloqueio CORS)
-            try
+            // 1. Preferir proxy do servidor (usa chave configurada no backend ou header X-Gemini-Api-Key sem expor na URL)
+            if (_navigationManager != null && !string.IsNullOrWhiteSpace(_navigationManager.BaseUri))
             {
-                var client = ObterHttpClientLimpo();
-                response = await client.GetAsync(googleEndpoint);
-                responseJson = await response.Content.ReadAsStringAsync();
-            }
-            catch (Exception exDirect)
-            {
-                // 2. Fallback: Se o navegador bloquear o domínio externo (adblocker/CORS/firewall), tentar via proxy do servidor
-                if (_navigationManager != null && !string.IsNullOrWhiteSpace(_navigationManager.BaseUri))
+                try
                 {
-                    try
+                    string proxyUrl = $"{_navigationManager.BaseUri.TrimEnd('/')}/api/gemini/models";
+                    var proxyClient = ObterHttpClientLimpo();
+                    using var req = new HttpRequestMessage(HttpMethod.Get, proxyUrl);
+                    if (!string.IsNullOrWhiteSpace(key))
                     {
-                        string proxyUrl = $"{_navigationManager.BaseUri.TrimEnd('/')}/api/gemini/models?key={Uri.EscapeDataString(key)}";
-                        var proxyClient = ObterHttpClientLimpo();
-                        response = await proxyClient.GetAsync(proxyUrl);
-                        responseJson = await response.Content.ReadAsStringAsync();
+                        req.Headers.TryAddWithoutValidation("X-Gemini-Api-Key", key);
                     }
-                    catch
-                    {
-                        return (false, $"Erro de conexão ao identificar modelos: {exDirect.Message}", new List<GeminiModelInfo>());
-                    }
+                    response = await proxyClient.SendAsync(req);
+                    responseJson = await response.Content.ReadAsStringAsync();
                 }
-                else
+                catch { }
+            }
+
+            // 2. Fallback para chamada direta se estiver em ambiente nativo (MAUI) e houver chave explícita
+            if ((response == null || !response.IsSuccessStatusCode) && !string.IsNullOrWhiteSpace(key))
+            {
+                try
+                {
+                    var client = ObterHttpClientLimpo();
+                    using var req = new HttpRequestMessage(HttpMethod.Get, "https://generativelanguage.googleapis.com/v1beta/models");
+                    req.Headers.TryAddWithoutValidation("x-goog-api-key", key);
+                    response = await client.SendAsync(req);
+                    responseJson = await response.Content.ReadAsStringAsync();
+                }
+                catch (Exception exDirect)
                 {
                     return (false, $"Erro de conexão ao identificar modelos: {exDirect.Message}", new List<GeminiModelInfo>());
                 }
             }
 
-            if (response != null && !response.IsSuccessStatusCode)
+            if (response == null)
+            {
+                return (false, "Informe a Google Gemini API Key ou configure-a no servidor antes de identificar os modelos.", new List<GeminiModelInfo>());
+            }
+
+            if (!response.IsSuccessStatusCode)
             {
                 string erroTraduzido = TratarErroGoogleApi(response.StatusCode, responseJson);
                 return (false, erroTraduzido, new List<GeminiModelInfo>());
@@ -202,12 +206,10 @@ namespace JT_Food.Shared.Services.Implementations
                             }
                         }
 
-                        // Filtra modelos suportados para geração de texto (ex: gemini-1.5-flash, gemini-1.5-pro, gemini-2.0-flash, etc.)
                         if (suportaGeracao || rawName.Contains("gemini", StringComparison.OrdinalIgnoreCase))
                         {
                             string idLimpo = rawName.StartsWith("models/") ? rawName.Substring("models/".Length) : rawName;
 
-                            // Ignora modelos puramente de embedding ou imagem se houver
                             if (idLimpo.Contains("embedding", StringComparison.OrdinalIgnoreCase) ||
                                 idLimpo.Contains("aqa", StringComparison.OrdinalIgnoreCase))
                             {
@@ -246,82 +248,90 @@ namespace JT_Food.Shared.Services.Implementations
         public async Task<string> GerarDiagnosticoGeralAsync(string promptContexto)
         {
             string? apiKey = ObterApiKey();
-            if (!string.IsNullOrWhiteSpace(apiKey))
-            {
-                try
-                {
-                    string modelo = !string.IsNullOrWhiteSpace(CustomModel) ? CustomModel : "gemini-1.5-flash";
-                    string endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={Uri.EscapeDataString(apiKey.Trim())}";
+            string modelo = !string.IsNullOrWhiteSpace(CustomModel) ? CustomModel : "gemini-1.5-flash";
 
-                    var requestBody = new
+            try
+            {
+                var requestBody = new
+                {
+                    contents = new[]
                     {
-                        contents = new[]
+                        new
                         {
-                            new
+                            parts = new[]
                             {
-                                parts = new[]
+                                new
                                 {
-                                    new
-                                    {
-                                        text = $"Você é um consultor executivo sênior de gastronomia e negócios de restaurantes do sistema JT_Food. " +
-                                               $"Analise os dados reais do restaurante e gere um relatório executivo em Markdown bonito, estruturado com emojis, " +
-                                               $"destaques de KPIs, gargalos operacionais e recomendações acionáveis:\n\n{promptContexto}"
-                                    }
+                                    text = $"Você é um consultor executivo sênior de gastronomia e negócios de restaurantes do sistema JT_Food. " +
+                                           $"Analise os dados reais do restaurante e gere um relatório executivo em Markdown bonito, estruturado com emojis, " +
+                                           $"destaques de KPIs, gargalos operacionais e recomendações acionáveis:\n\n{promptContexto}"
                                 }
                             }
                         }
-                    };
-
-                    var jsonBody = JsonSerializer.Serialize(requestBody);
-                    HttpResponseMessage? response = null;
-
-                    using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
-
-                    // 1. Tentar primeiro via Proxy do servidor (evita bloqueios de CORS no browser)
-                    if (_navigationManager != null && !string.IsNullOrWhiteSpace(_navigationManager.BaseUri))
-                    {
-                        try
-                        {
-                            string proxyUrl = $"{_navigationManager.BaseUri.TrimEnd('/')}/api/gemini/generate?key={Uri.EscapeDataString(apiKey.Trim())}&model={Uri.EscapeDataString(modelo)}";
-                            var proxyClient = ObterHttpClientLimpo();
-                            using var proxyContent = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-                            response = await proxyClient.PostAsync(proxyUrl, proxyContent, cts.Token);
-                        }
-                        catch { }
                     }
+                };
 
-                    // 2. Se o proxy não respondeu com sucesso, tentar chamada direta com timeout
-                    if (response == null || !response.IsSuccessStatusCode)
-                    {
-                        try
-                        {
-                            var client = ObterHttpClientLimpo();
-                            using var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-                            response = await client.PostAsync(endpoint, content, cts.Token);
-                        }
-                        catch { }
-                    }
+                var jsonBody = JsonSerializer.Serialize(requestBody);
+                HttpResponseMessage? response = null;
 
-                    if (response != null && response.IsSuccessStatusCode)
-                    {
-                        var jsonStr = await response.Content.ReadAsStringAsync();
-                        using var doc = JsonDocument.Parse(jsonStr);
-                        if (doc.RootElement.TryGetProperty("candidates", out var candProp) &&
-                            candProp.GetArrayLength() > 0 &&
-                            candProp[0].TryGetProperty("content", out var contentProp) &&
-                            contentProp.TryGetProperty("parts", out var partsProp) &&
-                            partsProp.GetArrayLength() > 0 &&
-                            partsProp[0].TryGetProperty("text", out var textProp))
-                        {
-                            var text = textProp.GetString();
-                            if (!string.IsNullOrWhiteSpace(text)) return text;
-                        }
-                    }
-                }
-                catch (Exception ex)
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(8));
+
+                // 1. Tentar primeiro via Proxy do servidor (a chave pode vir da config do servidor ou header X-Gemini-Api-Key)
+                if (_navigationManager != null && !string.IsNullOrWhiteSpace(_navigationManager.BaseUri))
                 {
-                    Console.WriteLine($"[GeminiRelatorioService] Falha na chamada da IA (ativando motor local): {ex.Message}");
+                    try
+                    {
+                        string proxyUrl = $"{_navigationManager.BaseUri.TrimEnd('/')}/api/gemini/generate?model={Uri.EscapeDataString(modelo)}";
+                        var proxyClient = ObterHttpClientLimpo();
+                        using var req = new HttpRequestMessage(HttpMethod.Post, proxyUrl)
+                        {
+                            Content = new StringContent(jsonBody, Encoding.UTF8, "application/json")
+                        };
+                        if (!string.IsNullOrWhiteSpace(apiKey))
+                        {
+                            req.Headers.TryAddWithoutValidation("X-Gemini-Api-Key", apiKey.Trim());
+                        }
+                        response = await proxyClient.SendAsync(req, cts.Token);
+                    }
+                    catch { }
                 }
+
+                // 2. Se o proxy não respondeu e há chave local explícita (ex: MAUI), tentar chamada direta usando header x-goog-api-key
+                if ((response == null || !response.IsSuccessStatusCode) && !string.IsNullOrWhiteSpace(apiKey))
+                {
+                    try
+                    {
+                        string endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(modelo)}:generateContent";
+                        var client = ObterHttpClientLimpo();
+                        using var req = new HttpRequestMessage(HttpMethod.Post, endpoint)
+                        {
+                            Content = new StringContent(jsonBody, Encoding.UTF8, "application/json")
+                        };
+                        req.Headers.TryAddWithoutValidation("x-goog-api-key", apiKey.Trim());
+                        response = await client.SendAsync(req, cts.Token);
+                    }
+                    catch { }
+                }
+
+                if (response != null && response.IsSuccessStatusCode)
+                {
+                    var jsonStr = await response.Content.ReadAsStringAsync();
+                    using var doc = JsonDocument.Parse(jsonStr);
+                    if (doc.RootElement.TryGetProperty("candidates", out var candProp) &&
+                        candProp.GetArrayLength() > 0 &&
+                        candProp[0].TryGetProperty("content", out var contentProp) &&
+                        contentProp.TryGetProperty("parts", out var partsProp) &&
+                        partsProp.GetArrayLength() > 0 &&
+                        partsProp[0].TryGetProperty("text", out var textProp))
+                    {
+                        var text = textProp.GetString();
+                        if (!string.IsNullOrWhiteSpace(text)) return text;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GeminiRelatorioService] Falha na chamada da IA (ativando motor local): {ex.Message}");
             }
 
             // Motor analítico local embutido de altíssimo nível (Smart Analytics)

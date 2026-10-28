@@ -361,3 +361,11 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+
+# Segredos e Configurações Locais / Produção
+**/appsettings.Production.json
+**/appsettings.Local.json
+**/*secret*.json
+.env
+.vscode/settings.json

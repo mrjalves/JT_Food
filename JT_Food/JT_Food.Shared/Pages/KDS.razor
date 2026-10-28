@@ -1,8 +1,10 @@
 @page "/kds"
 @using JT_Classes.Restaurante
 @using JT_Food.Shared.BusinessLogic
+@using JT_Food.Shared.Services.Interfaces
 @using JT_Servicos.Restaurante
 @inject KDSLogic KdsLogic
+@inject IComandaService ComandaOperacionalService
 @inject ComandaService ComandaService
 @inject AdicionaisItemComandaService AdicionaisItemComandaService
 @implements IDisposable
@@ -228,9 +230,12 @@
 
     protected override async Task OnInitializedAsync()
     {
+        KdsLogic.OnKdsAtualizado += HandleRealTimeUpdate;
+        ComandaOperacionalService.OnDataChanged += HandleRealTimeUpdate;
+
         await CarregarKdsAsync();
 
-        // Configurar timer para auto-refresh a cada 30 segundos
+        // Configurar timer de fallback para sincronização periódica
         timer = new System.Threading.Timer(async _ =>
         {
             await InvokeAsync(async () =>
@@ -238,7 +243,16 @@
                 await CarregarKdsAsync();
                 StateHasChanged();
             });
-        }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+        }, null, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(15));
+    }
+
+    private void HandleRealTimeUpdate()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await CarregarKdsAsync();
+            StateHasChanged();
+        });
     }
 
     private async Task FiltrarSetor(string setor)
@@ -323,6 +337,8 @@
 
     public void Dispose()
     {
+        KdsLogic.OnKdsAtualizado -= HandleRealTimeUpdate;
+        ComandaOperacionalService.OnDataChanged -= HandleRealTimeUpdate;
         timer?.Dispose();
     }
 }

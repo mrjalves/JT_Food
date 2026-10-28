@@ -153,10 +153,21 @@ public static IServiceCollection AddJTFoodServices(this IServiceCollection servi
     services.AddScoped<ItemCompraService>();
 
     // Orquestradores de Lógica de Negócios (BusinessLogic)
+    services.AddScoped<PromocaoLogic>();
+    services.AddScoped<LayoutSalaoLogic>();
     services.AddScoped<CaixaLogic>();
     services.AddScoped<ProducaoLogic>();
     services.AddScoped<KDSLogic>();
     services.AddScoped<ComercialLogic>();
+    services.AddScoped<RelatorioIALogic>();
+
+    // Serviços Operacionais JT_Food Core
+    services.AddScoped<IComandaService, ComandaOperacionalService>();
+    services.AddScoped<ICardapioService, CardapioService>();
+    services.AddScoped<IMesaLayoutService, MesaLayoutService>();
+    services.AddScoped<IImpressaoRedeService, EscPosPrintService>();
+    services.AddScoped<IAuthPerfilService, AuthPerfilService>();
+    services.AddScoped<IIAAnalyticsService, GeminiRelatorioService>();
 
     return services;
 }

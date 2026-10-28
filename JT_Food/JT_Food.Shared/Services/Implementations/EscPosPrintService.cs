@@ -12,7 +12,8 @@ namespace JT_Food.Shared.Services.Implementations
 {
     public class EscPosPrintService : IImpressaoRedeService
     {
-        private readonly List<ImpressoraRede> _impressoras = new();
+        private static readonly List<ImpressoraRede> _impressoras = new();
+        private static readonly object _syncLock = new();
         private readonly List<(Pedido Pedido, string Setor, string Motivo)> _filaFalhas = new();
 
         public EscPosPrintService()
@@ -22,78 +23,90 @@ namespace JT_Food.Shared.Services.Implementations
 
         private void InicializarImpressorasPadrao()
         {
-            if (_impressoras.Any()) return;
-
-            _impressoras.AddRange(new[]
+            lock (_syncLock)
             {
-                new ImpressoraRede
+                if (_impressoras.Any()) return;
+
+                _impressoras.AddRange(new[]
                 {
-                    Id = 1,
-                    NomeSetor = "Cozinha Central (Pratos & Porções)",
-                    EnderecoIp = "192.168.1.201",
-                    PortaTcp = 9100,
-                    LarguraColunas = 48,
-                    Tipo = "Cozinha",
-                    Ativa = true
-                },
-                new ImpressoraRede
-                {
-                    Id = 2,
-                    NomeSetor = "Bar & Bebidas",
-                    EnderecoIp = "192.168.1.202",
-                    PortaTcp = 9100,
-                    LarguraColunas = 48,
-                    Tipo = "Bar",
-                    Ativa = true
-                },
-                new ImpressoraRede
-                {
-                    Id = 3,
-                    NomeSetor = "Chapa & Hambúrgueres",
-                    EnderecoIp = "192.168.1.203",
-                    PortaTcp = 9100,
-                    LarguraColunas = 48,
-                    Tipo = "Chapa",
-                    Ativa = true
-                },
-                new ImpressoraRede
-                {
-                    Id = 4,
-                    NomeSetor = "Caixa / Fechamento",
-                    EnderecoIp = "192.168.1.200",
-                    PortaTcp = 9100,
-                    LarguraColunas = 48,
-                    Tipo = "Caixa",
-                    Ativa = true
-                }
-            });
+                    new ImpressoraRede
+                    {
+                        Id = 1,
+                        NomeSetor = "Cozinha Central (Pratos & Porções)",
+                        EnderecoIp = "192.168.1.201",
+                        PortaTcp = 9100,
+                        LarguraColunas = 48,
+                        Tipo = "Cozinha",
+                        Ativa = true
+                    },
+                    new ImpressoraRede
+                    {
+                        Id = 2,
+                        NomeSetor = "Bar & Bebidas",
+                        EnderecoIp = "192.168.1.202",
+                        PortaTcp = 9100,
+                        LarguraColunas = 48,
+                        Tipo = "Bar",
+                        Ativa = true
+                    },
+                    new ImpressoraRede
+                    {
+                        Id = 3,
+                        NomeSetor = "Chapa & Hambúrgueres",
+                        EnderecoIp = "192.168.1.203",
+                        PortaTcp = 9100,
+                        LarguraColunas = 48,
+                        Tipo = "Chapa",
+                        Ativa = true
+                    },
+                    new ImpressoraRede
+                    {
+                        Id = 4,
+                        NomeSetor = "Caixa / Fechamento",
+                        EnderecoIp = "192.168.1.200",
+                        PortaTcp = 9100,
+                        LarguraColunas = 48,
+                        Tipo = "Caixa",
+                        Ativa = true
+                    }
+                });
+            }
         }
 
         public Task<List<ImpressoraRede>> ObterImpressorasAsync()
         {
-            return Task.FromResult(_impressoras.ToList());
+            lock (_syncLock)
+            {
+                return Task.FromResult(_impressoras.ToList());
+            }
         }
 
         public Task<bool> SalvarImpressoraAsync(ImpressoraRede impressora)
         {
-            if (impressora.Id == 0)
+            lock (_syncLock)
             {
-                impressora.Id = _impressoras.Any() ? _impressoras.Max(i => i.Id) + 1 : 1;
-                _impressoras.Add(impressora);
+                if (impressora.Id == 0)
+                {
+                    impressora.Id = _impressoras.Any() ? _impressoras.Max(i => i.Id) + 1 : 1;
+                    _impressoras.Add(impressora);
+                }
+                else
+                {
+                    var idx = _impressoras.FindIndex(i => i.Id == impressora.Id);
+                    if (idx >= 0) _impressoras[idx] = impressora;
+                    else _impressoras.Add(impressora);
+                }
+                return Task.FromResult(true);
             }
-            else
-            {
-                var idx = _impressoras.FindIndex(i => i.Id == impressora.Id);
-                if (idx >= 0) _impressoras[idx] = impressora;
-                else _impressoras.Add(impressora);
-            }
-            return Task.FromResult(true);
         }
 
         public Task<bool> ExcluirImpressoraAsync(int id)
         {
-            var removido = _impressoras.RemoveAll(i => i.Id == id) > 0;
-            return Task.FromResult(removido);
+            lock (_syncLock)
+            {
+                var removido = _impressoras.RemoveAll(i => i.Id == id) > 0;
+                return Task.FromResult(removido);
+            }
         }
 
         public async Task<(bool Sucesso, string Mensagem)> TestarConexaoAsync(ImpressoraRede impressora)

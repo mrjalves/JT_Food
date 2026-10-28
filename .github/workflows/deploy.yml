@@ -1,32 +1,33 @@
-name: Deploy Food
+name: CI & Deploy Food
 
-on:  
-  push:    
-    branches: [master]  
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
   workflow_dispatch:
 
-concurrency:  
-  group: deploy-food  
+concurrency:
+  group: deploy-food-${{ github.ref }}
   cancel-in-progress: false
 
-env:  
-  # ATENÇÃO: Verifica se o nome das pastas corresponde exatamente ao teu projeto
-  PROJECT: JT_Food/JT_Food.Web/JT_Food.Web.csproj  
-  SERVICE: jt_sistemas_food  
-  DEST: /var/www/jt_sistemas_food  
+env:
+  PROJECT: JT_Food/JT_Food.Web/JT_Food.Web.csproj
+  TEST_PROJECT: JT_Food/JT_Food.Tests/JT_Food.Tests.csproj
+  SERVICE: jt_sistemas_food
+  DEST: /var/www/jt_food
   DOTNET: 10.0.x
 
-jobs:  
-  deploy:    
-    runs-on: ubuntu-latest    
+jobs:
+  build-and-test:
+    name: Build & Testes Unitários
+    runs-on: ubuntu-latest
     steps:
-      # 1. Faz o checkout do repositório principal (Projeto Food)
       - name: Checkout Application
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      # 2. Faz o checkout do repositório secundário (ApplicationLayer)
       - name: Checkout JT_ApplicationLayer
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: mrjalves/JT_ApplicationLayer
           token: ${{ secrets.GH_PAT }}
@@ -37,7 +38,6 @@ jobs:
         run: |
           rm -rf "$GITHUB_WORKSPACE/../JT_ApplicationLayer"
           mv "$GITHUB_WORKSPACE/JT_ApplicationLayer" "$GITHUB_WORKSPACE/../JT_ApplicationLayer"
-          # Garantir namespaces explícitos em componentes Razor modulares se ausentes
           for f in "$GITHUB_WORKSPACE/../JT_ApplicationLayer/JT_UserInterface.Shared/Components"/*/*.razor; do
             [ -f "$f" ] || continue
             dir=$(basename "$(dirname "$f")")
@@ -46,33 +46,64 @@ jobs:
             fi
           done
 
-      # 3. Configura a versão do .NET para a compilação
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: ${{ env.DOTNET }}
 
-      # 4. Publica a aplicação gerando os ficheiros finais
-      - name: Publish
-        run: dotnet publish ${{ env.PROJECT }} -c Release -o ./publish -p:ErrorOnDuplicatePublishOutputFiles=false
+      - name: Run Unit Tests
+        run: |
+          if [ -f "${{ env.TEST_PROJECT }}" ]; then
+            dotnet test "${{ env.TEST_PROJECT }}" -c Release --verbosity normal
+          fi
 
-      # 5. Configura a chave SSH para comunicar de forma segura com o servidor (VPS)
+      - name: Publish Web Application
+        run: dotnet publish "${{ env.PROJECT }}" -c Release -o ./publish -p:ErrorOnDuplicatePublishOutputFiles=false
+
+      - name: Upload Publish Artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: jt-food-web-publish
+          path: ./publish
+          retention-days: 3
+
+  deploy:
+    name: Deploy em VPS Linux
+    needs: build-and-test
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Publish Artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: jt-food-web-publish
+          path: ./publish
+
       - name: Configurar SSH
         env:
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           SSH_HOST: ${{ secrets.VPS_HOST }}
           SSH_PORT: ${{ secrets.VPS_PORT }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
           set -e
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -T 10 -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+          if [ -n "$KNOWN_HOSTS" ]; then
+            printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -T 10 -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+          fi
+          chmod 600 ~/.ssh/known_hosts
           test -s ~/.ssh/known_hosts
 
-      # 6. Envia os ficheiros compilados para o teu servidor Linux usando rsync
-      - name: Enviar ficheiros
+      - name: Enviar ficheiros com backup para rollback
+        env:
+          TARGET_PATH: ${{ secrets.VPS_PATH || env.DEST }}
         run: |
+          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p ${TARGET_PATH} ${TARGET_PATH}_backup && rsync -a --delete --exclude 'uploads/' --exclude 'files/' --exclude 'Logs/' ${TARGET_PATH}/ ${TARGET_PATH}_backup/ || true"
           rsync -az --delete \
             --exclude '/appsettings.json' \
             --exclude '/appsettings.Production.json' \
@@ -80,22 +111,50 @@ jobs:
             --exclude '*.db-shm' \
             --exclude '*.db-wal' \
             --exclude 'uploads/' \
+            --exclude 'files/' \
+            --exclude 'Logs/' \
             -e "ssh -p ${{ secrets.VPS_PORT }}" \
             ./publish/ \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ secrets.VPS_PATH || env.DEST }}/
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${TARGET_PATH}/
 
-      # 7. Acede ao servidor via SSH para reiniciar a aplicação e verificar se está a correr
-      - name: Reiniciar e verificar
+      - name: Reiniciar, verificar Health HTTP e Rollback automático
+        env:
+          TARGET_PATH: ${{ secrets.VPS_PATH || env.DEST }}
         run: |
-          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'bash -s' <<'EOF'
+          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "TARGET_PATH='${TARGET_PATH}' SERVICE='${{ env.SERVICE }}' bash -s" <<'EOF'
           set -e
-          sudo systemctl restart ${{ env.SERVICE }}
+          sudo systemctl restart "$SERVICE"
           sleep 5
-          if ! systemctl is-active --quiet ${{ env.SERVICE }}; then
-            echo "::error::Serviço não subiu"
-            journalctl -u ${{ env.SERVICE }} -n 50 --no-pager
+
+          HEALTH_OK=false
+          if systemctl is-active --quiet "$SERVICE"; then
+            for i in 1 2 3 4 5; do
+              if curl -fsS --max-time 5 http://127.0.0.1:5041/health >/dev/null 2>&1; then
+                HEALTH_OK=true
+                break
+              fi
+              sleep 2
+            done
+          fi
+
+          if [ "$HEALTH_OK" != "true" ]; then
+            echo "::error::Health check falhou! Executando rollback automático para versão anterior..."
+            journalctl -u "$SERVICE" -n 50 --no-pager || true
+            if [ -d "${TARGET_PATH}_backup" ]; then
+              rsync -a --delete \
+                --exclude '/appsettings.json' \
+                --exclude '/appsettings.Production.json' \
+                --exclude '*.db' \
+                --exclude '*.db-shm' \
+                --exclude '*.db-wal' \
+                --exclude 'uploads/' \
+                --exclude 'files/' \
+                --exclude 'Logs/' \
+                "${TARGET_PATH}_backup/" "${TARGET_PATH}/"
+              sudo systemctl restart "$SERVICE"
+            fi
             exit 1
           fi
-          echo "Serviço ativo. Logs de migração:"
-          journalctl -u ${{ env.SERVICE }} -n 30 --no-pager | grep -A5 MIGRACAO || true
+
+          echo "Serviço ativo e endpoint /health respondeu 200 OK."
           EOF
