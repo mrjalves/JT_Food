@@ -194,7 +194,7 @@ namespace JT_Food.Shared.Services.Implementations
             }
         }
 
-        public static string FormatarIdentificacaoCanonica(string? identificacao)
+        public string FormatarIdentificacaoCanonica(string? identificacao)
         {
             if (string.IsNullOrWhiteSpace(identificacao)) return "Mesa 01";
             string limpo = identificacao.Trim();

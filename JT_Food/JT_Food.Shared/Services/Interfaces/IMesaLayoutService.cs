@@ -19,5 +19,6 @@ namespace JT_Food.Shared.Services.Interfaces
         Task<ElementoSalao> GarantirElementoParaMesaAsync(JT_Classes.Restaurante.Mesa mesa, int ambientePadraoId = 1);
         Task<bool> RemoverElementoPorIdentificacaoAsync(string identificacaoMesa);
         Task<List<JT_Classes.Restaurante.Mesa>> ObterMesasSincronizadasAsync();
+        string FormatarIdentificacaoCanonica(string? identificacao);
     }
 }
