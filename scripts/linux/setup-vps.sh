@@ -11,7 +11,7 @@
 set -euo pipefail
 
 DEPLOY_USER="${1:-$USER}"
-APP_DIR="/var/www/jt_food"
+APP_DIR="/var/www/jt_sistemas_food"
 SERVICE_NAME="jt_sistemas_food"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

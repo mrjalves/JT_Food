@@ -14,7 +14,7 @@ No repositório do `JT_Food` no GitHub, vá em **Settings** > **Secrets and vari
 | `VPS_PORT` | Porta SSH da sua VPS | `22` |
 | `VPS_USER` | Usuário SSH com permissão de escrita | `ubuntu` ou `root` |
 | `VPS_SSH_KEY` | Chave privada SSH (formato OpenSSH/ed25519) | `-----BEGIN OPENSSH PRIVATE KEY----- ...` |
-| `VPS_PATH` | Diretório de destino da aplicação na VPS | `/var/www/jt_food` |
+| `VPS_PATH` | Diretório de destino da aplicação na VPS | `/var/www/jt_sistemas_food` |
 | `GH_PAT` *(Opcional)* | Personal Access Token com escopo `repo` (necessário se `JT_ApplicationLayer` for privado) | `ghp_xxxxxxxxxxxx` |
 
 ---

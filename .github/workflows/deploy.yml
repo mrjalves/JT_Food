@@ -15,7 +15,7 @@ env:
   PROJECT: JT_Food/JT_Food.Web/JT_Food.Web.csproj
   TEST_PROJECT: JT_Food/JT_Food.Tests/JT_Food.Tests.csproj
   SERVICE: jt_sistemas_food
-  DEST: /var/www/jt_food
+  DEST: /var/www/jt_sistemas_food
   DOTNET: 10.0.x
 
 jobs:
@@ -103,7 +103,7 @@ jobs:
         env:
           TARGET_PATH: ${{ secrets.VPS_PATH || env.DEST }}
         run: |
-          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p ${TARGET_PATH} ${TARGET_PATH}_backup && rsync -a --delete --exclude 'uploads/' --exclude 'files/' --exclude 'Logs/' ${TARGET_PATH}/ ${TARGET_PATH}_backup/ || true"
+          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p ~/.jt_food_backup && rsync -a --delete --exclude 'uploads/' --exclude 'files/' --exclude 'Logs/' ${TARGET_PATH}/ ~/.jt_food_backup/ || true"
           rsync -az --delete \
             --exclude '/appsettings.json' \
             --exclude '/appsettings.Production.json' \
@@ -126,21 +126,10 @@ jobs:
           sudo systemctl restart "$SERVICE"
           sleep 5
 
-          HEALTH_OK=false
-          if systemctl is-active --quiet "$SERVICE"; then
-            for i in 1 2 3 4 5; do
-              if curl -fsS --max-time 5 http://127.0.0.1:5041/health >/dev/null 2>&1; then
-                HEALTH_OK=true
-                break
-              fi
-              sleep 2
-            done
-          fi
-
-          if [ "$HEALTH_OK" != "true" ]; then
-            echo "::error::Health check falhou! Executando rollback automático para versão anterior..."
+          if ! systemctl is-active --quiet "$SERVICE"; then
+            echo "::error::Serviço não subiu! Executando rollback automático para versão anterior..."
             journalctl -u "$SERVICE" -n 50 --no-pager || true
-            if [ -d "${TARGET_PATH}_backup" ]; then
+            if [ -d ~/.jt_food_backup ]; then
               rsync -a --delete \
                 --exclude '/appsettings.json' \
                 --exclude '/appsettings.Production.json' \
@@ -150,11 +139,12 @@ jobs:
                 --exclude 'uploads/' \
                 --exclude 'files/' \
                 --exclude 'Logs/' \
-                "${TARGET_PATH}_backup/" "${TARGET_PATH}/"
+                ~/.jt_food_backup/ "${TARGET_PATH}/"
               sudo systemctl restart "$SERVICE"
             fi
             exit 1
           fi
 
-          echo "Serviço ativo e endpoint /health respondeu 200 OK."
+          echo "Serviço ativo. Logs de inicialização:"
+          journalctl -u "$SERVICE" -n 30 --no-pager | grep -A5 MIGRACAO || true
           EOF

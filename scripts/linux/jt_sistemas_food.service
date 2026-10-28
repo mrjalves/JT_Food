@@ -6,8 +6,8 @@ After=network.target
 Type=simple
 User=www-data
 Group=www-data
-WorkingDirectory=/var/www/jt_food
-ExecStart=/usr/bin/dotnet /var/www/jt_food/JT_Food.Web.dll
+WorkingDirectory=/var/www/jt_sistemas_food
+ExecStart=/usr/bin/dotnet /var/www/jt_sistemas_food/JT_Food.Web.dll
 Restart=always
 RestartSec=10
 KillSignal=SIGINT
@@ -21,7 +21,7 @@ ProtectHome=true
 ProtectControlGroups=true
 ProtectKernelModules=true
 ProtectKernelTunables=true
-ReadWritePaths=/var/www/jt_food/uploads /var/www/jt_food/files /var/www/jt_food/Logs
+ReadWritePaths=/var/www/jt_sistemas_food/uploads /var/www/jt_sistemas_food/files /var/www/jt_sistemas_food/Logs
 
 # Variáveis de ambiente da aplicação
 Environment=ASPNETCORE_ENVIRONMENT=Production

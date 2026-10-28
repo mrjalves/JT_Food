@@ -162,7 +162,7 @@ Configure em **Settings** > **Secrets and variables** > **Actions**:
 | `VPS_PORT` | Porta SSH do servidor | `22` |
 | `VPS_USER` | Usuário com permissão de escrita e sudo | `ubuntu` ou `deploy` |
 | `VPS_SSH_KEY` | Chave privada SSH (formato OpenSSH/ED25519) | `-----BEGIN OPENSSH PRIVATE KEY-----` |
-| `VPS_PATH` | *(Opcional)* Caminho de destino na VPS (padrão: `/var/www/jt_food`) | `/var/www/jt_food` |
+| `VPS_PATH` | *(Opcional)* Caminho de destino na VPS (padrão: `/var/www/jt_sistemas_food`) | `/var/www/jt_sistemas_food` |
 | `VPS_KNOWN_HOSTS` | *(Recomendado)* Chave pública do host SSH (`ssh-keyscan`) para evitar MITM | `185.123.45.67 ssh-ed25519 AAAA...` |
 | `GH_PAT` | Token de leitura para clonar o repositório `JT_ApplicationLayer` | `ghp_...` |
 
