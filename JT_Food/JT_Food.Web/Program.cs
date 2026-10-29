@@ -66,6 +66,10 @@ builder.Services.AddScoped(sp =>
 });
 
 builder.Services.AddJTUserInterface();
+if (Config.Instancia != null)
+{
+    Config.Instancia.ClientId = "JT_Food";
+}
 builder.Services.AddScoped<ISecureStorageService, JT_Food.Shared.Services.WebSecureStorageService>();
 builder.Services.AddJTFoodServices();
 

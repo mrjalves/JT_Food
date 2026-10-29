@@ -26,6 +26,10 @@ if (dadosFConfig != null)
 builder.Services.AddScoped<JT_Classes.Acessos.ISecureStorageService, JT_Food.Shared.Services.WebSecureStorageService>();
 
 builder.Services.AddJTUserInterface();
+if (Config.Instancia != null)
+{
+    Config.Instancia.ClientId = "JT_Food";
+}
 
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient("GeminiCleanClient");
