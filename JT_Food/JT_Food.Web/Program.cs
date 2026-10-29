@@ -163,22 +163,43 @@ app.MapGet("/health", () => Results.Ok(new
     timestamp = DateTime.UtcNow
 }));
 
-static string? ResolverGeminiKey(HttpContext ctx, IConfiguration cfg)
+static async Task<string?> ResolverGeminiKeyAsync(HttpContext ctx, IConfiguration cfg)
 {
     if (ctx.Request.Headers.TryGetValue("X-Gemini-Api-Key", out var headerKey) && !string.IsNullOrWhiteSpace(headerKey))
     {
         return headerKey.ToString().Trim();
     }
 
-    return cfg["Config:Gemini:ApiKey"]
+    var key = cfg["Config:Gemini:ApiKey"]
         ?? cfg["Gemini:ApiKey"]
         ?? cfg["GeminiApiKey"]
         ?? Environment.GetEnvironmentVariable("GEMINI_API_KEY");
+
+    if (!string.IsNullOrWhiteSpace(key))
+    {
+        return key.Trim();
+    }
+
+    try
+    {
+        var iaService = ctx.RequestServices.GetService<JT_Servicos.IA.ConfiguracaoIAService>();
+        if (iaService != null)
+        {
+            var configIa = await iaService.GetAtivaAsync();
+            if (!string.IsNullOrWhiteSpace(configIa?.ApiKey))
+            {
+                return configIa.ApiKey.Trim();
+            }
+        }
+    }
+    catch { }
+
+    return null;
 }
 
 app.MapGet("/api/gemini/models", async (HttpContext context, IConfiguration config, IHttpClientFactory factory) =>
 {
-    var apiKey = ResolverGeminiKey(context, config);
+    var apiKey = await ResolverGeminiKeyAsync(context, config);
     if (string.IsNullOrWhiteSpace(apiKey))
     {
         return Results.BadRequest(new { error = new { message = "Chave de API não informada.", reason = "API_KEY_INVALID" } });
@@ -187,7 +208,7 @@ app.MapGet("/api/gemini/models", async (HttpContext context, IConfiguration conf
     try
     {
         var client = factory.CreateClient("GeminiCleanClient");
-        using var req = new HttpRequestMessage(HttpMethod.Get, "https://generativelanguage.googleapis.com/v1beta/models");
+        using var req = new HttpRequestMessage(HttpMethod.Get, $"https://generativelanguage.googleapis.com/v1beta/models?key={Uri.EscapeDataString(apiKey)}");
         req.Headers.TryAddWithoutValidation("x-goog-api-key", apiKey);
         var response = await client.SendAsync(req, context.RequestAborted);
         var content = await response.Content.ReadAsStringAsync(context.RequestAborted);
@@ -201,7 +222,7 @@ app.MapGet("/api/gemini/models", async (HttpContext context, IConfiguration conf
 
 app.MapPost("/api/gemini/generate", async (string? model, HttpContext context, IConfiguration config, IHttpClientFactory factory) =>
 {
-    var apiKey = ResolverGeminiKey(context, config);
+    var apiKey = await ResolverGeminiKeyAsync(context, config);
     if (string.IsNullOrWhiteSpace(apiKey))
     {
         return Results.BadRequest(new { error = new { message = "Chave de API não informada.", reason = "API_KEY_INVALID" } });
@@ -214,9 +235,8 @@ app.MapPost("/api/gemini/generate", async (string? model, HttpContext context, I
         using var reader = new StreamReader(context.Request.Body);
         var body = await reader.ReadToEndAsync(context.RequestAborted);
 
-        using var req = new HttpRequestMessage(
-            HttpMethod.Post,
-            $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(modelo)}:generateContent")
+        string url = $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(modelo)}:generateContent?key={Uri.EscapeDataString(apiKey)}";
+        using var req = new HttpRequestMessage(HttpMethod.Post, url)
         {
             Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json")
         };

@@ -250,6 +250,11 @@ namespace JT_Food.Shared.Services.Implementations
             string? apiKey = ObterApiKey();
             string modelo = !string.IsNullOrWhiteSpace(CustomModel) ? CustomModel : "gemini-1.5-flash";
 
+            if (string.IsNullOrWhiteSpace(apiKey) && (_navigationManager == null || string.IsNullOrWhiteSpace(_configuration["Config:Gemini:ApiKey"])))
+            {
+                return GerarRelatorioExecutivoLocal(promptContexto);
+            }
+
             try
             {
                 var requestBody = new
@@ -296,12 +301,12 @@ namespace JT_Food.Shared.Services.Implementations
                     catch { }
                 }
 
-                // 2. Se o proxy não respondeu e há chave local explícita (ex: MAUI), tentar chamada direta usando header x-goog-api-key
+                // 2. Se o proxy não respondeu e há chave local explícita (ex: MAUI), tentar chamada direta usando header x-goog-api-key e param key
                 if ((response == null || !response.IsSuccessStatusCode) && !string.IsNullOrWhiteSpace(apiKey))
                 {
                     try
                     {
-                        string endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(modelo)}:generateContent";
+                        string endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(modelo)}:generateContent?key={Uri.EscapeDataString(apiKey.Trim())}";
                         var client = ObterHttpClientLimpo();
                         using var req = new HttpRequestMessage(HttpMethod.Post, endpoint)
                         {
