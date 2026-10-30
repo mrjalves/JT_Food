@@ -111,6 +111,24 @@
         }
     }
 
+    protected override async Task<bool> SalvarConfiguracao(JT_Classes.Comum.Configuracao configuracao)
+    {
+        try
+        {
+            return await base.SalvarConfiguracao(configuracao);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden || ex.StatusCode == System.Net.HttpStatusCode.Unauthorized || ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            Console.WriteLine($"[Configuracoes] Aviso: Não foi possível persistir configuração comum global ({ex.StatusCode}). Prosseguindo com os módulos específicos.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Configuracoes] Erro ao salvar configuração: {ex.Message}");
+            return true;
+        }
+    }
+
     public override RenderFragment? TabsAdicionais => 
         @<text>
             <TabPage Title="Impressoras Térmicas ESC/POS">

@@ -1,9 +1,13 @@
 using JT_Aplicacao.Config;
 using JT_Classes.Acessos;
+using JT_Classes.Comum;
+using JT_Classes.IA;
+using JT_Classes.Restaurante;
 using JT_Food.Shared;
 using JT_Food.Web.Components;
 using JT_UserInterface.Shared;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -286,6 +290,35 @@ apiOperacoes.MapPost("/kds/avancar/{itemId:int}", async (
     var (sucesso, mensagem, novoStatus) = await kdsLogic.AvancarStatusItemAsync(itemId);
     return sucesso ? Results.Ok(new { sucesso, mensagem, novoStatus }) : Results.BadRequest(new { sucesso, mensagem, novoStatus });
 });
+
+// Food Config endpoints
+app.MapGet("/api/configuracoes-food", async (JT_Servicos.Restaurante.MFoodConfiguracaoService svc) => Results.Ok(await svc.GetAll()));
+app.MapGet("/api/configuracoes-food/ativa", async (JT_Servicos.Restaurante.MFoodConfiguracaoService svc) => Results.Ok(await svc.GetAtivaAsync()));
+app.MapGet("/api/configuracoes-food/{id:int}", async (int id, JT_Servicos.Restaurante.MFoodConfiguracaoService svc) => await svc.GetById(id) is { } e ? Results.Ok(e) : Results.NotFound());
+app.MapPost("/api/configuracoes-food", async ([FromBody] MFoodConfiguracao entity, JT_Servicos.Restaurante.MFoodConfiguracaoService svc) => await svc.Save(entity) ? Results.Ok(entity) : Results.BadRequest());
+app.MapPost("/api/configuracoes-food/ativa", async ([FromBody] MFoodConfiguracao entity, JT_Servicos.Restaurante.MFoodConfiguracaoService svc) => await svc.Save(entity) ? Results.Ok(entity) : Results.BadRequest());
+app.MapPut("/api/configuracoes-food/{id:int}", async (int id, [FromBody] MFoodConfiguracao entity, JT_Servicos.Restaurante.MFoodConfiguracaoService svc) => await svc.Save(entity) ? Results.Ok(entity) : Results.BadRequest());
+
+// Config Geral endpoints
+app.MapGet("/api/configuracoes", async (JT_Servicos.Comum.ConfiguracaoService svc) => Results.Ok(await svc.GetAll()));
+app.MapGet("/api/configuracoes/{id:int}", async (int id, JT_Servicos.Comum.ConfiguracaoService svc) => await svc.GetById(id) is { } e ? Results.Ok(e) : Results.NotFound());
+app.MapGet("/api/configuracoes/usuario/{usuarioId:int}", async (int usuarioId, JT_Servicos.Comum.ConfiguracaoService svc) => await svc.GetByUsuarioIdAsync(usuarioId) is { } e ? Results.Ok(e) : Results.NotFound());
+app.MapPost("/api/configuracoes", async ([FromBody] Configuracao entity, JT_Servicos.Comum.ConfiguracaoService svc) => await svc.Save(entity) ? Results.Ok(entity) : Results.BadRequest());
+app.MapPut("/api/configuracoes/{id:int}", async (int id, [FromBody] Configuracao entity, JT_Servicos.Comum.ConfiguracaoService svc) => await svc.Save(entity) ? Results.Ok(entity) : Results.BadRequest());
+
+// IA Config endpoints
+app.MapGet("/api/configuracoes-ia", async (JT_Servicos.IA.ConfiguracaoIAService svc) => Results.Ok(await svc.GetAll()));
+app.MapGet("/api/configuracoes-ia/modelos", async ([FromQuery] string? apiKey, JT_Servicos.IA.ConfiguracaoIAService svc) => Results.Ok(await svc.ListarModelosDisponiveisAsync(apiKey)));
+app.MapGet("/api/configuracoes-ia/{id:int}", async (int id, JT_Servicos.IA.ConfiguracaoIAService svc) => await svc.GetById(id) is { } e ? Results.Ok(e) : Results.NotFound());
+app.MapPost("/api/configuracoes-ia", async ([FromBody] ConfiguracaoIA entity, JT_Servicos.IA.ConfiguracaoIAService svc) => await svc.Save(entity) ? Results.Ok(entity) : Results.BadRequest());
+app.MapPut("/api/configuracoes-ia/{id:int}", async (int id, [FromBody] ConfiguracaoIA entity, JT_Servicos.IA.ConfiguracaoIAService svc) => await svc.Save(entity) ? Results.Ok(entity) : Results.BadRequest());
+
+// Hotkeys Config endpoints
+app.MapGet("/api/configuracoes-hotkeys", async (JT_Servicos.Comum.ConfiguracaoHotkeysService svc) => Results.Ok(await svc.GetAll()));
+app.MapGet("/api/configuracoes-hotkeys/ativa", async (JT_Servicos.Comum.ConfiguracaoHotkeysService svc) => Results.Ok(await svc.GetAtivaAsync()));
+app.MapGet("/api/configuracoes-hotkeys/{id:int}", async (int id, JT_Servicos.Comum.ConfiguracaoHotkeysService svc) => await svc.GetById(id) is { } e ? Results.Ok(e) : Results.NotFound());
+app.MapPost("/api/configuracoes-hotkeys", async ([FromBody] ConfiguracaoHotkeys entity, JT_Servicos.Comum.ConfiguracaoHotkeysService svc) => await svc.Save(entity) ? Results.Ok(entity) : Results.BadRequest());
+app.MapPut("/api/configuracoes-hotkeys/{id:int}", async (int id, [FromBody] ConfiguracaoHotkeys entity, JT_Servicos.Comum.ConfiguracaoHotkeysService svc) => await svc.Save(entity) ? Results.Ok(entity) : Results.BadRequest());
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()

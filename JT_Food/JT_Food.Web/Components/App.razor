@@ -25,6 +25,21 @@
 <body>
     <Routes @rendermode="InteractiveAuto" />
 
+    <script>
+        // Suprime ruídos de promessas rejeitadas de extensões do navegador (ex: Cuponomia, gerenciadores de senhas)
+        // que fecham portas de comunicação em background e emitem 'A listener indicated an asynchronous response...'
+        window.addEventListener('unhandledrejection', function (event) {
+            var msg = event && event.reason && (event.reason.message || event.reason.toString());
+            if (typeof msg === 'string' && (
+                msg.includes('message channel closed') ||
+                msg.includes('A listener indicated an asynchronous response') ||
+                msg.includes('cuponomia')
+            )) {
+                event.preventDefault();
+            }
+        });
+    </script>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     
